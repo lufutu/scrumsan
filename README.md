@@ -1,36 +1,156 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ScrumSan - Agile Project Management Tool
 
-## Getting Started
+ScrumSan is a modern, full-featured agile project management application inspired by VivifyScrum. It provides teams with powerful tools to manage projects, sprints, and tasks using Scrum and Kanban methodologies.
 
-First, run the development server:
+![ScrumSan Dashboard](/placeholder.svg?height=400&width=800&query=scrum%20board%20dashboard%20with%20kanban%20view)
 
-```bash
+## 🚀 Features
+
+- **Project Management**: Create and manage multiple projects
+- **Sprint Planning**: Plan and track sprints with start and end dates
+- **Task Management**: Create, assign, and track tasks with customizable statuses
+- **Kanban Boards**: Visualize workflow with customizable boards
+- **Team Collaboration**: Invite team members and assign roles
+- **Real-time Updates**: Collaborative editing with real-time updates
+- **File Attachments**: Upload and manage files for tasks
+- **Analytics**: Track project progress with burndown charts, velocity metrics, and more
+- **Time Tracking**: Log and monitor time spent on tasks
+- **Notifications**: Stay updated with in-app notifications
+
+## 🛠️ Tech Stack
+
+- **Frontend**: Next.js 15 (App Router), React, TypeScript, Tailwind CSS, shadcn/ui
+- **Backend**: Supabase (PostgreSQL, Authentication, Storage, Realtime)
+- **State Management**: React Context API, React Query
+- **Styling**: Tailwind CSS with custom theming
+- **Charts**: Chart.js for analytics visualizations
+- **Deployment**: Vercel
+
+## 📋 Prerequisites
+
+- Node.js 19.x or higher
+- npm or yarn
+- Supabase account
+
+## 🔧 Installation
+
+1. **Clone the repository**
+
+\`\`\`bash
+git clone https://github.com/yourusername/scrumsan.git
+cd scrumsan
+\`\`\`
+
+2. **Install dependencies**
+
+\`\`\`bash
+npm install
+# or
+yarn install
+\`\`\`
+
+3. **Set up environment variables**
+
+Create a `.env.local` file in the root directory with the following variables:
+
+\`\`\`
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+\`\`\`
+
+4. **Set up the database**
+
+Run the SQL initialization script in your Supabase SQL editor (found in `lib/supabase/init.sql`).
+
+5. **Run the development server**
+
+\`\`\`bash
 npm run dev
 # or
 yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+\`\`\`
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+6. **Open your browser**
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Navigate to [http://localhost:3000](http://localhost:3000) to see the application.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 📁 Project Structure
 
-## Learn More
+\`\`\`
+scrumsan/
+├── app/                    # Next.js App Router
+│   ├── (app)/              # Authenticated app routes
+│   │   ├── projects/       # Project-related pages
+│   │   ├── users/          # User management
+│   │   └── reports/        # Analytics and reports
+│   ├── login/              # Authentication pages
+│   ├── signup/
+│   └── ...
+├── components/             # React components
+│   ├── dashboard/          # Dashboard-specific components
+│   ├── providers/          # Context providers
+│   └── ui/                 # UI components (shadcn/ui)
+├── hooks/                  # Custom React hooks
+├── lib/                    # Utility functions and services
+│   ├── services/           # Business logic services
+│   └── supabase/           # Supabase-related code
+├── public/                 # Static assets
+└── ...
+\`\`\`
 
-To learn more about Next.js, take a look at the following resources:
+## 🗄️ Database Schema
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+The application uses a PostgreSQL database with the following main tables:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- **users**: User accounts and profiles
+- **organizations**: Organizations that group projects and users
+- **projects**: Project details and settings
+- **project_members**: User-project relationships with roles
+- **boards**: Kanban boards for projects
+- **board_columns**: Columns within boards (e.g., To Do, In Progress, Done)
+- **tasks**: Individual work items
+- **sprints**: Time-boxed iterations
+- **sprint_tasks**: Tasks assigned to sprints
+- **comments**: Comments on tasks
+- **attachments**: Files attached to tasks
+- **time_logs**: Time tracking records
 
-## Deploy on Vercel
+## 🔐 Authentication and Authorization
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+ScrumSan uses Supabase Authentication for user management and implements Row Level Security (RLS) policies to ensure data security. The application supports:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Email/password authentication
+- Role-based access control (Admin, Member, Viewer)
+- Organization-level permissions
+- Project-level permissions
+
+## 🚢 Deployment
+
+The application is optimized for deployment on Vercel:
+
+1. Connect your GitHub repository to Vercel
+2. Set up the environment variables
+3. Deploy with the default settings
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## 📄 License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## 🙏 Acknowledgements
+
+- [Next.js](https://nextjs.org/)
+- [Supabase](https://supabase.io/)
+- [Tailwind CSS](https://tailwindcss.com/)
+- [shadcn/ui](https://ui.shadcn.com/)
+- [Chart.js](https://www.chartjs.org/)
+- [Lucide Icons](https://lucide.dev/)
