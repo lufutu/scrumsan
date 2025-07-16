@@ -1,0 +1,359 @@
+"use client"
+
+import { useState, useEffect } from 'react'
+import { useSupabase } from '@/providers/supabase-provider'
+import { useOrganization } from '@/providers/organization-provider'
+import { ChevronRight, ChevronDown, Building2, FolderOpen, Kanban, Calendar, Plus } from 'lucide-react'
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
+import { cn } from '@/lib/utils'
+import {
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
+} from '@/components/ui/sidebar'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
+import BoardCreationWizard from '@/components/projects/board-creation-wizard-simple'
+import { Tables } from '@/types/database'
+
+type Project = Tables<'projects'> & {
+  boards?: Tables<'boards'>[]
+}
+
+type Board = Tables<'boards'> & {
+  board_type?: string | null
+}
+
+type Organization = Tables<'organizations'> & {
+  projects?: Project[]
+  boards?: Board[] // standalone boards
+}
+
+interface ExpandableNavProps {
+  className?: string
+}
+
+export function ExpandableNav({ className }: ExpandableNavProps) {
+  const { supabase } = useSupabase()
+  const { organizations, activeOrg } = useOrganization()
+  const pathname = usePathname()
+  const [expandedOrgs, setExpandedOrgs] = useState<Set<string>>(new Set())
+  const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set())
+  const [orgData, setOrgData] = useState<Organization[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    if (organizations.length > 0) {
+      fetchOrgData()
+    }
+  }, [organizations])
+
+  useEffect(() => {
+    // Auto-expand active organization
+    if (activeOrg?.id) {
+      setExpandedOrgs(prev => new Set([...prev, activeOrg.id]))
+    }
+    
+    // Auto-expand based on current route
+    if (pathname.startsWith('/boards/')) {
+      const boardId = pathname.split('/')[2]
+      if (boardId) {
+        // Find which organization and project this board belongs to
+        orgData.forEach(org => {
+          setExpandedOrgs(prev => new Set([...prev, org.id]))
+          
+          org.projects?.forEach(project => {
+            const projectHasBoard = project.boards?.some(board => board.id === boardId)
+            if (projectHasBoard) {
+              setExpandedProjects(prev => new Set([...prev, project.id]))
+            }
+          })
+        })
+      }
+    }
+  }, [activeOrg?.id, pathname, orgData])
+
+  const fetchOrgData = async () => {
+    try {
+      setIsLoading(true)
+      
+      const enrichedOrgs = await Promise.all(
+        organizations.map(async (org) => {
+          // Fetch projects with their boards
+          const { data: projects, error: projectsError } = await supabase
+            .from('projects')
+            .select(`
+              *,
+              boards (*)
+            `)
+            .eq('organization_id', org.id)
+            .order('created_at', { ascending: false })
+
+          if (projectsError) {
+            console.error('Error fetching projects:', projectsError)
+            return { ...org, projects: [], boards: [] }
+          }
+
+          // Fetch standalone boards (boards without project_id)
+          const { data: standaloneBoards, error: boardsError } = await supabase
+            .from('boards')
+            .select('*')
+            .eq('organization_id', org.id)
+            .is('project_id', null)
+            .order('created_at', { ascending: false })
+
+          if (boardsError) {
+            console.error('Error fetching standalone boards:', boardsError)
+            return { ...org, projects: projects || [], boards: [] }
+          }
+
+          return {
+            ...org,
+            projects: projects || [],
+            boards: standaloneBoards || []
+          }
+        })
+      )
+
+      setOrgData(enrichedOrgs)
+    } catch (err) {
+      console.error('Error fetching organization data:', err)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const toggleOrgExpansion = (orgId: string) => {
+    setExpandedOrgs(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(orgId)) {
+        newSet.delete(orgId)
+      } else {
+        newSet.add(orgId)
+      }
+      return newSet
+    })
+  }
+
+  const toggleProjectExpansion = (projectId: string) => {
+    setExpandedProjects(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(projectId)) {
+        newSet.delete(projectId)
+      } else {
+        newSet.add(projectId)
+      }
+      return newSet
+    })
+  }
+
+  const getBoardIcon = (boardType?: string | null) => {
+    return boardType === 'scrum' ? Calendar : Kanban
+  }
+
+  const getBoardTypeLabel = (boardType?: string | null) => {
+    return boardType === 'scrum' ? 'Scrum' : 'Kanban'
+  }
+
+  if (isLoading) {
+    return (
+      <SidebarGroup className={className}>
+        <SidebarGroupLabel>Workspace</SidebarGroupLabel>
+        <SidebarGroupContent>
+          <div className="space-y-2">
+            <div className="h-8 bg-muted rounded animate-pulse" />
+            <div className="h-8 bg-muted rounded animate-pulse" />
+            <div className="h-8 bg-muted rounded animate-pulse" />
+          </div>
+        </SidebarGroupContent>
+      </SidebarGroup>
+    )
+  }
+
+  return (
+    <SidebarGroup className={className}>
+      <SidebarGroupLabel>Workspace</SidebarGroupLabel>
+      <SidebarGroupContent>
+        <SidebarMenu>
+          {orgData.map((org) => {
+            const isExpanded = expandedOrgs.has(org.id)
+            const hasProjects = org.projects && org.projects.length > 0
+            const hasStandaloneBoards = org.boards && org.boards.length > 0
+            const hasContent = hasProjects || hasStandaloneBoards
+
+            return (
+              <Collapsible key={org.id} open={isExpanded} onOpenChange={() => toggleOrgExpansion(org.id)}>
+                <SidebarMenuItem>
+                  <CollapsibleTrigger asChild>
+                    <SidebarMenuButton
+                      className={cn(
+                        "w-full justify-between",
+                        activeOrg?.id === org.id && "bg-sidebar-accent text-sidebar-accent-foreground"
+                      )}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Building2 className="h-4 w-4" />
+                        <span className="truncate">{org.name}</span>
+                      </div>
+                      {hasContent && (
+                        isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />
+                      )}
+                    </SidebarMenuButton>
+                  </CollapsibleTrigger>
+
+                  <CollapsibleContent>
+                    <SidebarMenuSub>
+                      {/* Projects */}
+                      {org.projects?.map((project) => {
+                        const projectBoards = project.boards || []
+                        const hasBoards = projectBoards.length > 0
+                        const isProjectExpanded = expandedProjects.has(project.id)
+
+                        return (
+                          <div key={project.id}>
+                            {/* Project Details Link */}
+                            <SidebarMenuSubItem>
+                              <SidebarMenuSubButton
+                                asChild
+                                className={cn(
+                                  pathname === `/projects/${project.id}` && 
+                                  "bg-sidebar-accent text-sidebar-accent-foreground"
+                                )}
+                              >
+                                <Link href={`/projects/${project.id}`} className="flex items-center gap-2">
+                                  <FolderOpen className="h-4 w-4" />
+                                  <span className="truncate">{project.name}</span>
+                                </Link>
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
+
+                            {/* Project Boards (if any) */}
+                            {hasBoards && (
+                              <Collapsible 
+                                open={isProjectExpanded} 
+                                onOpenChange={() => toggleProjectExpansion(project.id)}
+                              >
+                                <SidebarMenuSubItem>
+                                  <CollapsibleTrigger asChild>
+                                    <SidebarMenuSubButton className="text-muted-foreground">
+                                      {isProjectExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                                      <span className="text-xs">Boards ({projectBoards.length})</span>
+                                    </SidebarMenuSubButton>
+                                  </CollapsibleTrigger>
+
+                                  <CollapsibleContent>
+                                    <SidebarMenuSub>
+                                      {projectBoards.map((board) => {
+                                        const BoardIcon = getBoardIcon(board.board_type)
+                                        const boardPath = `/boards/${board.id}`
+                                        
+                                        return (
+                                          <SidebarMenuSubItem key={board.id}>
+                                            <SidebarMenuSubButton
+                                              asChild
+                                              className={cn(
+                                                pathname === boardPath && 
+                                                "bg-sidebar-accent text-sidebar-accent-foreground"
+                                              )}
+                                            >
+                                              <Link href={boardPath} className="flex items-center gap-2">
+                                                <BoardIcon className="h-3 w-3" />
+                                                <span className="truncate">{board.name}</span>
+                                                <span className="text-xs text-muted-foreground ml-auto">
+                                                  {getBoardTypeLabel(board.board_type)}
+                                                </span>
+                                              </Link>
+                                            </SidebarMenuSubButton>
+                                          </SidebarMenuSubItem>
+                                        )
+                                      })}
+                                      
+                                      {/* Add Board to Project */}
+                                      <SidebarMenuSubItem>
+                                        <BoardCreationWizard 
+                                          projectId={project.id}
+                                          onSuccess={fetchOrgData}
+                                        >
+                                          <SidebarMenuSubButton className="text-muted-foreground hover:text-foreground">
+                                            <Plus className="h-3 w-3" />
+                                            <span>Add Board</span>
+                                          </SidebarMenuSubButton>
+                                        </BoardCreationWizard>
+                                      </SidebarMenuSubItem>
+                                    </SidebarMenuSub>
+                                  </CollapsibleContent>
+                                </SidebarMenuSubItem>
+                              </Collapsible>
+                            )}
+                          </div>
+                        )
+                      })}
+
+                      {/* Standalone Boards */}
+                      {org.boards?.map((board) => {
+                        const BoardIcon = getBoardIcon(board.board_type)
+                        const boardPath = `/boards/${board.id}`
+                        
+                        return (
+                          <SidebarMenuSubItem key={board.id}>
+                            <SidebarMenuSubButton
+                              asChild
+                              className={cn(
+                                pathname === boardPath && 
+                                "bg-sidebar-accent text-sidebar-accent-foreground"
+                              )}
+                            >
+                              <Link href={boardPath} className="flex items-center gap-2">
+                                <BoardIcon className="h-4 w-4" />
+                                <span className="truncate">{board.name}</span>
+                                <span className="text-xs text-muted-foreground ml-auto">
+                                  {getBoardTypeLabel(board.board_type)}
+                                </span>
+                              </Link>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        )
+                      })}
+
+                      {/* Add Project to Organization */}
+                      <SidebarMenuSubItem>
+                        <SidebarMenuSubButton 
+                          asChild 
+                          className="text-muted-foreground hover:text-foreground"
+                        >
+                          <Link href={`/organizations/${org.id}`}>
+                            <Plus className="h-4 w-4" />
+                            <span>Add Project</span>
+                          </Link>
+                        </SidebarMenuSubButton>
+                      </SidebarMenuSubItem>
+
+                      {/* Add Standalone Board */}
+                      <SidebarMenuSubItem>
+                        <BoardCreationWizard 
+                          organizationId={org.id}
+                          onSuccess={fetchOrgData}
+                        >
+                          <SidebarMenuSubButton className="text-muted-foreground hover:text-foreground">
+                            <Plus className="h-4 w-4" />
+                            <span>Add Board</span>
+                          </SidebarMenuSubButton>
+                        </BoardCreationWizard>
+                      </SidebarMenuSubItem>
+                    </SidebarMenuSub>
+                  </CollapsibleContent>
+                </SidebarMenuItem>
+              </Collapsible>
+            )
+          })}
+        </SidebarMenu>
+      </SidebarGroupContent>
+    </SidebarGroup>
+  )
+} 
