@@ -1,18 +1,24 @@
 "use client"
 
 import { useState } from 'react'
-import { useSupabase } from '@/providers/supabase-provider'
 import { useActiveOrg } from '@/hooks/useActiveOrg'
-import { useToast } from '@/hooks/use-toast'
+import { toast } from 'sonner'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Plus, Loader2 } from 'lucide-react'
-import { Tables } from '@/types/database'
 
-type Project = Tables<'projects'>
+interface Project {
+  id: string
+  name: string
+  description?: string
+  clientName?: string
+  clientEmail?: string
+  startDate?: string
+  endDate?: string
+}
 
 interface ProjectFormProps {
   project?: Project
@@ -20,86 +26,76 @@ interface ProjectFormProps {
 }
 
 export default function ProjectForm({ project, onSuccess }: ProjectFormProps) {
-  const { supabase, user } = useSupabase()
   const activeOrg = useActiveOrg()
-  const { toast } = useToast()
   const [open, setOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [formData, setFormData] = useState({
     name: project?.name || '',
-    description: project?.description || ''
+    description: project?.description || '',
+    clientName: project?.clientName || '',
+    clientEmail: project?.clientEmail || '',
+    startDate: project?.startDate || '',
+    endDate: project?.endDate || ''
   })
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (!user || !activeOrg) {
-      toast({
-        title: "Error",
-        description: "You must be logged in and have an active organization"
-      })
+    if (!activeOrg) {
+      toast.error("You must have an active organization")
       return
     }
 
     if (!formData.name.trim()) {
-      toast({
-        title: "Validation Error",
-        description: "Project name is required"
-      })
+      toast.error("Project name is required")
       return
     }
 
     setIsLoading(true)
 
     try {
-      if (project) {
-        // Update existing project
-        const { error } = await supabase
-          .from('projects')
-          .update({
-            name: formData.name.trim(),
-            description: formData.description.trim() || null
-          })
-          .eq('id', project.id)
+      const endpoint = project 
+        ? `/api/projects/${project.id}` 
+        : `/api/organizations/${activeOrg.id}/projects`
+      
+      const method = project ? 'PATCH' : 'POST'
+      
+      const response = await fetch(endpoint, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: formData.name.trim(),
+          description: formData.description.trim() || undefined,
+          clientName: formData.clientName.trim() || undefined,
+          clientEmail: formData.clientEmail.trim() || undefined,
+          startDate: formData.startDate || undefined,
+          endDate: formData.endDate || undefined
+        }),
+      })
 
-        if (error) throw error
-
-        toast({
-          title: "Success",
-          description: "Project updated successfully"
-        })
-      } else {
-        // Create new project
-        const { error } = await supabase
-          .from('projects')
-          .insert({
-            name: formData.name.trim(),
-            description: formData.description.trim() || null,
-            organization_id: activeOrg.id,
-            created_by: user.id
-          })
-
-        if (error) throw error
-
-        toast({
-          title: "Success", 
-          description: "Project created successfully"
-        })
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to save project')
       }
 
+      toast.success(project ? "Project updated successfully" : "Project created successfully")
+
       setOpen(false)
-      setFormData({ name: '', description: '' })
+      setFormData({ 
+        name: '', 
+        description: '', 
+        clientName: '', 
+        clientEmail: '', 
+        startDate: '', 
+        endDate: '' 
+      })
       onSuccess?.()
-      
-      // Refresh the page to show updated data
-      window.location.reload()
       
     } catch (err: any) {
       console.error('Error saving project:', err)
-      toast({
-        title: "Error",
-        description: err.message || "Failed to save project"
-      })
+      toast.error(err.message || "Failed to save project")
     } finally {
       setIsLoading(false)
     }
@@ -111,7 +107,11 @@ export default function ProjectForm({ project, onSuccess }: ProjectFormProps) {
       // Reset form when dialog closes
       setFormData({
         name: project?.name || '',
-        description: project?.description || ''
+        description: project?.description || '',
+        clientName: project?.clientName || '',
+        clientEmail: project?.clientEmail || '',
+        startDate: project?.startDate || '',
+        endDate: project?.endDate || ''
       })
     }
   }
@@ -165,6 +165,52 @@ export default function ProjectForm({ project, onSuccess }: ProjectFormProps) {
               onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
               disabled={isLoading}
               rows={3}
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="startDate">Start Date</Label>
+              <Input
+                id="startDate"
+                type="date"
+                value={formData.startDate}
+                onChange={(e) => setFormData(prev => ({ ...prev, startDate: e.target.value }))}
+                disabled={isLoading}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="endDate">End Date</Label>
+              <Input
+                id="endDate"
+                type="date"
+                value={formData.endDate}
+                onChange={(e) => setFormData(prev => ({ ...prev, endDate: e.target.value }))}
+                disabled={isLoading}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="clientName">Client Name</Label>
+            <Input
+              id="clientName"
+              placeholder="Enter client name (optional)"
+              value={formData.clientName}
+              onChange={(e) => setFormData(prev => ({ ...prev, clientName: e.target.value }))}
+              disabled={isLoading}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="clientEmail">Client Email</Label>
+            <Input
+              id="clientEmail"
+              type="email"
+              placeholder="Enter client email (optional)"
+              value={formData.clientEmail}
+              onChange={(e) => setFormData(prev => ({ ...prev, clientEmail: e.target.value }))}
+              disabled={isLoading}
             />
           </div>
 

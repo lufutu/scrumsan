@@ -1,137 +1,99 @@
 "use client"
 
-import { useEffect, useState } from 'react'
-import { useSupabase } from '@/providers/supabase-provider'
+import { useState } from 'react'
 import { useToast } from '@/hooks/use-toast'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import { Label } from '@/components/ui/label'
-import { Plus, MoreHorizontal, Trash2, Edit, Loader2, GripVertical } from 'lucide-react'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import TaskCard from '@/components/tasks/task-card'
-import TaskForm from '@/components/tasks/task-form'
-import ProjectScrumBoard from '@/components/projects/project-scrum-board'
-import { Tables } from '@/types/database'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { GripVertical, Plus } from 'lucide-react'
+import { TaskCardModern } from '@/components/scrum/TaskCardModern'
+import TaskCreationDialog from '@/components/common/TaskCreationDialog'
+import { ComprehensiveInlineForm } from '@/components/scrum/ComprehensiveInlineForm'
+import { useUsers } from '@/hooks/useUsers'
+import { useLabels } from '@/hooks/useLabels'
 
-type Board = Tables<'boards'> & {
-  board_type?: string | null
-  board_columns: Array<Tables<'board_columns'> & {
-    tasks: Array<Tables<'tasks'> & {
+type Board = {
+  id: string
+  name: string
+  boardType: string | null
+  organizationId: string
+  description: string | null
+  color: string | null
+  createdAt: string
+  organization?: {
+    id: string
+    name: string
+  } | null
+  projectLinks?: Array<{
+    id: string
+    project: {
+      id: string
+      name: string
+    }
+  }>
+  columns?: Array<{
+    id: string
+    name: string
+    position: number
+    tasks: Array<{
+      id: string
+      title: string
+      description: string | null
+      status: string | null
+      taskType: string | null
+      priority: string | null
+      storyPoints: number | null
+      assigneeId: string | null
+      createdAt: string
       assignee?: {
         id: string
-        full_name: string | null
-        avatar_url: string | null
+        fullName: string | null
+        avatarUrl: string | null
       } | null
     }>
   }>
+  _count?: {
+    tasks: number
+    sprints: number
+  }
 }
 
-type BoardColumn = Tables<'board_columns'> & {
-  tasks: Array<Tables<'tasks'> & {
+type BoardColumn = {
+  id: string
+  name: string
+  position: number
+  tasks: Array<{
+    id: string
+    title: string
+    description: string | null
+    status: string | null
+    taskType: string | null
+    priority: string | null
+    storyPoints: number | null
+    assigneeId: string | null
+    createdAt: string
     assignee?: {
       id: string
-      full_name: string | null
-      avatar_url: string | null
+      fullName: string | null
+      avatarUrl: string | null
     } | null
   }>
 }
 
 interface StandaloneBoardViewProps {
-  boardId: string
-  board: any
+  board: Board
   onUpdate: () => void
 }
 
-export default function StandaloneBoardView({ boardId, board: initialBoard, onUpdate }: StandaloneBoardViewProps) {
-  const { supabase } = useSupabase()
+export default function StandaloneBoardView({ board, onUpdate }: StandaloneBoardViewProps) {
   const { toast } = useToast()
-  const [board, setBoard] = useState<Board | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
   const [draggedTask, setDraggedTask] = useState<string | null>(null)
-  const [draggedColumn, setDraggedColumn] = useState<string | null>(null)
   const [draggedOver, setDraggedOver] = useState<string | null>(null)
-  const [draggedOverColumn, setDraggedOverColumn] = useState<string | null>(null)
-  const [showNewColumnDialog, setShowNewColumnDialog] = useState(false)
-  const [newColumnName, setNewColumnName] = useState('')
-  const [isCreatingColumn, setIsCreatingColumn] = useState(false)
+  const [showInlineForm, setShowInlineForm] = useState<{[key: string]: boolean}>({})
+  const { users } = useUsers({ organizationId: board.organizationId })
+  const { labels } = useLabels(board.id)
 
-  useEffect(() => {
-    fetchBoardData()
-  }, [boardId])
-
-  const fetchBoardData = async () => {
-    try {
-      setIsLoading(true)
-      
-      const { data: boardData, error: boardError } = await supabase
-        .from('boards')
-        .select(`
-          *,
-          board_columns (
-            *,
-            tasks (
-              *,
-              assignee:users!assignee_id (
-                id,
-                full_name,
-                avatar_url
-              )
-            )
-          )
-        `)
-        .eq('id', boardId)
-        .single()
-
-      if (boardError) throw boardError
-
-      if (boardData) {
-        // Sort columns by position and tasks by created_at
-        boardData.board_columns.sort((a, b) => a.position - b.position)
-        boardData.board_columns.forEach(column => {
-          column.tasks.sort((a, b) => new Date(a.created_at || '').getTime() - new Date(b.created_at || '').getTime())
-        })
-        setBoard(boardData)
-      }
-    } catch (err: any) {
-      console.error('Error fetching board:', err)
-      toast({
-        title: "Error",
-        description: "Failed to load board data"
-      })
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  // If it's a scrum board, but this is standalone, show a message explaining that scrum features need a project
-  if (board?.board_type === 'scrum') {
-    return (
-      <div className="h-full">
-        <div className="mb-6">
-          <h2 className="text-2xl font-bold">{board.name}</h2>
-          <p className="text-muted-foreground">Standalone Scrum board</p>
-        </div>
-        
-        <Card className="p-8 text-center">
-          <div className="max-w-md mx-auto">
-            <h3 className="text-lg font-semibold mb-2">Scrum Features Not Available</h3>
-            <p className="text-muted-foreground mb-4">
-              Sprint management and scrum features are only available for boards within projects. 
-              This is a standalone board that works as a Kanban board.
-            </p>
-            <p className="text-sm text-muted-foreground mb-4">
-              To use scrum features like sprints, create this board within a project instead.
-            </p>
-            <Button onClick={() => window.location.reload()}>
-              Continue as Kanban Board
-            </Button>
-          </div>
-        </Card>
-      </div>
-    )
-  }
+  // Scrum boards are now supported as standalone boards
 
   // Kanban board implementation (similar to project board but for standalone)
   const handleTaskDragStart = (e: React.DragEvent, taskId: string) => {
@@ -160,13 +122,13 @@ export default function StandaloneBoardView({ boardId, board: initialBoard, onUp
     e.stopPropagation()
     setDraggedOver(null)
 
-    if (!draggedTask || !board) return
+    if (!draggedTask || !board?.columns) return
 
     try {
       let sourceColumn: BoardColumn | null = null
-      let task: any = null
+      let task: BoardColumn['tasks'][0] | null = null
 
-      for (const column of board.board_columns) {
+      for (const column of board.columns) {
         const foundTask = column.tasks.find(t => t.id === draggedTask)
         if (foundTask) {
           sourceColumn = column
@@ -180,7 +142,7 @@ export default function StandaloneBoardView({ boardId, board: initialBoard, onUp
         return
       }
 
-      const targetColumn = board.board_columns.find(col => col.id === targetColumnId)
+      const targetColumn = board.columns.find(col => col.id === targetColumnId)
       if (!targetColumn) return
 
       const getStatusFromColumn = (columnName: string) => {
@@ -192,44 +154,26 @@ export default function StandaloneBoardView({ boardId, board: initialBoard, onUp
 
       const newStatus = getStatusFromColumn(targetColumn.name)
 
-      const { error } = await supabase
-        .from('tasks')
-        .update({ 
-          column_id: targetColumnId,
+      // Update task via API
+      const response = await fetch(`/api/tasks/${draggedTask}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          columnId: targetColumnId,
           status: newStatus
-        })
-        .eq('id', draggedTask)
-
-      if (error) throw error
-
-      setBoard(prev => {
-        if (!prev) return prev
-        
-        const newBoard = { ...prev }
-        newBoard.board_columns = newBoard.board_columns.map(column => {
-          if (column.id === sourceColumn!.id) {
-            return {
-              ...column,
-              tasks: column.tasks.filter(t => t.id !== draggedTask)
-            }
-          }
-          if (column.id === targetColumnId) {
-            return {
-              ...column,
-              tasks: [...column.tasks, { ...task, column_id: targetColumnId, status: newStatus }]
-            }
-          }
-          return column
-        })
-        
-        return newBoard
+        }),
       })
+
+      if (!response.ok) throw new Error('Failed to update task')
+
+      // Refresh board data
+      onUpdate()
 
       toast({
         title: "Success",
         description: "Task moved successfully"
       })
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error moving task:', err)
       toast({
         title: "Error",
@@ -240,48 +184,186 @@ export default function StandaloneBoardView({ boardId, board: initialBoard, onUp
     setDraggedTask(null)
   }
 
-  if (isLoading) {
-    return (
-      <div className="h-96 flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
-          <p className="text-muted-foreground">Loading board...</p>
-        </div>
-      </div>
-    )
-  }
 
-  if (!board) {
+  if (!board?.columns) {
     return (
       <Card>
         <CardContent className="p-6 text-center">
-          <div className="text-destructive">Failed to load board</div>
+          <div className="text-destructive">Board has no columns</div>
         </CardContent>
       </Card>
     )
   }
 
+  // For scrum boards, use the ProjectScrumBoard component
+  if (board.boardType === 'scrum' && board.columns) {
+    return (
+      <div className="h-full">
+        <div className="mb-6">
+          <h2 className="text-2xl font-bold">{board.name}</h2>
+          <p className="text-muted-foreground">Standalone Scrum board</p>
+        </div>
+        
+        {/* Import and use ProjectScrumBoard but pass organizationId instead of projectId */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 h-full min-h-96">
+          {board.columns.map((column) => (
+            <div key={column.id} className="flex flex-col">
+              <Card className={`flex-1 transition-all ${
+                draggedOver === column.id ? 'ring-2 ring-blue-500' : ''
+              }`}>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
+                      <CardTitle className="text-lg font-semibold">
+                        {column.name} ({column.tasks.length})
+                      </CardTitle>
+                    </div>
+                  </div>
+                </CardHeader>
+                
+                <CardContent 
+                  className="flex-1 space-y-3 min-h-64"
+                  onDragOver={(e) => handleTaskDragOver(e, column.id)}
+                  onDragLeave={handleTaskDragLeave}
+                  onDrop={(e) => handleTaskDrop(e, column.id)}
+                >
+                  {column.tasks.length === 0 ? (
+                    <div className="text-center text-muted-foreground text-sm py-8">
+                      No tasks in this column
+                    </div>
+                  ) : (
+                    <>
+                      {column.tasks.map((task) => (
+                        <div
+                          key={task.id}
+                          draggable
+                          onDragStart={(e) => handleTaskDragStart(e, task.id)}
+                          className="cursor-move"
+                        >
+                          <TaskCardModern
+                            id={task.id}
+                            title={task.title}
+                            description={task.description}
+                            taskType={task.taskType as 'story' | 'bug' | 'task' | 'epic' | 'improvement' | 'idea' | 'note' || 'task'}
+                            storyPoints={task.storyPoints || 0}
+                            assignee={task.assignee ? {
+                              name: task.assignee.fullName || '',
+                              initials: task.assignee.fullName?.split(' ').map(n => n[0]).join('') || '',
+                              avatar: task.assignee.avatarUrl
+                            } : undefined}
+                            status={task.status === 'todo' ? 'todo' : task.status === 'done' ? 'done' : 'in_progress'}
+                          />
+                        </div>
+                      ))}
+                      
+                      {!showInlineForm[column.id] && (
+                        <button
+                          onClick={() => setShowInlineForm(prev => ({ ...prev, [column.id]: true }))}
+                          className="w-full p-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-500 hover:border-gray-400 hover:text-gray-600 transition-colors text-left mt-3"
+                        >
+                          <div className="flex items-center gap-2">
+                            <Plus className="h-4 w-4" />
+                            <span className="text-sm">Add item...</span>
+                          </div>
+                        </button>
+                      )}
+                      
+                      {showInlineForm[column.id] && (
+                        <div className="mt-3">
+                          <ComprehensiveInlineForm
+                            onAdd={async (data) => {
+                              try {
+                                const response = await fetch('/api/tasks', {
+                                  method: 'POST',
+                                  headers: {
+                                    'Content-Type': 'application/json',
+                                  },
+                                  body: JSON.stringify({
+                                    title: data.title,
+                                    boardId: board.id,
+                                    columnId: column.id,
+                                    taskType: data.taskType,
+                                    assigneeId: data.assigneeId,
+                                    labels: data.labels || [],
+                                    priority: data.priority,
+                                    storyPoints: data.storyPoints,
+                                    status: 'todo'
+                                  })
+                                });
+                                
+                                if (!response.ok) {
+                                  const error = await response.json();
+                                  throw new Error(error.message || 'Failed to create task');
+                                }
+                                
+                                onUpdate();
+                                setShowInlineForm(prev => ({ ...prev, [column.id]: false }));
+                                toast({
+                                  title: "Success",
+                                  description: "Task created successfully"
+                                });
+                              } catch (err: any) {
+                                console.error('Error creating task:', err)
+                                toast({
+                                  title: "Error",
+                                  description: "Failed to create task"
+                                })
+                              }
+                            }}
+                            onCancel={() => setShowInlineForm(prev => ({ ...prev, [column.id]: false }))}
+                            placeholder="What needs to be done?"
+                            users={users.map(u => ({
+                              id: u.id,
+                              name: u.fullName || 'Unknown',
+                              initials: u.fullName?.split(' ').map(n => n[0]).join('').toUpperCase() || 'U',
+                              avatar: u.avatarUrl
+                            }))}
+                            labels={labels.map(l => ({
+                              id: l.id,
+                              name: l.name,
+                              color: l.color || '#6B7280'
+                            }))}
+                          />
+                        </div>
+                      )}
+                      
+                      {column.tasks.length === 0 && (
+                        <div className="text-center text-muted-foreground text-sm py-8">
+                          No tasks in this column
+                        </div>
+                      )}
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          ))}
+        </div>
+        
+        {/* Footer removed - using inline add in columns */}
+      </div>
+    )
+  }
+
+  // Kanban board implementation
   return (
     <div className="h-full">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="text-2xl font-bold">{board.name}</h2>
           <p className="text-muted-foreground">
-            Standalone {board.board_type === 'scrum' ? 'Scrum' : 'Kanban'} board
+            Standalone {board.boardType === 'scrum' ? 'Scrum' : 'Kanban'} board
           </p>
         </div>
         
         <div className="flex gap-2">
-          <TaskForm 
-            projectId={undefined} 
-            organizationId={board.organization_id || undefined} 
-            onSuccess={() => { fetchBoardData(); onUpdate(); }} 
-          />
+          {/* Add buttons removed - using inline add in columns */}
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 h-full min-h-96">
-        {board.board_columns.map((column) => (
+        {board.columns?.map((column) => (
           <div key={column.id} className="flex flex-col">
             <Card className={`flex-1 transition-all ${
               draggedOver === column.id ? 'ring-2 ring-blue-500' : ''
@@ -303,27 +385,105 @@ export default function StandaloneBoardView({ boardId, board: initialBoard, onUp
                 onDragLeave={handleTaskDragLeave}
                 onDrop={(e) => handleTaskDrop(e, column.id)}
               >
-                {column.tasks.length === 0 ? (
+                {column.tasks.map((task) => (
+                  <div
+                    key={task.id}
+                    draggable
+                    onDragStart={(e) => handleTaskDragStart(e, task.id)}
+                    className="cursor-move"
+                  >
+                    <TaskCardModern
+                      id={task.id}
+                      title={task.title}
+                      description={task.description}
+                      taskType={task.taskType as 'story' | 'bug' | 'task' | 'epic' | 'improvement' | 'idea' | 'note' || 'task'}
+                      storyPoints={task.storyPoints || 0}
+                      assignee={task.assignee ? {
+                        name: task.assignee.fullName || '',
+                        initials: task.assignee.fullName?.split(' ').map(n => n[0]).join('') || '',
+                        avatar: task.assignee.avatarUrl
+                      } : undefined}
+                      status={task.status === 'todo' ? 'todo' : task.status === 'done' ? 'done' : 'in_progress'}
+                    />
+                  </div>
+                ))}
+                
+                {!showInlineForm[column.id] && (
+                  <button
+                    onClick={() => setShowInlineForm(prev => ({ ...prev, [column.id]: true }))}
+                    className="w-full p-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-500 hover:border-gray-400 hover:text-gray-600 transition-colors text-left mt-3"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Plus className="h-4 w-4" />
+                      <span className="text-sm">Add item...</span>
+                    </div>
+                  </button>
+                )}
+                
+                {showInlineForm[column.id] && (
+                  <div className="mt-3">
+                    <ComprehensiveInlineForm
+                      onAdd={async (data) => {
+                        try {
+                          const response = await fetch('/api/tasks', {
+                            method: 'POST',
+                            headers: {
+                              'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                              title: data.title,
+                              projectId: board.projectId,
+                              boardId: board.id,
+                              columnId: column.id,
+                              taskType: data.taskType,
+                              assigneeId: data.assigneeId,
+                              labels: data.labels || [],
+                              priority: data.priority,
+                              storyPoints: data.storyPoints,
+                              status: 'todo'
+                            })
+                          });
+                          
+                          if (!response.ok) {
+                            const error = await response.json();
+                            throw new Error(error.message || 'Failed to create task');
+                          }
+                          
+                          onUpdate();
+                          setShowInlineForm(prev => ({ ...prev, [column.id]: false }));
+                          toast({
+                            title: "Success",
+                            description: "Task created successfully"
+                          });
+                        } catch (err: any) {
+                          console.error('Error creating task:', err)
+                          toast({
+                            title: "Error",
+                            description: "Failed to create task"
+                          })
+                        }
+                      }}
+                      onCancel={() => setShowInlineForm(prev => ({ ...prev, [column.id]: false }))}
+                      placeholder="What needs to be done?"
+                      users={users.map(u => ({
+                        id: u.id,
+                        name: u.fullName || 'Unknown',
+                        initials: u.fullName?.split(' ').map(n => n[0]).join('').toUpperCase() || 'U',
+                        avatar: u.avatarUrl
+                      }))}
+                      labels={labels.map(l => ({
+                        id: l.id,
+                        name: l.name,
+                        color: l.color || '#6B7280'
+                      }))}
+                    />
+                  </div>
+                )}
+                
+                {column.tasks.length === 0 && (
                   <div className="text-center text-muted-foreground text-sm py-8">
                     No tasks in this column
                   </div>
-                ) : (
-                  column.tasks.map((task) => (
-                    <div
-                      key={task.id}
-                      draggable
-                      onDragStart={(e) => handleTaskDragStart(e, task.id)}
-                      className="cursor-move"
-                    >
-                      <TaskCard
-                        task={task}
-                        projectId={undefined}
-                        organizationId={board.organization_id || undefined}
-                        onUpdate={() => { fetchBoardData(); onUpdate(); }}
-                        className="hover:shadow-lg transition-all"
-                      />
-                    </div>
-                  ))
                 )}
               </CardContent>
             </Card>

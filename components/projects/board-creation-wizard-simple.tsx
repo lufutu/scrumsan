@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from 'react'
-import { useSupabase } from '@/providers/supabase-provider'
 import { useToast } from '@/hooks/use-toast'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -11,9 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Plus, Kanban, Calendar, Loader2 } from 'lucide-react'
 
 interface BoardCreationWizardProps {
-  projectId?: string
-  organizationId?: string
-  onSuccess?: () => void
+  organizationId: string
+  onSuccess?: (newBoard?: { id?: string }) => void
   children?: React.ReactNode
 }
 
@@ -24,8 +22,7 @@ interface WizardData {
   type: BoardType
 }
 
-export default function BoardCreationWizard({ projectId, organizationId, onSuccess, children }: BoardCreationWizardProps) {
-  const { supabase } = useSupabase()
+export default function BoardCreationWizard({ organizationId, onSuccess, children }: BoardCreationWizardProps) {
   const { toast } = useToast()
   const [isOpen, setIsOpen] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
@@ -33,8 +30,6 @@ export default function BoardCreationWizard({ projectId, organizationId, onSucce
     name: '',
     type: 'kanban'
   })
-
-  const isStandalone = !projectId && organizationId
 
   const handleCreateBoard = async () => {
     if (!wizardData.name.trim()) {
@@ -45,64 +40,29 @@ export default function BoardCreationWizard({ projectId, organizationId, onSucce
       return
     }
 
-    if (!projectId && !organizationId) {
-      toast({
-        title: "Error",
-        description: "Either project ID or organization ID must be provided"
-      })
-      return
-    }
-
     setIsCreating(true)
 
     try {
-      // Create the board
-      const boardData: any = {
+      const boardData = {
         name: wizardData.name.trim(),
-        board_type: wizardData.type
+        boardType: wizardData.type,
+        organizationId: organizationId
       }
 
-      if (projectId) {
-        boardData.project_id = projectId
-      } else if (organizationId) {
-        boardData.organization_id = organizationId
+      const response = await fetch('/api/boards', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(boardData),
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to create board')
       }
 
-      const { data: newBoard, error: boardError } = await supabase
-        .from('boards')
-        .insert(boardData)
-        .select()
-        .single()
-
-      if (boardError) throw boardError
-
-      // Create default columns based on board type
-      let defaultColumns
-      if (wizardData.type === 'kanban') {
-        defaultColumns = [
-          { name: 'To Do', position: 0 },
-          { name: 'In Progress', position: 1 },
-          { name: 'Done', position: 2 }
-        ]
-      } else {
-        // Scrum board columns
-        defaultColumns = [
-          { name: 'Product Backlog', position: 0 },
-          { name: 'Sprint Backlog', position: 1 },
-          { name: 'In Progress', position: 2 },
-          { name: 'Testing', position: 3 },
-          { name: 'Done', position: 4 }
-        ]
-      }
-
-      const { error: columnsError } = await supabase
-        .from('board_columns')
-        .insert(defaultColumns.map(col => ({
-          ...col,
-          board_id: newBoard.id
-        })))
-
-      if (columnsError) throw columnsError
+      const newBoard = await response.json()
 
       toast({
         title: "Success",
@@ -116,7 +76,7 @@ export default function BoardCreationWizard({ projectId, organizationId, onSucce
         type: 'kanban'
       })
 
-      onSuccess?.()
+      onSuccess?.(newBoard)
 
     } catch (err: any) {
       console.error('Error creating board:', err)
@@ -142,7 +102,7 @@ export default function BoardCreationWizard({ projectId, organizationId, onSucce
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>
-            Create New {isStandalone ? 'Standalone ' : ''}Board
+            Create New Board
           </DialogTitle>
         </DialogHeader>
 
@@ -192,14 +152,13 @@ export default function BoardCreationWizard({ projectId, organizationId, onSucce
           <div className="p-4 bg-muted/50 rounded-lg">
             <div className="text-sm font-medium mb-2">
               {wizardData.type === 'kanban' ? 'Kanban Board' : 'Scrum Board'}
-              {isStandalone && ' (Standalone)'}
             </div>
             <p className="text-sm text-muted-foreground">
               {wizardData.type === 'kanban' 
                 ? "A simple one-page board with manageable lists of items. Perfect for continuous workflow management."
                 : "A board with Product Backlog, Sprints, and analytics. Ideal for agile development teams using Scrum methodology."
               }
-              {isStandalone && " This board will be independent of any specific project."}
+              {" This board can be linked to projects later for team coordination."}
             </p>
           </div>
 

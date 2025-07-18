@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Search, Filter, Calendar, User, AlertCircle, CheckCircle2, Clock, Play } from 'lucide-react'
-import TaskForm from '@/components/tasks/task-form'
+import TaskCreationDialog from '@/components/common/TaskCreationDialog'
 import { Tables } from '@/types/database'
 
 type Task = Tables<'tasks'> & {
@@ -183,7 +183,7 @@ export default function TaskList({ projectId }: TaskListProps) {
               Manage and track tasks for this project
             </CardDescription>
           </div>
-          <TaskForm projectId={projectId} onSuccess={fetchTasks} />
+          <TaskCreationDialog projectId={projectId} onSuccess={fetchTasks} />
         </div>
       </CardHeader>
       

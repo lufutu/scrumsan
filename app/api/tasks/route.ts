@@ -1,0 +1,357 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
+import { prisma } from '@/lib/prisma'
+import { getCurrentUser } from '@/lib/auth-utils'
+// Real-time updates are handled automatically by Supabase
+import { z } from 'zod'
+
+const taskSchema = z.object({
+  title: z.string().min(1),
+  description: z.string().optional(),
+  status: z.string().optional(),
+  taskType: z.string().optional(),
+  priority: z.string().optional(),
+  storyPoints: z.number().optional(),
+  effortUnits: z.number().optional(),
+  estimationType: z.enum(['story_points', 'effort_units']).optional(),
+  itemValue: z.string().optional(),
+  estimatedHours: z.number().optional(),
+  labels: z.array(z.object({
+    id: z.string(),
+    name: z.string(),
+    color: z.string()
+  })).optional(),
+  assignees: z.array(z.object({
+    id: z.string()
+  })).optional(),
+  reviewers: z.array(z.object({
+    id: z.string()
+  })).optional(),
+  customFieldValues: z.array(z.object({
+    customFieldId: z.string(),
+    value: z.string()
+  })).optional(),
+  boardId: z.string().uuid().optional(),
+  columnId: z.string().uuid().optional(),
+  assigneeId: z.string().uuid().optional(),
+  epicId: z.string().uuid().optional(),
+  dueDate: z.string().optional(),
+  position: z.number().optional(),
+})
+
+export async function GET(req: NextRequest) {
+  try {
+    const supabase = await createClient()
+    const user = await getCurrentUser(supabase)
+    
+    const url = new URL(req.url)
+    const boardId = url.searchParams.get('boardId')
+    const assigneeId = url.searchParams.get('assigneeId')
+    const status = url.searchParams.get('status')
+    
+    const whereClause: any = {}
+    
+    // Filter by board if provided
+    if (boardId) {
+      whereClause.boardId = boardId
+    }
+    
+    // Filter by assignee if provided
+    if (assigneeId) {
+      whereClause.assigneeId = assigneeId
+    }
+    
+    // Filter by status if provided
+    if (status) {
+      whereClause.status = status
+    }
+    
+    // Add user access check - user must be member of organization
+    if (boardId) {
+      // Check board access
+      const board = await prisma.board.findUnique({
+        where: { id: boardId },
+        select: {
+          organizationId: true
+        }
+      })
+      
+      if (!board) {
+        return NextResponse.json(
+          { error: 'Board not found' },
+          { status: 404 }
+        )
+      }
+      
+      const orgMember = await prisma.organizationMember.findFirst({
+        where: {
+          organizationId: board.organizationId,
+          userId: user.id
+        }
+      })
+      
+      if (!orgMember) {
+        return NextResponse.json(
+          { error: 'Unauthorized' },
+          { status: 403 }
+        )
+      }
+    }
+    
+    const tasks = await prisma.task.findMany({
+      where: whereClause,
+      include: {
+        assignee: {
+          select: {
+            id: true,
+            fullName: true,
+            avatarUrl: true
+          }
+        },
+        creator: {
+          select: {
+            id: true,
+            fullName: true,
+            avatarUrl: true
+          }
+        },
+        board: {
+          select: {
+            id: true,
+            name: true
+          }
+        },
+        column: {
+          select: {
+            id: true,
+            name: true
+          }
+        },
+        epic: {
+          select: {
+            id: true,
+            title: true
+          }
+        },
+        subtasks: {
+          select: {
+            id: true,
+            title: true
+          }
+        },
+        _count: {
+          select: {
+            comments: true,
+            attachments: true,
+            subtasks: true
+          }
+        }
+      },
+      orderBy: [
+        { position: 'asc' },
+        { createdAt: 'desc' }
+      ]
+    })
+    
+    return NextResponse.json(tasks)
+  } catch (error: any) {
+    console.error('Error fetching tasks:', error)
+    return NextResponse.json(
+      { error: error.message || 'Failed to fetch tasks' },
+      { status: 500 }
+    )
+  }
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const supabase = await createClient()
+    const body = await req.json()
+    
+    // Validate input
+    const validatedData = taskSchema.parse(body)
+    
+    // Get current user
+    const user = await getCurrentUser(supabase)
+    
+    // Check user access based on board/project
+    if (validatedData.boardId) {
+      const board = await prisma.board.findUnique({
+        where: { id: validatedData.boardId },
+        select: {
+          organizationId: true
+        }
+      })
+      
+      if (!board) {
+        return NextResponse.json(
+          { error: 'Board not found' },
+          { status: 404 }
+        )
+      }
+      
+      const orgMember = await prisma.organizationMember.findFirst({
+        where: {
+          organizationId: board.organizationId,
+          userId: user.id
+        }
+      })
+      
+      if (!orgMember) {
+        return NextResponse.json(
+          { error: 'Unauthorized' },
+          { status: 403 }
+        )
+      }
+    }
+    
+    // Create task
+    const task = await prisma.task.create({
+      data: {
+        title: validatedData.title,
+        description: validatedData.description,
+        status: validatedData.status,
+        taskType: validatedData.taskType || 'story',
+        priority: validatedData.priority,
+        storyPoints: validatedData.storyPoints,
+        effortUnits: validatedData.effortUnits,
+        estimationType: validatedData.estimationType || 'story_points',
+        itemValue: validatedData.itemValue,
+        estimatedHours: validatedData.estimatedHours || 0,
+        labels: validatedData.labels?.map(l => l.name) || [],
+        boardId: validatedData.boardId,
+        columnId: validatedData.columnId,
+        // Use first assignee as primary assignee for backward compatibility
+        assigneeId: validatedData.assignees?.[0]?.id || validatedData.assigneeId,
+        epicId: validatedData.epicId,
+        dueDate: validatedData.dueDate ? new Date(validatedData.dueDate) : null,
+        position: validatedData.position,
+        createdBy: user.id
+      },
+      include: {
+        assignee: {
+          select: {
+            id: true,
+            fullName: true,
+            avatarUrl: true
+          }
+        },
+        creator: {
+          select: {
+            id: true,
+            fullName: true,
+            avatarUrl: true
+          }
+        },
+        board: {
+          select: {
+            id: true,
+            name: true
+          }
+        },
+        column: {
+          select: {
+            id: true,
+            name: true
+          }
+        },
+        epic: {
+          select: {
+            id: true,
+            title: true
+          }
+        },
+        _count: {
+          select: {
+            comments: true,
+            attachments: true,
+            subtasks: true
+          }
+        }
+      }
+    })
+
+    // Handle multiple assignees
+    if (validatedData.assignees && validatedData.assignees.length > 0) {
+      await prisma.taskAssignee.createMany({
+        data: validatedData.assignees.map(assignee => ({
+          taskId: task.id,
+          userId: assignee.id
+        })),
+        skipDuplicates: true
+      })
+    }
+
+    // Handle multiple reviewers
+    if (validatedData.reviewers && validatedData.reviewers.length > 0) {
+      await prisma.taskReviewer.createMany({
+        data: validatedData.reviewers.map(reviewer => ({
+          taskId: task.id,
+          userId: reviewer.id
+        })),
+        skipDuplicates: true
+      })
+    }
+
+    // Handle labels (create TaskLabel relationships)
+    if (validatedData.labels && validatedData.labels.length > 0) {
+      // Find or create labels
+      for (const labelData of validatedData.labels) {
+        // Check if label exists
+        let label = await prisma.label.findFirst({
+          where: {
+            boardId: validatedData.boardId!,
+            name: labelData.name
+          }
+        })
+
+        // Create label if it doesn't exist
+        if (!label) {
+          label = await prisma.label.create({
+            data: {
+              boardId: validatedData.boardId!,
+              name: labelData.name,
+              color: labelData.color
+            }
+          })
+        }
+
+        // Create TaskLabel relationship
+        await prisma.taskLabel.create({
+          data: {
+            taskId: task.id,
+            labelId: label.id
+          }
+        })
+      }
+    }
+
+    // Handle custom field values
+    if (validatedData.customFieldValues && validatedData.customFieldValues.length > 0) {
+      await prisma.taskCustomFieldValue.createMany({
+        data: validatedData.customFieldValues.map(fieldValue => ({
+          taskId: task.id,
+          customFieldId: fieldValue.customFieldId,
+          value: fieldValue.value
+        })),
+        skipDuplicates: true
+      })
+    }
+
+    // Real-time updates are automatically handled by Supabase when data changes
+
+    return NextResponse.json(task)
+  } catch (error: any) {
+    console.error('Error creating task:', error)
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: 'Validation error', details: error.errors },
+        { status: 400 }
+      )
+    }
+    return NextResponse.json(
+      { error: error.message || 'Failed to create task' },
+      { status: 500 }
+    )
+  }
+}

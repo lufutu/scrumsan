@@ -277,8 +277,8 @@ export default function SprintForm({ projectId, sprint, onSuccess }: SprintFormP
     try {
       setIsLoading(true)
 
-      let newStatus = action === 'start' ? 'active' : 'completed'
-      let updateData: any = { status: newStatus }
+      const newStatus = action === 'start' ? 'active' : 'completed'
+      const updateData: any = { status: newStatus }
 
       if (action === 'complete') {
         // Calculate completed points

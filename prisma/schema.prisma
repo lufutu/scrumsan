@@ -1,0 +1,439 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User profiles (extends Supabase auth.users)
+model User {
+  id                String    @id @db.Uuid
+  email             String?   @unique
+  fullName          String?   @map("full_name")
+  avatarUrl         String?   @map("avatar_url")
+  phone             String?
+  emailConfirmed    Boolean   @default(false) @map("email_confirmed")
+  lastSignIn        DateTime? @map("last_sign_in") @db.Timestamptz
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt         DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  authSyncedAt      DateTime? @map("auth_synced_at") @db.Timestamptz
+
+  // Relationships
+  organizationMembers OrganizationMember[]
+  projectMembers      ProjectMember[]
+  createdProjects     Project[]            @relation("ProjectCreator")
+  createdBoards       Board[]              @relation("BoardCreator")
+  assignedTasks       Task[]               @relation("TaskAssignee")
+  reviewedTasks       Task[]               @relation("TaskReviewer")
+  createdTasks        Task[]               @relation("TaskCreator")
+  comments            Comment[]
+  attachments         Attachment[]
+  createdTaskRelations TaskRelation[]      @relation("TaskRelationCreator")
+  taskAssignments     TaskAssignee[]
+  taskReviews         TaskReviewer[]
+
+  @@map("users")
+}
+
+// Organizations
+model Organization {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name         String
+  description  String?
+  ownerId      String?  @map("owner_id") @db.Uuid
+  settings     Json?    @default("{}")
+  billingEmail String?  @map("billing_email")
+  plan         String?  @default("free")
+  logo         String?
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relationships
+  members     OrganizationMember[]
+  projects    Project[]
+  boards      Board[]
+
+  @@map("organizations")
+}
+
+// Organization membership
+model OrganizationMember {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  role           String // 'owner', 'admin', 'member'
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relationships
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+  @@map("organization_members")
+}
+
+// Projects - Management/Overview entities for team coordination
+model Project {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  name           String
+  description    String?
+  logo           String?
+  startDate      DateTime? @map("start_date") @db.Date
+  endDate        DateTime? @map("end_date") @db.Date
+  status         String?   @default("active") // active, completed, on_hold, cancelled
+  settings       Json?     @default("{}")
+  clientName     String?   @map("client_name") // Client information
+  clientEmail    String?   @map("client_email")
+  createdBy      String?   @map("created_by") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relationships
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  creator      User?              @relation("ProjectCreator", fields: [createdBy], references: [id])
+  members      ProjectMember[]
+  boardLinks   ProjectBoard[]     // Many-to-many with boards
+
+  @@map("projects")
+}
+
+// Project membership
+model ProjectMember {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  projectId String   @map("project_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  role      String   // 'owner', 'admin', 'member'
+  engagement String? // 'full_time', 'part_time', 'consultant'
+  hoursPerWeek Int?  @map("hours_per_week")
+  joinedAt  DateTime @default(now()) @map("joined_at") @db.Timestamptz
+  leftAt    DateTime? @map("left_at") @db.Timestamptz
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relationships
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+  @@map("project_members")
+}
+
+// Project-Board linking (Many-to-Many)
+model ProjectBoard {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  projectId String   @map("project_id") @db.Uuid
+  boardId   String   @map("board_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relationships
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  board   Board   @relation(fields: [boardId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, boardId])
+  @@map("project_boards")
+}
+
+// Boards - Independent work management entities
+model Board {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid // Required - boards belong to orgs
+  name           String
+  boardType      String?   @map("board_type") // kanban, scrum
+  logo           String?
+  description    String?
+  color          String?   @default("#3B82F6")
+  createdBy      String?   @map("created_by") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relationships
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  creator      User?           @relation("BoardCreator", fields: [createdBy], references: [id])
+  projectLinks ProjectBoard[]  // Many-to-many with projects
+  columns      BoardColumn[]
+  tasks        Task[]
+  sprints      Sprint[]
+  labels       Label[]
+  customFields CustomField[]
+
+  @@map("boards")
+}
+
+// Board columns
+model BoardColumn {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  boardId   String?  @map("board_id") @db.Uuid
+  name      String
+  position  Int
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relationships
+  board Board? @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  tasks Task[]
+
+  @@map("board_columns")
+}
+
+// Tasks - Belong to boards, not projects
+model Task {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  boardId          String    @map("board_id") @db.Uuid // Required - tasks always belong to a board
+  columnId         String?   @map("column_id") @db.Uuid
+  sprintColumnId   String?   @map("sprint_column_id") @db.Uuid
+  title            String
+  description      String?
+  status           String?
+  taskType         String?   @default("story") @map("task_type")
+  itemCode         String?   @unique @map("item_code") // e.g., "SPDR-1"
+  epicId           String?   @map("epic_id") @db.Uuid
+  parentId         String?   @map("parent_id") @db.Uuid // For parent-child relationships
+  blockedBy        String[]  @map("blocked_by")
+  estimatedHours   Int?      @default(0) @map("estimated_hours")
+  loggedHours      Int?      @default(0) @map("logged_hours")
+  priority         String?
+  storyPoints      Int?      @map("story_points")
+  effortUnits      Int?      @map("effort_units") // Alternative to story points
+  estimationType   String?   @default("story_points") @map("estimation_type") // "story_points" or "effort_units"
+  itemValue        String?   @map("item_value") // Business value separate from effort (XS, S, M, L, XL, XXL)
+  labels           String[]
+  position         Int?
+  assigneeId       String?   @map("assignee_id") @db.Uuid
+  reviewerId       String?   @map("reviewer_id") @db.Uuid
+  createdBy        String?   @map("created_by") @db.Uuid
+  dueDate          DateTime? @map("due_date") @db.Date
+  isPriority       Boolean   @default(false) @map("is_priority") // Priority flag
+  isArchived       Boolean   @default(false) @map("is_archived")
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relationships
+  board             Board          @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  column            BoardColumn?   @relation(fields: [columnId], references: [id], onDelete: SetNull)
+  sprintColumn      SprintColumn?  @relation("SprintColumnTasks", fields: [sprintColumnId], references: [id], onDelete: SetNull)
+  epic              Task?          @relation("EpicTasks", fields: [epicId], references: [id])
+  subtasks          Task[]         @relation("EpicTasks")
+  parent            Task?          @relation("ParentSubitems", fields: [parentId], references: [id])
+  subitems          Task[]         @relation("ParentSubitems")
+  assignee          User?          @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  reviewer          User?          @relation("TaskReviewer", fields: [reviewerId], references: [id])
+  creator           User?          @relation("TaskCreator", fields: [createdBy], references: [id])
+  comments          Comment[]
+  attachments       Attachment[]
+  sprintTasks       SprintTask[]
+  relationsAsSource TaskRelation[] @relation("SourceTask")
+  relationsAsTarget TaskRelation[] @relation("TargetTask")
+  taskLabels        TaskLabel[]
+  taskAssignees     TaskAssignee[]
+  taskReviewers     TaskReviewer[]
+  customFieldValues TaskCustomFieldValue[]
+
+  @@map("tasks")
+}
+
+// Task relations (dependencies, blocking, etc.)
+model TaskRelation {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sourceTaskId String   @map("source_task_id") @db.Uuid
+  targetTaskId String   @map("target_task_id") @db.Uuid
+  relationType String   @map("relation_type") // 'blocks', 'duplicates', 'relates_to'
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+  createdBy    String?  @map("created_by") @db.Uuid
+
+  // Relationships
+  sourceTask Task  @relation("SourceTask", fields: [sourceTaskId], references: [id], onDelete: Cascade)
+  targetTask Task  @relation("TargetTask", fields: [targetTaskId], references: [id], onDelete: Cascade)
+  creator    User? @relation("TaskRelationCreator", fields: [createdBy], references: [id])
+
+  @@unique([sourceTaskId, targetTaskId, relationType])
+  @@map("task_relations")
+}
+
+
+// Sprints - Belong to boards only
+model Sprint {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  boardId   String    @map("board_id") @db.Uuid // Required - sprints belong to boards
+  name      String
+  goal      String?
+  status    String?   @default("planning") // planning, active, completed
+  startDate DateTime? @map("start_date") @db.Date
+  endDate   DateTime? @map("end_date") @db.Date
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relationships
+  board         Board             @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  sprintTasks   SprintTask[]
+  sprintColumns SprintColumn[]
+
+  @@map("sprints")
+}
+
+// Sprint tasks
+model SprintTask {
+  id       String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sprintId String @map("sprint_id") @db.Uuid
+  taskId   String @map("task_id") @db.Uuid
+
+  // Relationships
+  sprint Sprint @relation(fields: [sprintId], references: [id], onDelete: Cascade)
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@unique([sprintId, taskId])
+  @@map("sprint_tasks")
+}
+
+
+// Sprint columns (for Sprint Backlog customization)
+model SprintColumn {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sprintId  String   @map("sprint_id") @db.Uuid
+  name      String
+  position  Int
+  isDone    Boolean  @default(false) @map("is_done")
+  wipLimit  Int?     @map("wip_limit")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relationships
+  sprint Sprint @relation(fields: [sprintId], references: [id], onDelete: Cascade)
+  tasks  Task[] @relation("SprintColumnTasks")
+
+  @@map("sprint_columns")
+}
+
+// Comments
+model Comment {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  taskId    String   @map("task_id") @db.Uuid
+  userId    String?  @map("user_id") @db.Uuid
+  content   String
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relationships
+  task Task  @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id])
+
+  @@map("comments")
+}
+
+// Attachments
+model Attachment {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  taskId     String?  @map("task_id") @db.Uuid
+  url        String
+  name       String?
+  uploadedBy String?  @map("uploaded_by") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relationships
+  task     Task? @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  uploader User? @relation(fields: [uploadedBy], references: [id])
+
+  @@map("attachments")
+}
+
+
+
+
+
+
+
+
+
+
+// Labels
+model Label {
+  id          String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  boardId     String      @map("board_id") @db.Uuid
+  name        String
+  description String?     // For Epic details
+  color       String?     @default("#3B82F6")
+  createdAt   DateTime    @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relationships
+  board      Board       @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  taskLabels TaskLabel[]
+
+  @@unique([boardId, name])
+  @@map("labels")
+}
+
+// Task labels (many-to-many relationship)
+model TaskLabel {
+  id      String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  taskId  String @map("task_id") @db.Uuid
+  labelId String @map("label_id") @db.Uuid
+
+  // Relationships
+  task  Task  @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  label Label @relation(fields: [labelId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, labelId])
+  @@map("task_labels")
+}
+
+
+// Task Assignees (many-to-many for multiple assignees)
+model TaskAssignee {
+  id     String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  taskId String @map("task_id") @db.Uuid
+  userId String @map("user_id") @db.Uuid
+
+  // Relationships
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, userId])
+  @@map("task_assignees")
+}
+
+// Task Reviewers (many-to-many for multiple reviewers)
+model TaskReviewer {
+  id     String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  taskId String @map("task_id") @db.Uuid
+  userId String @map("user_id") @db.Uuid
+
+  // Relationships
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, userId])
+  @@map("task_reviewers")
+}
+
+// Custom Fields for Boards
+model CustomField {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  boardId     String   @map("board_id") @db.Uuid
+  name        String
+  fieldType   String   @map("field_type") // "text" or "numeric"
+  defaultValue String? @map("default_value")
+  minValue    Float?   @map("min_value") // For numeric fields
+  maxValue    Float?   @map("max_value") // For numeric fields
+  position    Int?     @default(0)
+  isRequired  Boolean  @default(false) @map("is_required")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relationships
+  board  Board                   @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  values TaskCustomFieldValue[]
+
+  @@map("custom_fields")
+}
+
+// Task Custom Field Values
+model TaskCustomFieldValue {
+  id            String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  taskId        String @map("task_id") @db.Uuid
+  customFieldId String @map("custom_field_id") @db.Uuid
+  value         String
+
+  // Relationships
+  task        Task        @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  customField CustomField @relation(fields: [customFieldId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, customFieldId])
+  @@map("task_custom_field_values")
+}
+

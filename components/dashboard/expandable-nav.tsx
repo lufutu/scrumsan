@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useSupabase } from '@/providers/supabase-provider'
 import { useOrganization } from '@/providers/organization-provider'
-import { ChevronRight, ChevronDown, Building2, FolderOpen, Kanban, Calendar, Plus } from 'lucide-react'
+import { ChevronRight, ChevronDown, Building2, FolderOpen, Kanban, Calendar, Plus, Zap } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
@@ -27,12 +27,22 @@ type Project = Tables<'projects'> & {
 }
 
 type Board = Tables<'boards'> & {
-  board_type?: string | null
+  boardType?: string | null
+}
+
+type Sprint = {
+  id: string
+  name: string
+  goal?: string | null
+  status?: string | null
+  boardId?: string | null
+  projectId?: string | null
 }
 
 type Organization = Tables<'organizations'> & {
   projects?: Project[]
   boards?: Board[] // standalone boards
+  activeSprints?: Sprint[] // active sprints
 }
 
 interface ExpandableNavProps {
@@ -40,7 +50,6 @@ interface ExpandableNavProps {
 }
 
 export function ExpandableNav({ className }: ExpandableNavProps) {
-  const { supabase } = useSupabase()
   const { organizations, activeOrg } = useOrganization()
   const pathname = usePathname()
   const [expandedOrgs, setExpandedOrgs] = useState<Set<string>>(new Set())
@@ -53,6 +62,18 @@ export function ExpandableNav({ className }: ExpandableNavProps) {
       fetchOrgData()
     }
   }, [organizations])
+
+  useEffect(() => {
+    // Refresh sidebar data when navigating to boards page or when boards are created
+    if (pathname === '/boards' || pathname.startsWith('/boards/')) {
+      // Small delay to allow for board creation to complete
+      const timer = setTimeout(() => {
+        fetchOrgData()
+      }, 500)
+      
+      return () => clearTimeout(timer)
+    }
+  }, [pathname])
 
   useEffect(() => {
     // Auto-expand active organization
@@ -69,7 +90,7 @@ export function ExpandableNav({ className }: ExpandableNavProps) {
           setExpandedOrgs(prev => new Set([...prev, org.id]))
           
           org.projects?.forEach(project => {
-            const projectHasBoard = project.boards?.some(board => board.id === boardId)
+            const projectHasBoard = project.boardLinks?.some(link => link.board.id === boardId)
             if (projectHasBoard) {
               setExpandedProjects(prev => new Set([...prev, project.id]))
             }
@@ -85,43 +106,39 @@ export function ExpandableNav({ className }: ExpandableNavProps) {
       
       const enrichedOrgs = await Promise.all(
         organizations.map(async (org) => {
-          // Fetch projects with their boards
-          const { data: projects, error: projectsError } = await supabase
-            .from('projects')
-            .select(`
-              *,
-              boards (*)
-            `)
-            .eq('organization_id', org.id)
-            .order('created_at', { ascending: false })
+          try {
+            // Fetch projects with their boards using API
+            const projectsResponse = await fetch(`/api/projects?organizationId=${org.id}`)
+            const projects = projectsResponse.ok ? await projectsResponse.json() : []
 
-          if (projectsError) {
-            console.error('Error fetching projects:', projectsError)
-            return { ...org, projects: [], boards: [] }
-          }
+            // Fetch all boards for this organization
+            const boardsResponse = await fetch(`/api/boards?organizationId=${org.id}`)
+            const allBoards = boardsResponse.ok ? await boardsResponse.json() : []
+            
+            // Filter out boards that are linked to projects to get standalone boards
+            const projectLinkedBoardIds = new Set(
+              projects.flatMap(p => p.boardLinks?.map(link => link.board.id) || [])
+            )
+            const standaloneBoards = allBoards.filter(board => !projectLinkedBoardIds.has(board.id))
 
-          // Fetch standalone boards (boards without project_id)
-          const { data: standaloneBoards, error: boardsError } = await supabase
-            .from('boards')
-            .select('*')
-            .eq('organization_id', org.id)
-            .is('project_id', null)
-            .order('created_at', { ascending: false })
+            // Fetch active sprints for this organization
+            const sprintsResponse = await fetch(`/api/sprints?organizationId=${org.id}&status=active`)
+            const activeSprints = sprintsResponse.ok ? await sprintsResponse.json() : []
 
-          if (boardsError) {
-            console.error('Error fetching standalone boards:', boardsError)
-            return { ...org, projects: projects || [], boards: [] }
-          }
-
-          return {
-            ...org,
-            projects: projects || [],
-            boards: standaloneBoards || []
+            return {
+              ...org,
+              projects: projects || [],
+              boards: standaloneBoards || [],
+              activeSprints: activeSprints || []
+            }
+          } catch (error) {
+            console.error(`Error fetching data for org ${org.id}:`, error)
+            return { ...org, projects: [], boards: [], activeSprints: [] }
           }
         })
       )
 
-      setOrgData(enrichedOrgs)
+      setOrgData(enrichedOrgs as any)
     } catch (err) {
       console.error('Error fetching organization data:', err)
     } finally {
@@ -185,7 +202,8 @@ export function ExpandableNav({ className }: ExpandableNavProps) {
             const isExpanded = expandedOrgs.has(org.id)
             const hasProjects = org.projects && org.projects.length > 0
             const hasStandaloneBoards = org.boards && org.boards.length > 0
-            const hasContent = hasProjects || hasStandaloneBoards
+            const hasActiveSprints = org.activeSprints && org.activeSprints.length > 0
+            const hasContent = hasProjects || hasStandaloneBoards || hasActiveSprints
 
             return (
               <Collapsible key={org.id} open={isExpanded} onOpenChange={() => toggleOrgExpansion(org.id)}>
@@ -211,7 +229,7 @@ export function ExpandableNav({ className }: ExpandableNavProps) {
                     <SidebarMenuSub>
                       {/* Projects */}
                       {org.projects?.map((project) => {
-                        const projectBoards = project.boards || []
+                        const projectBoards = project.boardLinks?.map(link => link.board) || []
                         const hasBoards = projectBoards.length > 0
                         const isProjectExpanded = expandedProjects.has(project.id)
 
@@ -250,7 +268,7 @@ export function ExpandableNav({ className }: ExpandableNavProps) {
                                   <CollapsibleContent>
                                     <SidebarMenuSub>
                                       {projectBoards.map((board) => {
-                                        const BoardIcon = getBoardIcon(board.board_type)
+                                        const BoardIcon = getBoardIcon(board.boardType)
                                         const boardPath = `/boards/${board.id}`
                                         
                                         return (
@@ -266,7 +284,7 @@ export function ExpandableNav({ className }: ExpandableNavProps) {
                                                 <BoardIcon className="h-3 w-3" />
                                                 <span className="truncate">{board.name}</span>
                                                 <span className="text-xs text-muted-foreground ml-auto">
-                                                  {getBoardTypeLabel(board.board_type)}
+                                                  {getBoardTypeLabel(board.boardType)}
                                                 </span>
                                               </Link>
                                             </SidebarMenuSubButton>
@@ -297,7 +315,7 @@ export function ExpandableNav({ className }: ExpandableNavProps) {
 
                       {/* Standalone Boards */}
                       {org.boards?.map((board) => {
-                        const BoardIcon = getBoardIcon(board.board_type)
+                        const BoardIcon = getBoardIcon(board.boardType)
                         const boardPath = `/boards/${board.id}`
                         
                         return (
@@ -313,13 +331,34 @@ export function ExpandableNav({ className }: ExpandableNavProps) {
                                 <BoardIcon className="h-4 w-4" />
                                 <span className="truncate">{board.name}</span>
                                 <span className="text-xs text-muted-foreground ml-auto">
-                                  {getBoardTypeLabel(board.board_type)}
+                                  {getBoardTypeLabel(board.boardType)}
                                 </span>
                               </Link>
                             </SidebarMenuSubButton>
                           </SidebarMenuSubItem>
                         )
                       })}
+
+                      {/* Active Sprints */}
+                      {org.activeSprints?.map((sprint) => (
+                        <SidebarMenuSubItem key={sprint.id}>
+                          <SidebarMenuSubButton
+                            asChild
+                            className={cn(
+                              pathname === `/sprints/${sprint.id}/backlog` && 
+                              "bg-sidebar-accent text-sidebar-accent-foreground"
+                            )}
+                          >
+                            <Link href={`/sprints/${sprint.id}/backlog`} className="flex items-center gap-2">
+                              <Zap className="h-4 w-4 text-green-600" />
+                              <span className="truncate">{sprint.name}</span>
+                              <span className="text-xs text-green-600 ml-auto font-medium">
+                                Active Sprint
+                              </span>
+                            </Link>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      ))}
 
                       {/* Add Project to Organization */}
                       <SidebarMenuSubItem>

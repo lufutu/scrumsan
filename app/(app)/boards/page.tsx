@@ -1,16 +1,25 @@
 "use client"
 
 import { useEffect, useState } from 'react'
-import { useSupabase } from '@/providers/supabase-provider'
 import { useActiveOrg } from '@/hooks/useActiveOrg'
 import { useToast } from '@/hooks/use-toast'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Kanban, Calendar, Plus, Users } from 'lucide-react'
+import { Kanban, Calendar, Plus, Users, MoreVertical } from 'lucide-react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import BoardCreationWizard from '@/components/projects/board-creation-wizard-simple'
+import BoardEditForm from '@/components/boards/board-edit-form'
+import BoardDeleteDialog from '@/components/boards/board-delete-dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { Tables } from '@/types/database'
 
 type Board = Tables<'boards'> & {
@@ -19,9 +28,9 @@ type Board = Tables<'boards'> & {
 }
 
 export default function BoardsPage() {
-  const { supabase } = useSupabase()
   const activeOrg = useActiveOrg()
   const { toast } = useToast()
+  const router = useRouter()
   const [boards, setBoards] = useState<Board[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -39,21 +48,25 @@ export default function BoardsPage() {
       setIsLoading(true)
       setError(null)
 
-      const { data, error } = await supabase
-        .from('boards')
-        .select(`
-          *,
-          tasks(count),
-          board_columns(count)
-        `)
-        .eq('organization_id', activeOrg.id)
-        .is('project_id', null) // Only standalone boards
-        .order('created_at', { ascending: false })
+      const response = await fetch(`/api/boards?organizationId=${activeOrg.id}`)
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch boards')
+      }
+      
+      const data = await response.json()
+      
+      // Transform the data to match the expected format
+      const transformedBoards = data.map((board: { boardType?: string; createdAt?: string; _count?: { tasks?: number; columns?: number } }) => ({
+        ...board,
+        board_type: board.boardType,
+        created_at: board.createdAt,
+        tasks: [{ count: board._count?.tasks || 0 }],
+        board_columns: [{ count: board._count?.columns || 0 }]
+      }))
 
-      if (error) throw error
-
-      setBoards(data || [])
-    } catch (err: any) {
+      setBoards(transformedBoards)
+    } catch (err) {
       console.error('Error fetching boards:', err)
       setError('Failed to load boards')
       toast({
@@ -62,6 +75,16 @@ export default function BoardsPage() {
       })
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const handleBoardCreated = async (newBoard?: { id?: string }) => {
+    // Refresh the boards list
+    await fetchBoards()
+    
+    // Redirect to the new board
+    if (newBoard?.id) {
+      router.push(`/boards/${newBoard.id}`)
     }
   }
 
@@ -96,7 +119,7 @@ export default function BoardsPage() {
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold">Boards</h1>
-            <p className="text-muted-foreground">Standalone boards in {activeOrg.name}</p>
+            <p className="text-muted-foreground">All boards in {activeOrg.name}</p>
           </div>
           <Skeleton className="h-10 w-32" />
         </div>
@@ -127,11 +150,11 @@ export default function BoardsPage() {
         <div>
           <h1 className="text-3xl font-bold">Boards</h1>
           <p className="text-muted-foreground">
-            Standalone boards in {activeOrg.name}
+            All boards in {activeOrg.name}
           </p>
         </div>
         
-        <BoardCreationWizard organizationId={activeOrg.id} onSuccess={fetchBoards}>
+        <BoardCreationWizard organizationId={activeOrg.id} onSuccess={handleBoardCreated}>
           <Button>
             <Plus className="h-4 w-4 mr-2" />
             Create Board
@@ -153,9 +176,9 @@ export default function BoardsPage() {
             <Kanban className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
             <h3 className="text-xl font-semibold mb-2">No boards yet</h3>
             <p className="text-muted-foreground mb-6">
-              Create your first standalone board to start organizing work.
+              Create your first board to start organizing work.
             </p>
-            <BoardCreationWizard organizationId={activeOrg.id} onSuccess={fetchBoards}>
+            <BoardCreationWizard organizationId={activeOrg.id} onSuccess={handleBoardCreated}>
               <Button>
                 <Plus className="h-4 w-4 mr-2" />
                 Create Your First Board
@@ -171,8 +194,62 @@ export default function BoardsPage() {
             const columnCount = board.board_columns?.[0]?.count || 0
 
             return (
-              <Card key={board.id} className="hover:shadow-lg transition-all cursor-pointer">
-                <Link href={`/boards/${board.id}`}>
+              <Card key={board.id} className="hover:shadow-lg transition-all relative group">
+                <div 
+                  className="absolute top-4 right-4 z-10 opacity-0 group-hover:opacity-100 transition-opacity"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem asChild>
+                        <Link href={`/boards/${board.id}`}>
+                          Open Board
+                        </Link>
+                      </DropdownMenuItem>
+                      <BoardEditForm 
+                        board={{
+                          id: board.id,
+                          name: board.name,
+                          description: board.description,
+                          boardType: board.board_type,
+                          color: board.color
+                        }} 
+                        onSuccess={fetchBoards}
+                      >
+                        <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                          Edit Board
+                        </DropdownMenuItem>
+                      </BoardEditForm>
+                      <DropdownMenuSeparator />
+                      <BoardDeleteDialog 
+                        board={{
+                          id: board.id,
+                          name: board.name,
+                          _count: {
+                            tasks: taskCount,
+                            sprints: 0 // We don't have this data in the list view
+                          }
+                        }}
+                        onSuccess={fetchBoards}
+                        redirectTo={null}
+                      >
+                        <DropdownMenuItem 
+                          onSelect={(e) => e.preventDefault()}
+                          className="text-red-600"
+                        >
+                          Delete Board
+                        </DropdownMenuItem>
+                      </BoardDeleteDialog>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+                
+                <Link href={`/boards/${board.id}`} className="block">
                   <CardHeader>
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-2">

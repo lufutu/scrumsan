@@ -12,8 +12,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Plus, X, ChevronRight, ChevronLeft, Kanban, Calendar, BarChart3, Loader2 } from 'lucide-react'
 
 interface BoardCreationWizardProps {
-  projectId: string
-  onSuccess?: () => void
+  projectId?: string
+  organizationId?: string
+  onSuccess?: (newBoard?: { id?: string }) => void
   children?: React.ReactNode
 }
 
@@ -25,17 +26,17 @@ interface WizardData {
   organization_id: string
 }
 
-export default function BoardCreationWizard({ projectId, onSuccess, children }: BoardCreationWizardProps) {
+export default function BoardCreationWizard({ projectId, organizationId, onSuccess, children }: BoardCreationWizardProps) {
   const { supabase } = useSupabase()
   const { toast } = useToast()
-  const { activeOrg } = useActiveOrg()
+  const activeOrg = useActiveOrg()
   const [isOpen, setIsOpen] = useState(false)
   const [currentStep, setCurrentStep] = useState(1)
   const [isCreating, setIsCreating] = useState(false)
   const [wizardData, setWizardData] = useState<WizardData>({
     name: '',
     type: 'kanban',
-    organization_id: (activeOrg as any)?.id || ''
+    organization_id: organizationId || (activeOrg as any)?.id || ''
   })
 
   const totalSteps = 3
@@ -64,18 +65,23 @@ export default function BoardCreationWizard({ projectId, onSuccess, children }: 
     setIsCreating(true)
 
     try {
-      // Create the board
-      const { data: newBoard, error: boardError } = await supabase
-        .from('boards')
-        .insert({
+      // Create the board using the API
+      const response = await fetch('/api/boards', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
           name: wizardData.name.trim(),
-          project_id: projectId,
-          board_type: wizardData.type
+          projectId: projectId,
+          organizationId: organizationId || wizardData.organization_id,
+          boardType: wizardData.type
         })
-        .select()
-        .single()
+      })
 
-      if (boardError) throw boardError
+      if (!response.ok) throw new Error('Failed to create board')
+      
+      const newBoard = await response.json()
 
       // Create default columns based on board type
       let defaultColumns
@@ -96,14 +102,18 @@ export default function BoardCreationWizard({ projectId, onSuccess, children }: 
         ]
       }
 
-      const { error: columnsError } = await supabase
-        .from('board_columns')
-        .insert(defaultColumns.map(col => ({
-          ...col,
-          board_id: newBoard.id
-        })))
+      // Create default columns using the API
+      const columnsResponse = await fetch(`/api/boards/${newBoard.id}/columns`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          columns: defaultColumns
+        })
+      })
 
-      if (columnsError) throw columnsError
+      if (!columnsResponse.ok) throw new Error('Failed to create columns')
 
       toast({
         title: "Success",
@@ -116,10 +126,11 @@ export default function BoardCreationWizard({ projectId, onSuccess, children }: 
       setWizardData({
         name: '',
         type: 'kanban',
-        organization_id: (activeOrg as any)?.id || ''
+        organization_id: organizationId || (activeOrg as any)?.id || ''
       })
 
-      onSuccess?.()
+      // Call success callback with the new board
+      onSuccess?.(newBoard)
 
     } catch (err: any) {
       console.error('Error creating board:', err)

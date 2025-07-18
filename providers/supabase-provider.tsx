@@ -57,6 +57,20 @@ export default function SupabaseProvider({
       if (event === "SIGNED_IN") {
         const { data: { user } } = await supabase.auth.getUser();
         setUser(user);
+        
+        // Auto-sync user data when they sign in
+        if (user?.id) {
+          try {
+            await fetch('/api/auth/sync', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({})
+            });
+          } catch (error) {
+            console.warn('Failed to sync user on login:', error);
+          }
+        }
+        
         router.refresh();
       } else if (event === "SIGNED_OUT") {
         setUser(null);

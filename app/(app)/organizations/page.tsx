@@ -59,7 +59,7 @@ export default function OrganizationsPage() {
             </CardHeader>
             <CardContent>
               <div className="text-sm text-muted-foreground">
-                {org.organization_members.length} members
+                {org.members?.length || 0} members
               </div>
             </CardContent>
           </Card>

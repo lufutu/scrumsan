@@ -1,40 +1,42 @@
 "use client"
 
-import { useEffect, useState } from 'react'
-import { useSupabase } from '@/providers/supabase-provider'
+import { useState } from 'react'
 import { useToast } from '@/hooks/use-toast'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
-import { Plus, MoreHorizontal, Trash2, Edit, Loader2, GripVertical } from 'lucide-react'
+import { Plus, MoreHorizontal, Trash2, GripVertical, Loader2 } from 'lucide-react'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import TaskCard from '@/components/tasks/task-card'
-import TaskForm from '@/components/tasks/task-form'
+import { TaskCardModern } from '@/components/scrum/TaskCardModern'
+import { ComprehensiveInlineForm } from '@/components/scrum/ComprehensiveInlineForm'
 import ProjectScrumBoard from '@/components/projects/project-scrum-board'
+import EnhancedScrumBoard from '@/components/scrum/EnhancedScrumBoard'
 import BoardCreationWizard from '@/components/projects/board-creation-wizard-simple'
-import { Tables } from '@/types/database'
+import { useBoards, Board } from '@/hooks/useBoards'
+import { useTasks } from '@/hooks/useTasks'
+import { useUsers } from '@/hooks/useUsers'
+import { useLabels } from '@/hooks/useLabels'
 
-type Board = Tables<'boards'> & {
-  board_type?: string | null
-  board_columns: Array<Tables<'board_columns'> & {
-    tasks: Array<Tables<'tasks'> & {
-      assignee?: {
-        id: string
-        full_name: string | null
-        avatar_url: string | null
-      } | null
-    }>
-  }>
-}
-
-type BoardColumn = Tables<'board_columns'> & {
-  tasks: Array<Tables<'tasks'> & {
+type BoardColumn = {
+  id: string
+  name: string
+  position: number
+  tasks: Array<{
+    id: string
+    title: string
+    description: string | null
+    status: string | null
+    taskType: string | null
+    priority: string | null
+    storyPoints: number | null
+    assigneeId: string | null
+    createdAt: string
     assignee?: {
       id: string
-      full_name: string | null
-      avatar_url: string | null
+      fullName: string | null
+      avatarUrl: string | null
     } | null
   }>
 }
@@ -44,10 +46,11 @@ interface ProjectBoardProps {
 }
 
 export default function ProjectBoard({ projectId }: ProjectBoardProps) {
-  const { supabase } = useSupabase()
   const { toast } = useToast()
-  const [board, setBoard] = useState<Board | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const { boards, isLoading, mutate } = useBoards(undefined, projectId)
+  const board = boards?.[0] || null
+  const { users } = useUsers({ projectId })
+  const { labels } = useLabels(board?.id || '')
   const [draggedTask, setDraggedTask] = useState<string | null>(null)
   const [draggedColumn, setDraggedColumn] = useState<string | null>(null)
   const [draggedOver, setDraggedOver] = useState<string | null>(null)
@@ -55,58 +58,8 @@ export default function ProjectBoard({ projectId }: ProjectBoardProps) {
   const [showNewColumnDialog, setShowNewColumnDialog] = useState(false)
   const [newColumnName, setNewColumnName] = useState('')
   const [isCreatingColumn, setIsCreatingColumn] = useState(false)
+  const [showInlineForm, setShowInlineForm] = useState<{[key: string]: boolean}>({})
 
-  useEffect(() => {
-    fetchBoard()
-  }, [projectId])
-
-  const fetchBoard = async () => {
-    try {
-      setIsLoading(true)
-      
-      // First, try to get existing board
-      let { data: boardData, error: boardError } = await supabase
-        .from('boards')
-        .select(`
-          *,
-          board_columns (
-            *,
-            tasks (
-              *,
-              assignee:users!assignee_id (
-                id,
-                full_name,
-                avatar_url
-              )
-            )
-          )
-        `)
-        .eq('project_id', projectId)
-        .single()
-
-      if (boardError && boardError.code === 'PGRST116') {
-        // No board exists, show creation options
-        setBoard(null)
-      } else if (boardError) {
-        throw boardError
-      } else if (boardData) {
-        // Sort columns by position and tasks by created_at
-        boardData.board_columns.sort((a, b) => a.position - b.position)
-        boardData.board_columns.forEach(column => {
-          column.tasks.sort((a, b) => new Date(a.created_at || '').getTime() - new Date(b.created_at || '').getTime())
-        })
-        setBoard(boardData)
-      }
-    } catch (err: any) {
-      console.error('Error fetching board:', err)
-      toast({
-        title: "Error",
-        description: "Failed to load board"
-      })
-    } finally {
-      setIsLoading(false)
-    }
-  }
 
   // Task drag handlers (for Kanban board only)
   const handleTaskDragStart = (e: React.DragEvent, taskId: string) => {
@@ -143,8 +96,8 @@ export default function ProjectBoard({ projectId }: ProjectBoardProps) {
       let sourceColumn: BoardColumn | null = null
       let task: any = null
 
-      for (const column of board.board_columns) {
-        const foundTask = column.tasks.find(t => t.id === draggedTask)
+      for (const column of (board as any).board_columns || []) {
+        const foundTask = column.tasks.find((t: any) => t.id === draggedTask)
         if (foundTask) {
           sourceColumn = column
           task = foundTask
@@ -158,7 +111,7 @@ export default function ProjectBoard({ projectId }: ProjectBoardProps) {
       }
 
       // Update task's column and status
-      const targetColumn = board.board_columns.find(col => col.id === targetColumnId)
+      const targetColumn = ((board as any).board_columns || []).find((col: any) => col.id === targetColumnId)
       if (!targetColumn) return
 
       // Map column names to status values
@@ -171,39 +124,20 @@ export default function ProjectBoard({ projectId }: ProjectBoardProps) {
 
       const newStatus = getStatusFromColumn(targetColumn.name)
 
-      const { error } = await supabase
-        .from('tasks')
-        .update({ 
-          column_id: targetColumnId,
+      // Update task via API
+      const response = await fetch(`/api/tasks/${draggedTask}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          columnId: targetColumnId,
           status: newStatus
-        })
-        .eq('id', draggedTask)
-
-      if (error) throw error
-
-      // Update local state
-      setBoard(prev => {
-        if (!prev) return prev
-        
-        const newBoard = { ...prev }
-        newBoard.board_columns = newBoard.board_columns.map(column => {
-          if (column.id === sourceColumn!.id) {
-            return {
-              ...column,
-              tasks: column.tasks.filter(t => t.id !== draggedTask)
-            }
-          }
-          if (column.id === targetColumnId) {
-            return {
-              ...column,
-              tasks: [...column.tasks, { ...task, column_id: targetColumnId, status: newStatus }]
-            }
-          }
-          return column
-        })
-        
-        return newBoard
+        }),
       })
+
+      if (!response.ok) throw new Error('Failed to update task')
+
+      // Refresh board data
+      mutate()
 
       toast({
         title: "Success",
@@ -262,8 +196,8 @@ export default function ProjectBoard({ projectId }: ProjectBoardProps) {
     }
 
     try {
-      const sourceColumn = board.board_columns.find(col => col.id === draggedColumn)
-      const targetColumn = board.board_columns.find(col => col.id === targetColumnId)
+      const sourceColumn = ((board as any).board_columns || []).find((col: any) => col.id === draggedColumn)
+      const targetColumn = ((board as any).board_columns || []).find((col: any) => col.id === targetColumnId)
       
       if (!sourceColumn || !targetColumn) return
 
@@ -271,7 +205,7 @@ export default function ProjectBoard({ projectId }: ProjectBoardProps) {
       const targetPosition = targetColumn.position
 
       // Create a new array with updated positions
-      const updatedColumns = board.board_columns.map(column => {
+      const updatedColumns = ((board as any).board_columns || []).map((column: any) => {
         if (column.id === draggedColumn) {
           return { ...column, position: targetPosition }
         }
@@ -292,29 +226,23 @@ export default function ProjectBoard({ projectId }: ProjectBoardProps) {
       })
 
       // Update positions in database
-      const positionUpdates = updatedColumns.map(column => ({
+      const positionUpdates = updatedColumns.map((column: any) => ({
         id: column.id,
         position: column.position
       }))
 
       for (const update of positionUpdates) {
-        const { error } = await supabase
-          .from('board_columns')
-          .update({ position: update.position })
-          .eq('id', update.id)
+        const response = await fetch(`/api/boards/${board.id}/columns/${update.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ position: update.position }),
+        })
 
-        if (error) throw error
+        if (!response.ok) throw new Error('Failed to update column position')
       }
 
-      // Update local state
-      setBoard(prev => {
-        if (!prev) return prev
-        
-        const newBoard = { ...prev }
-        newBoard.board_columns = updatedColumns.sort((a, b) => a.position - b.position)
-        
-        return newBoard
-      })
+      // Refresh board data
+      mutate()
 
       toast({
         title: "Success",
@@ -337,15 +265,16 @@ export default function ProjectBoard({ projectId }: ProjectBoardProps) {
     setIsCreatingColumn(true)
 
     try {
-      const { error } = await supabase
-        .from('board_columns')
-        .insert({
+      const response = await fetch(`/api/boards/${board.id}/columns`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           name: newColumnName.trim(),
-          board_id: board.id,
-          position: board.board_columns.length
-        })
+          position: ((board as any).board_columns || []).length
+        }),
+      })
 
-      if (error) throw error
+      if (!response.ok) throw new Error('Failed to create column')
 
       toast({
         title: "Success",
@@ -354,7 +283,7 @@ export default function ProjectBoard({ projectId }: ProjectBoardProps) {
 
       setShowNewColumnDialog(false)
       setNewColumnName('')
-      fetchBoard()
+      mutate()
     } catch (err: any) {
       console.error('Error creating column:', err)
       toast({
@@ -372,32 +301,19 @@ export default function ProjectBoard({ projectId }: ProjectBoardProps) {
     }
 
     try {
-      // Move all tasks in this column to the first column (To Do)
-      const firstColumn = board?.board_columns[0]
-      if (firstColumn && firstColumn.id !== columnId) {
-        await supabase
-          .from('tasks')
-          .update({ 
-            column_id: firstColumn.id,
-            status: 'todo'
-          })
-          .eq('column_id', columnId)
-      }
+      const response = await fetch(`/api/boards/${board?.id}/columns/${columnId}`, {
+        method: 'DELETE',
+      })
 
-      // Delete the column
-      const { error } = await supabase
-        .from('board_columns')
-        .delete()
-        .eq('id', columnId)
-
-      if (error) throw error
+      if (!response.ok) throw new Error('Failed to delete column')
 
       toast({
         title: "Success",
         description: "Column deleted successfully"
       })
 
-      fetchBoard()
+      // Refresh board data
+      mutate()
     } catch (err: any) {
       console.error('Error deleting column:', err)
       toast({
@@ -427,7 +343,7 @@ export default function ProjectBoard({ projectId }: ProjectBoardProps) {
             <p className="text-muted-foreground">
               Create your first board to start organizing your project
             </p>
-            <BoardCreationWizard projectId={projectId} onSuccess={fetchBoard} />
+            <BoardCreationWizard projectId={projectId} onSuccess={() => mutate()} />
           </div>
         </CardContent>
       </Card>
@@ -435,8 +351,8 @@ export default function ProjectBoard({ projectId }: ProjectBoardProps) {
   }
 
   // Show Scrum board if board type is scrum
-  if (board.board_type === 'scrum') {
-    return <ProjectScrumBoard projectId={projectId} board={board} onUpdate={fetchBoard} />
+  if ((board as any).board_type === 'scrum' || board.boardType === 'scrum') {
+    return <EnhancedScrumBoard projectId={projectId} boardId={board.id} />
   }
 
   // Show Kanban board (default)
@@ -452,8 +368,6 @@ export default function ProjectBoard({ projectId }: ProjectBoardProps) {
         </div>
         
         <div className="flex gap-2">
-          <TaskForm projectId={projectId} onSuccess={fetchBoard} />
-          
           <Dialog open={showNewColumnDialog} onOpenChange={setShowNewColumnDialog}>
             <DialogTrigger asChild>
               <Button variant="outline">
@@ -503,7 +417,7 @@ export default function ProjectBoard({ projectId }: ProjectBoardProps) {
 
       {/* Board Columns */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 h-full min-h-96">
-        {board.board_columns.map((column) => (
+        {((board as any).board_columns || []).map((column: any) => (
           <div 
             key={column.id} 
             className="flex flex-col"
@@ -541,7 +455,7 @@ export default function ProjectBoard({ projectId }: ProjectBoardProps) {
                       <DropdownMenuItem 
                         onClick={() => handleDeleteColumn(column.id)}
                         className="text-destructive focus:text-destructive"
-                        disabled={board.board_columns.length <= 1}
+                        disabled={((board as any).board_columns || []).length <= 1}
                       >
                         <Trash2 className="h-4 w-4 mr-2" />
                         Delete Column
@@ -557,26 +471,105 @@ export default function ProjectBoard({ projectId }: ProjectBoardProps) {
                 onDragLeave={handleTaskDragLeave}
                 onDrop={(e) => handleTaskDrop(e, column.id)}
               >
-                {column.tasks.length === 0 ? (
+                {column.tasks.map((task: any) => (
+                  <div
+                    key={task.id}
+                    draggable
+                    onDragStart={(e) => handleTaskDragStart(e, task.id)}
+                    className="cursor-move"
+                  >
+                    <TaskCardModern
+                      id={task.id}
+                      title={task.title}
+                      description={task.description}
+                      taskType={task.taskType as 'story' | 'bug' | 'task' | 'epic' | 'improvement' | 'idea' | 'note' || 'task'}
+                      storyPoints={task.storyPoints || 0}
+                      assignee={task.assignee ? {
+                        name: task.assignee.fullName || '',
+                        initials: task.assignee.fullName?.split(' ').map(n => n[0]).join('') || '',
+                        avatar: task.assignee.avatarUrl
+                      } : undefined}
+                      status={task.status === 'todo' ? 'todo' : task.status === 'done' ? 'done' : 'in_progress'}
+                    />
+                  </div>
+                ))}
+                
+                {!showInlineForm[column.id] && (
+                  <button
+                    onClick={() => setShowInlineForm(prev => ({ ...prev, [column.id]: true }))}
+                    className="w-full p-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-500 hover:border-gray-400 hover:text-gray-600 transition-colors text-left mt-3"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Plus className="h-4 w-4" />
+                      <span className="text-sm">Add item...</span>
+                    </div>
+                  </button>
+                )}
+                
+                {showInlineForm[column.id] && (
+                  <div className="mt-3">
+                    <ComprehensiveInlineForm
+                      onAdd={async (data) => {
+                        try {
+                          const response = await fetch('/api/tasks', {
+                            method: 'POST',
+                            headers: {
+                              'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                              title: data.title,
+                              projectId: projectId,
+                              boardId: board.id,
+                              columnId: column.id,
+                              taskType: data.taskType,
+                              assigneeId: data.assigneeId,
+                              labels: data.labels || [],
+                              priority: data.priority,
+                              storyPoints: data.storyPoints,
+                              status: 'todo'
+                            })
+                          });
+                          
+                          if (!response.ok) {
+                            const error = await response.json();
+                            throw new Error(error.message || 'Failed to create task');
+                          }
+                          
+                          mutate();
+                          setShowInlineForm(prev => ({ ...prev, [column.id]: false }));
+                          toast({
+                            title: "Success",
+                            description: "Task created successfully"
+                          });
+                        } catch (err: any) {
+                          console.error('Error creating task:', err)
+                          toast({
+                            title: "Error",
+                            description: "Failed to create task"
+                          })
+                        }
+                      }}
+                      onCancel={() => setShowInlineForm(prev => ({ ...prev, [column.id]: false }))}
+                      placeholder="What needs to be done?"
+                      users={users.map(u => ({
+                        id: u.id,
+                        name: u.fullName || 'Unknown',
+                        initials: u.fullName?.split(' ').map(n => n[0]).join('').toUpperCase() || 'U',
+                        avatar: u.avatarUrl
+                      }))}
+                      labels={labels.map(l => ({
+                        id: l.id,
+                        name: l.name,
+                        color: l.color || '#6B7280'
+                      }))}
+                    />
+                  </div>
+                )}
+                
+                {column.tasks.length === 0 && (
                   <div className="text-center text-muted-foreground text-sm py-8">
                     No tasks in this column
                   </div>
-                ) : (
-                  column.tasks.map((task) => (
-                    <div
-                      key={task.id}
-                      draggable
-                      onDragStart={(e) => handleTaskDragStart(e, task.id)}
-                      className="cursor-move"
-                    >
-                      <TaskCard
-                        task={task}
-                        projectId={projectId}
-                        onUpdate={fetchBoard}
-                        className="hover:shadow-lg transition-all"
-                      />
-                    </div>
-                  ))
                 )}
               </CardContent>
             </Card>

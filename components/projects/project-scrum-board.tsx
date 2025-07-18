@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useSupabase } from '@/providers/supabase-provider'
 import { useToast } from '@/hooks/use-toast'
+import { useLabels } from '@/hooks/useLabels'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -17,8 +18,8 @@ const Progress = ({ value, className }: { value: number; className?: string }) =
   </div>
 )
 import { Calendar, Clock, Target, Plus, Activity, ArrowRight, X, Timer, BarChart3, Users } from 'lucide-react'
-import TaskCard from '@/components/tasks/task-card'
-import TaskForm from '@/components/tasks/task-form'
+import { TaskCardModern } from '@/components/scrum/TaskCardModern'
+import { ComprehensiveInlineForm } from '@/components/scrum/ComprehensiveInlineForm'
 import SprintForm from '@/components/sprints/sprint-form'
 import { Tables } from '@/types/database'
 import { cn } from '@/lib/utils'
@@ -60,12 +61,14 @@ interface ProjectScrumBoardProps {
 export default function ProjectScrumBoard({ projectId, board, onUpdate }: ProjectScrumBoardProps) {
   const { supabase, user } = useSupabase()
   const { toast } = useToast()
+  const { labels } = useLabels(board.id)
   const [isLoading, setIsLoading] = useState(false)
   const [allTasks, setAllTasks] = useState<Task[]>([])
   const [sprints, setSprints] = useState<Sprint[]>([])
   const [activeSprint, setActiveSprint] = useState<Sprint | null>(null)
   const [draggedTask, setDraggedTask] = useState<Task | null>(null)
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null)
+  const [showEnhancedForm, setShowEnhancedForm] = useState<{[key: string]: boolean}>({})
 
   useEffect(() => {
     if (projectId && board?.id) {
@@ -153,7 +156,7 @@ export default function ProjectScrumBoard({ projectId, board, onUpdate }: Projec
 
       if (error) throw error
 
-      setAllTasks(tasksData || [])
+      setAllTasks(tasksData as any || [])
     } catch (err: unknown) {
       console.error('Error fetching tasks:', err)
       toast({
@@ -296,6 +299,53 @@ export default function ProjectScrumBoard({ projectId, board, onUpdate }: Projec
     }
   }
 
+  const createTaskEnhanced = async (data: {
+    title: string;
+    taskType: string;
+    assigneeId?: string;
+    labels?: string[];
+    dueDate?: string;
+    priority?: string;
+  }, columnId?: string) => {
+    try {
+      const response = await fetch('/api/tasks', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: data.title,
+          projectId: projectId,
+          boardId: board.id,
+          columnId: columnId,
+          taskType: data.taskType,
+          assigneeId: data.assigneeId,
+          labels: data.labels || [],
+          dueDate: data.dueDate,
+          priority: data.priority,
+          status: 'todo'
+        })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to create task');
+      }
+
+      await fetchTasks();
+      toast({
+        title: "Success",
+        description: "Task created successfully"
+      });
+    } catch (err: unknown) {
+      console.error('Error creating task:', err)
+      toast({
+        title: "Error",
+        description: "Failed to create task"
+      })
+    }
+  }
+
   // Drag and drop handlers
   const handleDragStart = (task: Task) => {
     setDraggedTask(task)
@@ -386,11 +436,6 @@ export default function ProjectScrumBoard({ projectId, board, onUpdate }: Projec
             <p className="text-muted-foreground">{board.name}</p>
           </div>
           <div className="flex items-center gap-2">
-            <TaskForm 
-              projectId={projectId} 
-              boardId={board.id}
-              onSuccess={() => { fetchData(); onUpdate(); }} 
-            />
             <SprintForm 
               projectId={projectId}
               onSuccess={() => { fetchData(); onUpdate(); }}
@@ -489,6 +534,35 @@ export default function ProjectScrumBoard({ projectId, board, onUpdate }: Projec
                 onDrop={(e) => handleDrop(e, undefined, 'backlog')}
               >
                 <div className="grid gap-3">
+                  {!showEnhancedForm['backlog'] && (
+                    <button
+                      onClick={() => setShowEnhancedForm(prev => ({ ...prev, backlog: true }))}
+                      className="w-full p-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-500 hover:border-gray-400 hover:text-gray-600 transition-colors text-left"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Plus className="h-4 w-4" />
+                        <span className="text-sm">What needs to be done?</span>
+                      </div>
+                    </button>
+                  )}
+                  
+                  {showEnhancedForm['backlog'] && (
+                    <ComprehensiveInlineForm
+                      onAdd={async (data) => {
+                        await createTaskEnhanced(data);
+                        setShowEnhancedForm(prev => ({ ...prev, backlog: false }));
+                      }}
+                      onCancel={() => setShowEnhancedForm(prev => ({ ...prev, backlog: false }))}
+                      placeholder="What needs to be done?"
+                      users={[]}
+                      labels={labels.map(l => ({
+                        id: l.id,
+                        name: l.name,
+                        color: l.color || '#6B7280'
+                      }))}
+                    />
+                  )}
+                  
                   {backlogTasks.map(task => (
                     <div
                       key={task.id}
@@ -590,11 +664,22 @@ export default function ProjectScrumBoard({ projectId, board, onUpdate }: Projec
                               draggable
                               onDragStart={() => handleDragStart(task)}
                             >
-                              <TaskCard
-                                task={task}
-                                projectId={projectId}
-                                onUpdate={() => { fetchTasks(); onUpdate(); }}
-                                className="cursor-move"
+                              <TaskCardModern
+                                id={task.id}
+                                title={task.title}
+                                description={task.description}
+                                taskType={task.taskType as 'story' | 'bug' | 'task' | 'epic' | 'improvement' | 'idea' | 'note' || 'task'}
+                                storyPoints={task.storyPoints || 0}
+                                assignee={task.assignee ? {
+                                  name: task.assignee.full_name || '',
+                                  initials: task.assignee.full_name?.split(' ').map(n => n[0]).join('') || '',
+                                  avatar: task.assignee.avatar_url
+                                } : undefined}
+                                labels={task.labels ? labels.filter(l => task.labels?.includes(l.id)).map(l => ({
+                                  name: l.name,
+                                  color: l.color || '#6B7280'
+                                })) : []}
+                                status={task.status === 'todo' ? 'todo' : task.status === 'done' ? 'done' : 'in_progress'}
                               />
                               {activeSprint.status === 'planning' && (
                                 <Button
@@ -608,6 +693,35 @@ export default function ProjectScrumBoard({ projectId, board, onUpdate }: Projec
                               )}
                             </div>
                           ))}
+                          
+                          {!showEnhancedForm[column.id] && (
+                            <button
+                              onClick={() => setShowEnhancedForm(prev => ({ ...prev, [column.id]: true }))}
+                              className="w-full p-2 border border-dashed border-gray-300 rounded text-gray-500 hover:border-gray-400 hover:text-gray-600 transition-colors text-left text-sm"
+                            >
+                              <div className="flex items-center gap-2">
+                                <Plus className="h-3 w-3" />
+                                <span>Add item...</span>
+                              </div>
+                            </button>
+                          )}
+                          
+                          {showEnhancedForm[column.id] && (
+                            <ComprehensiveInlineForm
+                              onAdd={async (data) => {
+                                await createTaskEnhanced(data, column.id);
+                                if (activeSprint) {
+                                  // Add to sprint after creating
+                                  // This would require additional API call
+                                }
+                                setShowEnhancedForm(prev => ({ ...prev, [column.id]: false }));
+                              }}
+                              onCancel={() => setShowEnhancedForm(prev => ({ ...prev, [column.id]: false }))}
+                              placeholder="What needs to be done?"
+                              users={[]}
+                              labels={[]}
+                            />
+                          )}
                           
                           {columnTasks.length === 0 && (
                             <div className="text-center py-8 text-muted-foreground">

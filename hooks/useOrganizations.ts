@@ -10,10 +10,10 @@ export interface Organization {
   name: string
   description: string | null
   logo: string | null
-  owner_id: string | null
-  created_at: string | null
-  organization_members: {
-    user_id: string
+  ownerId: string | null
+  createdAt: string | null
+  members: {
+    userId: string
     role: 'owner' | 'admin' | 'member'
   }[]
 }

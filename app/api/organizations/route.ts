@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { prisma } from '@/lib/prisma'
+import { getCurrentUser } from '@/lib/auth-utils'
 import { z } from 'zod'
 
 const organizationSchema = z.object({
@@ -10,19 +12,30 @@ const organizationSchema = z.object({
 
 export async function GET(req: NextRequest) {
   try {
-    const supabase = await createClient() 
-    const { data, error } = await supabase
-      .from('organizations')
-      .select(`
-        *,
-        organization_members (
-          user_id,
-          role
-        )
-      `)
+    // Get current user and ensure they exist in our database
+    const supabase = await createClient()
+    const user = await getCurrentUser(supabase)
     
-    if (error) throw error
-    return NextResponse.json(data)
+    // Get organizations where user is a member
+    const organizations = await prisma.organization.findMany({
+      where: {
+        members: {
+          some: {
+            userId: user.id
+          }
+        }
+      },
+      include: {
+        members: {
+          select: {
+            userId: true,
+            role: true
+          }
+        }
+      }
+    })
+    
+    return NextResponse.json(organizations)
   } catch (error: any) {
     return NextResponse.json(
       { error: error.message },
@@ -39,45 +52,44 @@ export async function POST(req: NextRequest) {
     // Validate input
     const validatedData = organizationSchema.parse(body)
     
-    // Get current user
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
-    if (userError || !user) throw new Error('Unauthorized')
+    // Get current user and ensure they exist in our database
+    const user = await getCurrentUser(supabase)
     
-    // Create organization
-    const { data, error } = await supabase
-      .from('organizations')
-      .insert([{
+    // Create organization with member in one transaction
+    const organization = await prisma.organization.create({
+      data: {
         name: validatedData.name,
         description: validatedData.description,
-        owner_id: user.id
-      }])
-      .select()
-      .single()
-    
-    if (error) throw error
-    
-    // Add owner as organization member
-    const { error: memberError } = await supabase
-      .from('organization_members')
-      .insert([{
-        organization_id: data.id,
-        user_id: user.id,
-        role: 'owner'
-      }])
-    
-    if (memberError) throw memberError
+        ownerId: user.id,
+        members: {
+          create: {
+            userId: user.id,
+            role: 'owner'
+          }
+        }
+      },
+      include: {
+        members: {
+          select: {
+            userId: true,
+            role: true
+          }
+        }
+      }
+    })
 
     // Return the organization data with ID so frontend can upload logo
-    return NextResponse.json(data)
+    return NextResponse.json(organization)
   } catch (error: any) {
+    console.error('Error creating organization:', error);
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: error.errors },
+        { message: 'Validation error', details: error.errors },
         { status: 400 }
       )
     }
     return NextResponse.json(
-      { error: error.message },
+      { message: error.message || 'Failed to create organization' },
       { status: 500 }
     )
   }

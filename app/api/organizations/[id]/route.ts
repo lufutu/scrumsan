@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { prisma } from '@/lib/prisma'
+import { getCurrentUser } from '@/lib/auth-utils'
 import { z } from 'zod'
 
 const organizationSchema = z.object({
@@ -15,30 +17,50 @@ export async function GET(
   try {
     const { id } = await params
     const supabase = await createClient()
-    const { data, error } = await supabase
-      .from('organizations')
-      .select(`
-        *,
-        organization_members (
-          user_id,
-          role
-        )
-      `)
-      .eq('id', id)
-      .single()
     
-    if (error) throw error
-    if (!data) {
+    // Get current user and ensure they exist in our database
+    const user = await getCurrentUser(supabase)
+    
+    // Get organization with user access check
+    const organization = await prisma.organization.findFirst({
+      where: {
+        id: id,
+        members: {
+          some: {
+            userId: user.id
+          }
+        }
+      },
+      include: {
+        members: {
+          select: {
+            userId: true,
+            role: true,
+            user: {
+              select: {
+                id: true,
+                fullName: true,
+                avatarUrl: true,
+                email: true
+              }
+            }
+          }
+        }
+      }
+    })
+    
+    if (!organization) {
       return NextResponse.json(
         { error: 'Organization not found' },
         { status: 404 }
       )
     }
     
-    return NextResponse.json(data)
+    return NextResponse.json(organization)
   } catch (error: any) {
+    console.error('Error fetching organization:', error);
     return NextResponse.json(
-      { error: error.message },
+      { message: error.message || 'Failed to fetch organization' },
       { status: 500 }
     )
   }
@@ -56,19 +78,18 @@ export async function PATCH(
     // Validate input
     const validatedData = organizationSchema.parse(body)
     
-    // Get current user
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
-    if (userError || !user) throw new Error('Unauthorized')
+    // Get current user and ensure they exist in our database
+    const user = await getCurrentUser(supabase)
     
     // Check if user is owner/admin
-    const { data: member, error: memberError } = await supabase
-      .from('organization_members')
-      .select('role')
-      .eq('organization_id', id)
-      .eq('user_id', user.id)
-      .single()
+    const member = await prisma.organizationMember.findFirst({
+      where: {
+        organizationId: id,
+        userId: user.id
+      }
+    })
     
-    if (memberError || !member || !['owner', 'admin'].includes(member.role)) {
+    if (!member || !['owner', 'admin'].includes(member.role)) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 403 }
@@ -76,25 +97,30 @@ export async function PATCH(
     }
     
     // Update organization
-    const { data, error } = await supabase
-      .from('organizations')
-      .update(validatedData)
-      .eq('id', id)
-      .select()
-      .single()
+    const organization = await prisma.organization.update({
+      where: { id },
+      data: validatedData,
+      include: {
+        members: {
+          select: {
+            userId: true,
+            role: true
+          }
+        }
+      }
+    })
     
-    if (error) throw error
-    
-    return NextResponse.json(data)
+    return NextResponse.json(organization)
   } catch (error: any) {
+    console.error('Error updating organization:', error);
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: error.errors },
+        { message: 'Validation error', details: error.errors },
         { status: 400 }
       )
     }
     return NextResponse.json(
-      { error: error.message },
+      { message: error.message || 'Failed to update organization' },
       { status: 500 }
     )
   }
@@ -108,37 +134,34 @@ export async function DELETE(
     const { id } = await params
     const supabase = await createClient()
     
-    // Get current user
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
-    if (userError || !user) throw new Error('Unauthorized')
+    // Get current user and ensure they exist in our database
+    const user = await getCurrentUser(supabase)
     
     // Check if user is owner
-    const { data: member, error: memberError } = await supabase
-      .from('organization_members')
-      .select('role')
-      .eq('organization_id', id)
-      .eq('user_id', user.id)
-      .single()
+    const member = await prisma.organizationMember.findFirst({
+      where: {
+        organizationId: id,
+        userId: user.id
+      }
+    })
     
-    if (memberError || !member || member.role !== 'owner') {
+    if (!member || member.role !== 'owner') {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 403 }
       )
     }
     
-    // Delete organization
-    const { error } = await supabase
-      .from('organizations')
-      .delete()
-      .eq('id', id)
-    
-    if (error) throw error
+    // Delete organization (cascade will handle related data)
+    await prisma.organization.delete({
+      where: { id }
+    })
     
     return NextResponse.json({ success: true })
   } catch (error: any) {
+    console.error('Error fetching organization:', error);
     return NextResponse.json(
-      { error: error.message },
+      { message: error.message || 'Failed to fetch organization' },
       { status: 500 }
     )
   }
