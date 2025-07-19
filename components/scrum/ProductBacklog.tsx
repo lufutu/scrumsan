@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { Column } from './Column'
 import { TaskCardModern } from './TaskCardModern'
 import { TaskTypeSelector } from './TaskTypeSelector'
-import { ItemModalRedesigned } from './ItemModalRedesigned'
+import { ItemModal } from './ItemModal'
 import BacklogTable from './BacklogTable'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -723,7 +723,7 @@ export default function ProductBacklog({
 
       {/* Item Modal */}
       {selectedTask && (
-        <ItemModalRedesigned
+        <ItemModal
           isOpen={!!selectedTask}
           onClose={() => setSelectedTask(null)}
           taskId={selectedTask.id}

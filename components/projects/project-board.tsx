@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label'
 import { Plus, MoreHorizontal, Trash2, GripVertical, Loader2 } from 'lucide-react'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { TaskCardModern } from '@/components/scrum/TaskCardModern'
-import { ItemModalRedesigned } from '@/components/scrum/ItemModalRedesigned'
+import { ItemModal } from '@/components/scrum/ItemModal'
 import { ComprehensiveInlineForm } from '@/components/scrum/ComprehensiveInlineForm'
 import ProjectScrumBoard from '@/components/projects/project-scrum-board'
 import EnhancedScrumBoard from '@/components/scrum/EnhancedScrumBoard'
@@ -582,7 +582,7 @@ export default function ProjectBoard({ projectId }: ProjectBoardProps) {
 
       {/* Task Modal */}
       {selectedTask && (
-        <ItemModalRedesigned
+        <ItemModal
           isOpen={!!selectedTask}
           onClose={() => setSelectedTask(null)}
           taskId={selectedTask.id}

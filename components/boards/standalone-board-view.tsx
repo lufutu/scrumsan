@@ -9,7 +9,7 @@ import { GripVertical, Plus } from 'lucide-react'
 import { TaskCardModern } from '@/components/scrum/TaskCardModern'
 import TaskCreationDialog from '@/components/common/TaskCreationDialog'
 import { ComprehensiveInlineForm } from '@/components/scrum/ComprehensiveInlineForm'
-import { ItemModalRedesigned } from '@/components/scrum/ItemModalRedesigned'
+import { ItemModal } from '@/components/scrum/ItemModal'
 import { useUsers } from '@/hooks/useUsers'
 import { useLabels } from '@/hooks/useLabels'
 
@@ -497,7 +497,7 @@ export default function StandaloneBoardView({ board, onUpdate }: StandaloneBoard
 
       {/* Task Modal */}
       {selectedTask && (
-        <ItemModalRedesigned
+        <ItemModal
           isOpen={!!selectedTask}
           onClose={() => setSelectedTask(null)}
           taskId={selectedTask.id}

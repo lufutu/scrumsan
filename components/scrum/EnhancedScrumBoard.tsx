@@ -29,7 +29,7 @@ import {
   Search
 } from 'lucide-react'
 import { TaskCardModern } from '@/components/scrum/TaskCardModern'
-import { ItemModalRedesigned } from '@/components/scrum/ItemModalRedesigned'
+import { ItemModal } from '@/components/scrum/ItemModal'
 import { ComprehensiveInlineForm } from '@/components/scrum/ComprehensiveInlineForm'
 import { 
   DndContext, 
@@ -706,7 +706,7 @@ export default function EnhancedScrumBoard({
 
       {/* Task Modal */}
       {selectedTask && (
-        <ItemModalRedesigned
+        <ItemModal
           isOpen={!!selectedTask}
           onClose={() => setSelectedTask(null)}
           taskId={selectedTask.id}

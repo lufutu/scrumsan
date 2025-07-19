@@ -19,7 +19,7 @@ const Progress = ({ value, className }: { value: number; className?: string }) =
 )
 import { Calendar, Clock, Target, Plus, Activity, ArrowRight, X, Timer, BarChart3, Users } from 'lucide-react'
 import { TaskCardModern } from '@/components/scrum/TaskCardModern'
-import { ItemModalRedesigned } from '@/components/scrum/ItemModalRedesigned'
+import { ItemModal } from '@/components/scrum/ItemModal'
 import { ComprehensiveInlineForm } from '@/components/scrum/ComprehensiveInlineForm'
 import SprintForm from '@/components/sprints/sprint-form'
 import { Tables } from '@/types/database'
@@ -809,7 +809,7 @@ export default function ProjectScrumBoard({ projectId, board, onUpdate }: Projec
 
       {/* Task Modal */}
       {selectedTask && (
-        <ItemModalRedesigned
+        <ItemModal
           isOpen={!!selectedTask}
           onClose={() => setSelectedTask(null)}
           taskId={selectedTask.id}

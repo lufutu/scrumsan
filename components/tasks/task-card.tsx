@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { MoreHorizontal, Edit, Trash, AlertCircle, ArrowUp, Ban, AlertTriangle } from 'lucide-react'
 import { useTaskRelations } from '@/hooks/useTaskRelations'
 import { Tables } from '@/types/database'
-import { ItemModalRedesigned } from '@/components/scrum/ItemModalRedesigned'
+import { ItemModal } from '@/components/scrum/ItemModal'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -212,7 +212,7 @@ export default function TaskCard({ task, onUpdate, onDelete, className = "" }: T
       </div>
     </div>
 
-    <ItemModalRedesigned
+    <ItemModal
       isOpen={isEditModalOpen}
       onClose={() => setIsEditModalOpen(false)}
       taskId={task.id}
