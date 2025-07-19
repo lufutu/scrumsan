@@ -28,7 +28,6 @@ export async function GET(
       include: {
         board: {
           select: {
-            projectId: true,
             organizationId: true
           }
         }
@@ -42,22 +41,8 @@ export async function GET(
       )
     }
 
-    // Check access
-    if (task.projectId) {
-      const projectMember = await prisma.projectMember.findFirst({
-        where: {
-          projectId: task.projectId,
-          userId: user.id
-        }
-      })
-      
-      if (!projectMember) {
-        return NextResponse.json(
-          { error: 'Unauthorized' },
-          { status: 403 }
-        )
-      }
-    } else if (task.board?.organizationId) {
+    // Check access to organization
+    if (task.board?.organizationId) {
       const orgMember = await prisma.organizationMember.findFirst({
         where: {
           organizationId: task.board.organizationId,
@@ -126,7 +111,6 @@ export async function POST(
       include: {
         board: {
           select: {
-            projectId: true,
             organizationId: true
           }
         }
@@ -140,22 +124,8 @@ export async function POST(
       )
     }
 
-    // Check access
-    if (parentTask.projectId) {
-      const projectMember = await prisma.projectMember.findFirst({
-        where: {
-          projectId: parentTask.projectId,
-          userId: user.id
-        }
-      })
-      
-      if (!projectMember) {
-        return NextResponse.json(
-          { error: 'Unauthorized' },
-          { status: 403 }
-        )
-      }
-    } else if (parentTask.board?.organizationId) {
+    // Check access to organization
+    if (parentTask.board?.organizationId) {
       const orgMember = await prisma.organizationMember.findFirst({
         where: {
           organizationId: parentTask.board.organizationId,
@@ -262,7 +232,6 @@ export async function POST(
           taskType: validatedData.taskType || 'task',
           parentId: parentTaskId,
           boardId: parentTask.boardId,
-          projectId: parentTask.projectId,
           assigneeId: validatedData.assigneeId,
           position: nextPosition,
           createdBy: user.id

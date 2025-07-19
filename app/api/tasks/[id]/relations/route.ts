@@ -29,11 +29,14 @@ export async function GET(
       include: {
         board: {
           select: {
-            projectId: true,
-            organizationId: true
+            organizationId: true,
+            projectLinks: {
+              select: {
+                projectId: true
+              }
+            }
           }
-        },
-        project: true
+        }
       }
     })
 
@@ -44,22 +47,8 @@ export async function GET(
       )
     }
 
-    // Check access
-    if (task.projectId) {
-      const projectMember = await prisma.projectMember.findFirst({
-        where: {
-          projectId: task.projectId,
-          userId: user.id
-        }
-      })
-      
-      if (!projectMember) {
-        return NextResponse.json(
-          { error: 'Unauthorized' },
-          { status: 403 }
-        )
-      }
-    } else if (task.board?.organizationId) {
+    // Check access to organization
+    if (task.board?.organizationId) {
       const orgMember = await prisma.organizationMember.findFirst({
         where: {
           organizationId: task.board.organizationId,
@@ -73,6 +62,11 @@ export async function GET(
           { status: 403 }
         )
       }
+    } else {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 403 }
+      )
     }
 
     // Get all relationships
@@ -224,7 +218,6 @@ export async function POST(
         include: {
           board: {
             select: {
-              projectId: true,
               organizationId: true
             }
           }
@@ -235,7 +228,6 @@ export async function POST(
         include: {
           board: {
             select: {
-              projectId: true,
               organizationId: true
             }
           }
@@ -251,16 +243,8 @@ export async function POST(
     }
 
     // Check access for both tasks
-    const checkAccess = async (task: { projectId?: string; board?: { organizationId?: string } }) => {
-      if (task.projectId) {
-        const projectMember = await prisma.projectMember.findFirst({
-          where: {
-            projectId: task.projectId,
-            userId: user.id
-          }
-        })
-        return !!projectMember
-      } else if (task.board?.organizationId) {
+    const checkAccess = async (task: { board?: { organizationId?: string } }) => {
+      if (task.board?.organizationId) {
         const orgMember = await prisma.organizationMember.findFirst({
           where: {
             organizationId: task.board.organizationId,
@@ -362,22 +346,8 @@ export async function PUT(
       )
     }
 
-    // Check access
-    if (task.projectId) {
-      const projectMember = await prisma.projectMember.findFirst({
-        where: {
-          projectId: task.projectId,
-          userId: user.id
-        }
-      })
-      
-      if (!projectMember) {
-        return NextResponse.json(
-          { error: 'Unauthorized' },
-          { status: 403 }
-        )
-      }
-    } else if (task.board?.organizationId) {
+    // Check access to organization
+    if (task.board?.organizationId) {
       const orgMember = await prisma.organizationMember.findFirst({
         where: {
           organizationId: task.board.organizationId,
@@ -391,6 +361,11 @@ export async function PUT(
           { status: 403 }
         )
       }
+    } else {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 403 }
+      )
     }
 
     // If setting a parent, verify parent task exists and prevent circular references
@@ -512,22 +487,8 @@ export async function DELETE(
       )
     }
 
-    // Check access
-    if (task.projectId) {
-      const projectMember = await prisma.projectMember.findFirst({
-        where: {
-          projectId: task.projectId,
-          userId: user.id
-        }
-      })
-      
-      if (!projectMember) {
-        return NextResponse.json(
-          { error: 'Unauthorized' },
-          { status: 403 }
-        )
-      }
-    } else if (task.board?.organizationId) {
+    // Check access to organization
+    if (task.board?.organizationId) {
       const orgMember = await prisma.organizationMember.findFirst({
         where: {
           organizationId: task.board.organizationId,
@@ -541,6 +502,11 @@ export async function DELETE(
           { status: 403 }
         )
       }
+    } else {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 403 }
+      )
     }
 
     // Delete the relation (check both directions)

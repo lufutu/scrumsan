@@ -98,8 +98,10 @@ export async function GET(
             id: true,
             url: true,
             name: true,
-            createdAt: true,
-            uploader: {
+            size: true,
+            type: true,
+            uploadedAt: true,
+            uploadedByUser: {
               select: {
                 id: true,
                 fullName: true,
@@ -125,9 +127,16 @@ export async function GET(
     }
     
     // Check user access through organization membership
+    if (!task.board) {
+      return NextResponse.json(
+        { error: 'Task board not found' },
+        { status: 404 }
+      )
+    }
+    
     const orgMember = await prisma.organizationMember.findFirst({
       where: {
-        organizationId: task.board!.organizationId,
+        organizationId: task.board.organizationId,
         userId: user.id
       }
     })

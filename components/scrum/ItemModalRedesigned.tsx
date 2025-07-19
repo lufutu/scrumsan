@@ -41,6 +41,9 @@ import {
 import { useSupabase } from '@/providers/supabase-provider';
 import { useToast } from '@/hooks/use-toast';
 import { Tables } from '@/types/database';
+import { FileUploadQueue, QueuedFile } from '@/components/ui/file-upload-queue';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { toast } from 'sonner';
 
 type Task = Tables<'tasks'> & {
   assignee?: {
@@ -94,6 +97,20 @@ interface Comment {
   created_at: string;
 }
 
+interface Attachment {
+  id: string;
+  name: string;
+  size: number;
+  type: string;
+  url: string;
+  uploadedAt: string;
+  uploadedByUser: {
+    id: string;
+    fullName: string;
+    avatarUrl?: string;
+  };
+}
+
 export function ItemModalRedesigned({
   isOpen,
   onClose,
@@ -114,11 +131,13 @@ export function ItemModalRedesigned({
   const [newChecklistItem, setNewChecklistItem] = useState('');
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState('');
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
 
   useEffect(() => {
     if (taskId && isOpen) {
       fetchTask();
       fetchComments();
+      fetchAttachments();
     }
   }, [taskId, isOpen]);
 
@@ -127,36 +146,15 @@ export function ItemModalRedesigned({
     
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('tasks')
-        .select(`
-          *,
-          assignee:users!assignee_id (
-            id,
-            full_name,
-            avatar_url
-          ),
-          created_by_user:users!created_by (
-            id,
-            full_name
-          ),
-          board:boards!board_id (
-            id,
-            name
-          ),
-          project:projects!project_id (
-            id,
-            name
-          ),
-          column:board_columns!column_id (
-            id,
-            name
-          )
-        `)
-        .eq('id', taskId)
-        .single();
+      const response = await fetch(`/api/tasks/${taskId}`);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Task fetch failed:', response.status, errorText);
+        throw new Error(`Failed to fetch task: ${response.status}`);
+      }
 
-      if (error) throw error;
+      const data = await response.json();
 
       setTask(data);
       setTitle(data.title);
@@ -181,24 +179,68 @@ export function ItemModalRedesigned({
     if (!taskId) return;
     
     try {
-      const { data, error } = await supabase
-        .from('task_comments')
-        .select(`
-          *,
-          user:users!user_id (
-            id,
-            full_name,
-            avatar_url
-          )
-        `)
-        .eq('task_id', taskId)
-        .order('created_at', { ascending: false });
-
-      if (error && error.code !== 'PGRST116') throw error;
-
-      setComments(data || []);
+      const response = await fetch(`/api/tasks/${taskId}/comments`);
+      
+      if (response.ok) {
+        const data = await response.json();
+        setComments(data || []);
+      }
     } catch (error) {
       console.error('Error fetching comments:', error);
+    }
+  };
+
+  const fetchAttachments = async () => {
+    if (!taskId) return;
+    
+    try {
+      const response = await fetch(`/api/tasks/${taskId}/attachments`);
+      if (response.ok) {
+        const data = await response.json();
+        setAttachments(data);
+      }
+    } catch (error) {
+      console.error('Error fetching attachments:', error);
+    }
+  };
+
+  const handleFileUpload = async (file: File) => {
+    const formData = new FormData();
+    formData.append('files', file);
+    const response = await fetch(`/api/tasks/${taskId}/attachments`, {
+      method: 'POST',
+      body: formData,
+    });
+    
+    if (!response.ok) {
+      throw new Error('Upload failed');
+    }
+    
+    return await response.json();
+  };
+
+  const handleUploadComplete = (queuedFile: QueuedFile, result: any) => {
+    setAttachments(prev => [...prev, result]);
+    toast.success(`${queuedFile.file.name} uploaded successfully`);
+  };
+
+  const handleUploadError = (queuedFile: QueuedFile, error: string) => {
+    toast.error(`Failed to upload ${queuedFile.file.name}: ${error}`);
+  };
+
+  const deleteAttachment = async (attachmentId: string) => {
+    try {
+      const response = await fetch(`/api/tasks/${taskId}/attachments/${attachmentId}`, {
+        method: 'DELETE',
+      });
+      
+      if (response.ok) {
+        setAttachments(prev => prev.filter(a => a.id !== attachmentId));
+        toast.success('Attachment deleted successfully');
+      }
+    } catch (error) {
+      console.error('Error deleting attachment:', error);
+      toast.error('Failed to delete attachment');
     }
   };
 
@@ -207,12 +249,20 @@ export function ItemModalRedesigned({
     
     setIsSaving(true);
     try {
-      const { error } = await supabase
-        .from('tasks')
-        .update(updates)
-        .eq('id', taskId);
+      const response = await fetch(`/api/tasks/${taskId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updates)
+      });
 
-      if (error) throw error;
+      if (!response.ok) {
+        throw new Error('Failed to update task');
+      }
+
+      const updatedTask = await response.json();
+      setTask(updatedTask);
 
       toast({
         title: "Success",
@@ -232,18 +282,22 @@ export function ItemModalRedesigned({
   };
 
   const addComment = async () => {
-    if (!newComment.trim() || !taskId || !user) return;
+    if (!newComment.trim() || !taskId) return;
     
     try {
-      const { error } = await supabase
-        .from('task_comments')
-        .insert({
-          task_id: taskId,
-          user_id: user.id,
+      const response = await fetch(`/api/tasks/${taskId}/comments`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
           content: newComment.trim()
-        });
+        })
+      });
 
-      if (error) throw error;
+      if (!response.ok) {
+        throw new Error('Failed to add comment');
+      }
 
       setNewComment('');
       fetchComments();
@@ -311,11 +365,18 @@ export function ItemModalRedesigned({
     }
   };
 
-  if (!task && !isLoading) return null;
+  if (!task) return null;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-[1200px] h-[90vh] p-0 gap-0">
+      <DialogContent 
+        className="h-[90vh] p-0 gap-0"
+        style={{ 
+          width: '95vw', 
+          maxWidth: '1600px',
+          minWidth: '1200px'
+        }}
+      >
         <VisuallyHidden>
           <DialogTitle>Item Details</DialogTitle>
         </VisuallyHidden>
@@ -440,6 +501,12 @@ export function ItemModalRedesigned({
                   className="px-4 pb-3 data-[state=active]:border-b-2 data-[state=active]:border-teal-500 rounded-none"
                 >
                   RELATIONS
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="files"
+                  className="px-4 pb-3 data-[state=active]:border-b-2 data-[state=active]:border-teal-500 rounded-none"
+                >
+                  FILES ({attachments.length})
                 </TabsTrigger>
               </TabsList>
 
@@ -626,6 +693,71 @@ export function ItemModalRedesigned({
                   </div>
                 </div>
               </TabsContent>
+
+              <TabsContent value="files" className="mt-6">
+                <div className="space-y-4">
+                  {/* File Upload Queue */}
+                  <FileUploadQueue
+                    onUpload={handleFileUpload}
+                    onUploadComplete={handleUploadComplete}
+                    onUploadError={handleUploadError}
+                    multiple={true}
+                    accept="*/*"
+                    maxSize={50}
+                    maxFiles={20}
+                    autoUpload={true}
+                    className="min-h-[120px]"
+                  />
+
+                  {/* Existing Attachments */}
+                  {attachments.length > 0 && (
+                    <div className="space-y-2">
+                      <h4 className="text-sm font-medium text-muted-foreground">
+                        Uploaded Files ({attachments.length})
+                      </h4>
+                      <div className="grid grid-cols-1 gap-2">
+                        {attachments.map((file) => (
+                          <Card key={file.id} className="group">
+                            <CardContent className="p-3">
+                              <div className="flex items-start gap-3">
+                                <div className="flex-shrink-0">
+                                  {file.type.startsWith('image/') ? (
+                                    <ImageIcon className="w-8 h-8 text-blue-500" />
+                                  ) : (
+                                    <FileText className="w-8 h-8 text-gray-500" />
+                                  )}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center justify-between">
+                                    <p className="text-sm font-medium text-gray-900 truncate">
+                                      {file.name}
+                                    </p>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => deleteAttachment(file.id)}
+                                      className="opacity-0 group-hover:opacity-100 transition-opacity"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                  </div>
+                                  <p className="text-xs text-gray-500">
+                                    {(file.size / 1024 / 1024).toFixed(2)} MB • 
+                                    Uploaded by {file.uploadedByUser.fullName}
+                                  </p>
+                                  <p className="text-xs text-gray-400">
+                                    {new Date(file.uploadedAt).toLocaleDateString()}
+                                  </p>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
             </Tabs>
           </div>
 
@@ -665,7 +797,7 @@ export function ItemModalRedesigned({
             <div>
               <Label className="text-sm font-medium text-gray-500 mb-3 block">LABELS</Label>
               <div className="flex flex-wrap gap-2">
-                {('labels' in task && task.labels) ? (
+                {(task && 'labels' in task && task.labels) ? (
                   (task.labels as any[]).map((label, index) => (
                     <Badge key={index} className="bg-blue-900 text-white hover:bg-blue-800">
                       {label.name}

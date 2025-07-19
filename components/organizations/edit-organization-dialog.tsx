@@ -18,7 +18,8 @@ import { Textarea } from '@/components/ui/textarea'
 import { Upload, X, Image as ImageIcon, Trash2 } from 'lucide-react'
 import Image from 'next/image'
 import { toast } from 'sonner'
-import { uploadOrganizationLogo } from '@/lib/supabase/storage'
+import { FileUploadQueue, QueuedFile } from '@/components/ui/file-upload-queue'
+// Removed uploadOrganizationLogo import - now using API endpoint
 import { useOrganizationLogo } from '@/hooks/useOrganizationLogo'
 import { Organization } from '@/hooks/useOrganizations'
 
@@ -43,7 +44,8 @@ export function EditOrganizationDialog({
   const [logoFile, setLogoFile] = useState<File | null>(null)
   const [logoPreview, setLogoPreview] = useState<string | null>(null)
   const [removeLogo, setRemoveLogo] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
 
   // Get current logo URL
   const { logoUrl: currentLogoUrl } = useOrganizationLogo(organization.id, organization.logo)
@@ -59,30 +61,21 @@ export function EditOrganizationDialog({
     setRemoveLogo(false)
   }, [organization])
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      // Validate file type
-      const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml']
-      if (!allowedTypes.includes(file.type)) {
-        toast.error('Invalid file type. Please select a PNG, JPG, WebP or SVG image.')
-        return
-      }
+  const handleLogoUpload = async (file: File) => {
+    // Just return the file - we'll handle actual upload during form submission
+    return { file }
+  }
 
-      // Validate file size (5MB max)
-      const maxSizeMB = 5
-      const fileSizeInMB = file.size / (1024 * 1024)
-      if (fileSizeInMB > maxSizeMB) {
-        toast.error(`File size exceeds the maximum allowed size of ${maxSizeMB}MB`)
-        return
-      }
+  const handleLogoUploadComplete = (queuedFile: QueuedFile, result: any) => {
+    setLogoFile(queuedFile.file)
+    setRemoveLogo(false)
+    // Create preview URL
+    const previewUrl = URL.createObjectURL(queuedFile.file)
+    setLogoPreview(previewUrl)
+  }
 
-      setLogoFile(file)
-      setRemoveLogo(false)
-      // Create preview URL
-      const previewUrl = URL.createObjectURL(file)
-      setLogoPreview(previewUrl)
-    }
+  const handleLogoUploadError = (queuedFile: QueuedFile, error: string) => {
+    toast.error(`Failed to process logo: ${error}`)
   }
 
   const handleRemoveNewLogo = () => {
@@ -90,9 +83,6 @@ export function EditOrganizationDialog({
     if (logoPreview) {
       URL.revokeObjectURL(logoPreview)
       setLogoPreview(null)
-    }
-    if (fileInputRef.current) {
-      fileInputRef.current.value = ''
     }
   }
 
@@ -114,11 +104,33 @@ export function EditOrganizationDialog({
 
       // Handle logo changes
       if (logoFile) {
-        // Upload new logo
-        const { filename } = await uploadOrganizationLogo(organization.id, logoFile)
-        logoToUpdate = filename
+        // Upload new logo via API
+        const logoFormData = new FormData()
+        logoFormData.append('logo', logoFile)
+        
+        const logoResponse = await fetch(`/api/organizations/${organization.id}/logo`, {
+          method: 'POST',
+          body: logoFormData,
+        })
+        
+        if (!logoResponse.ok) {
+          const logoError = await logoResponse.json()
+          throw new Error(logoError.error || 'Failed to upload logo')
+        }
+        
+        const logoResult = await logoResponse.json()
+        logoToUpdate = logoResult.filename
       } else if (removeLogo) {
-        // Remove logo
+        // Remove logo via API
+        const logoResponse = await fetch(`/api/organizations/${organization.id}/logo`, {
+          method: 'DELETE',
+        })
+        
+        if (!logoResponse.ok) {
+          const logoError = await logoResponse.json()
+          throw new Error(logoError.error || 'Failed to remove logo')
+        }
+        
         logoToUpdate = null
       }
 
@@ -276,33 +288,79 @@ export function EditOrganizationDialog({
 
             <div className="space-y-2">
               <Label htmlFor="logo">Logo</Label>
-              <div className="flex items-center gap-4">
-                {getLogoDisplay()}
-                
-                <div className="flex-1">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={isLoading}
-                    className="w-full"
-                  >
-                    <Upload className="w-4 h-4 mr-2" />
-                    {logoFile ? 'Change Logo' : currentLogoUrl && !removeLogo ? 'Update Logo' : 'Upload Logo'}
-                  </Button>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    PNG, JPG, WebP or SVG. Max 5MB.
-                  </p>
+              {logoPreview || (currentLogoUrl && !removeLogo) ? (
+                <div className="flex items-center gap-4">
+                  {getLogoDisplay()}
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">
+                      {logoFile?.name || 'Current logo'}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {logoFile ? `${(logoFile.size / 1024 / 1024).toFixed(2)} MB` : ''}
+                    </p>
+                    <div className="flex gap-2 mt-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={logoFile ? handleRemoveNewLogo : handleRemoveCurrentLogo}
+                      >
+                        <X className="w-4 h-4 mr-1" />
+                        Remove
+                      </Button>
+                      {!logoFile && (
+                        <FileUploadQueue
+                          onUpload={handleLogoUpload}
+                          onUploadComplete={handleLogoUploadComplete}
+                          onUploadError={handleLogoUploadError}
+                          multiple={false}
+                          accept="image/*"
+                          maxSize={5}
+                          maxFiles={1}
+                          disabled={isLoading || isUploadingLogo}
+                          className="h-8 inline-block"
+                        >
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-8"
+                          >
+                            Change
+                          </Button>
+                        </FileUploadQueue>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              </div>
-              
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleFileSelect}
-                className="hidden"
-              />
+              ) : (
+                <FileUploadQueue
+                  onUpload={handleLogoUpload}
+                  onUploadComplete={handleLogoUploadComplete}
+                  onUploadError={handleLogoUploadError}
+                  multiple={false}
+                  accept="image/*"
+                  maxSize={5}
+                  maxFiles={1}
+                  disabled={isLoading}
+                  autoUpload={true}
+                  showQueue={false}
+                  className="h-32"
+                >
+                  <div className="flex flex-col items-center justify-center text-center">
+                    <ImageIcon className="h-8 w-8 mb-2 text-muted-foreground" />
+                    <p className="text-sm font-medium">
+                      Drag & drop your logo here
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      or click to browse
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      PNG, JPG, WebP or SVG • Max 5MB
+                    </p>
+                  </div>
+                </FileUploadQueue>
+              )}
             </div>
           </div>
 

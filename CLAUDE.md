@@ -197,6 +197,18 @@ This is a **VivifyScrum clone** - a comprehensive project management application
 - **Use provided helper functions** like `getItemTypeById()`, `getPriorityColor()`, etc.
 - **Maintain consistency** across all components using the same constants
 
+### IMPORTANT: Component Version Management Rule
+- **ALWAYS use the latest redesigned components**, not old versions
+- **When a component is redesigned**, immediately:
+  - Update all imports to use the new version (e.g., `ItemModalRedesigned`)
+  - Remove the old component file completely to avoid confusion
+  - Migrate all functionality to the new version
+- **Never work on old component versions** - always update the current/latest version
+- **File naming for redesigned components**:
+  - Keep redesigned suffix during development: `ComponentRedesigned.tsx`
+  - After migration is complete, rename to replace the original component
+- **This prevents accidentally updating wrong files** and maintains code consistency
+
 #### Example: Adding a Comments Feature
 BAD (UI only):
 - ✗ Create comment UI component

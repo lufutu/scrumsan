@@ -32,7 +32,7 @@ export function OrgSwitcher() {
     const [imageErrors, setImageErrors] = React.useState<Set<string>>(new Set())
     
     // Generate logo URLs for all organizations
-    const logoUrls = useOrganizationLogos(organizations)
+    const { logoUrls } = useOrganizationLogos(organizations)
 
     const handleImageError = (orgId: string) => {
         setImageErrors(prev => new Set([...prev, orgId]))

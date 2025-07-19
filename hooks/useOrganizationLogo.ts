@@ -1,11 +1,10 @@
 "use client"
 
 import { useState, useEffect } from 'react'
-import { getOrganizationLogoSignedUrl, checkOrganizationLogoExists, listOrganizationLogos } from '@/lib/supabase/storage'
 
 /**
  * Hook to get the logo URL for an organization
- * Handles the conversion from stored filename to actual URL
+ * Uses signed URLs from the API for secure access
  */
 export function useOrganizationLogo(organizationId: string, logoFilename: string | null) {
   const [logoUrl, setLogoUrl] = useState<string | null>(null)
@@ -15,42 +14,47 @@ export function useOrganizationLogo(organizationId: string, logoFilename: string
   useEffect(() => {
     if (!logoFilename || !organizationId) {
       setLogoUrl(null)
+      setError(null)
       return
     }
 
     // Check if it's already a full URL (for backward compatibility)
     if (logoFilename.startsWith('http')) {
       setLogoUrl(logoFilename)
+      setError(null)
       return
     }
 
-    const checkAndGenerateUrl = async () => {
+    const fetchSignedUrl = async () => {
       try {
         setIsLoading(true)
         setError(null)
         
-        // Check if file exists first
-        const fileExists = await checkOrganizationLogoExists(organizationId, logoFilename)
+        // Get signed URL from API
+        const response = await fetch(`/api/organizations/${organizationId}/logo/url`)
         
-        if (!fileExists) {
-          setLogoUrl(null)
-          setError(`Logo file not found: ${logoFilename}`)
-          return
+        if (!response.ok) {
+          if (response.status === 404) {
+            // No logo found
+            setLogoUrl(null)
+            return
+          }
+          throw new Error('Failed to get logo URL')
         }
         
-        // Generate signed URL from filename
-        const url = await getOrganizationLogoSignedUrl(organizationId, logoFilename)
-        setLogoUrl(url)
+        const data = await response.json()
+        setLogoUrl(data.url)
+        
       } catch (err) {
-        console.error('Error generating logo URL:', err)
-        setError(err instanceof Error ? err.message : 'Failed to generate logo URL')
+        console.error('Error fetching logo URL:', err)
+        setError(err instanceof Error ? err.message : 'Failed to load logo')
         setLogoUrl(null)
       } finally {
         setIsLoading(false)
       }
     }
 
-    checkAndGenerateUrl()
+    fetchSignedUrl()
   }, [organizationId, logoFilename])
 
   return { logoUrl, isLoading, error }
@@ -58,49 +62,59 @@ export function useOrganizationLogo(organizationId: string, logoFilename: string
 
 /**
  * Hook to get logo URLs for multiple organizations
- * Useful for lists of organizations
+ * Uses signed URLs from the API for secure access
  */
 export function useOrganizationLogos(organizations: Array<{ id: string; logo: string | null }>) {
   const [logoUrls, setLogoUrls] = useState<Record<string, string | null>>({})
+  const [isLoading, setIsLoading] = useState(false)
 
   useEffect(() => {
-    const generateLogoUrls = async () => {
+    const fetchAllLogoUrls = async () => {
+      setIsLoading(true)
       const newLogoUrls: Record<string, string | null> = {}
 
-      for (const org of organizations) {
+      // Process organizations in parallel
+      const promises = organizations.map(async (org) => {
         if (!org.logo) {
           newLogoUrls[org.id] = null
-          continue
+          return
         }
 
         // Check if it's already a full URL (for backward compatibility)
         if (org.logo.startsWith('http')) {
           newLogoUrls[org.id] = org.logo
-          continue
+          return
         }
 
         try {
-          // Check if file exists first
-          const fileExists = await checkOrganizationLogoExists(org.id, org.logo)
+          // Get signed URL from API
+          const response = await fetch(`/api/organizations/${org.id}/logo/url`)
           
-          if (fileExists) {
-            // Generate signed URL from filename
-            const url = await getOrganizationLogoSignedUrl(org.id, org.logo)
-            newLogoUrls[org.id] = url
+          if (response.ok) {
+            const data = await response.json()
+            newLogoUrls[org.id] = data.url
           } else {
+            // If 404, no logo exists
             newLogoUrls[org.id] = null
           }
         } catch (err) {
-          console.error(`Error generating logo URL for org ${org.id}:`, err)
+          console.error(`Error fetching logo URL for org ${org.id}:`, err)
           newLogoUrls[org.id] = null
         }
-      }
+      })
 
+      await Promise.all(promises)
       setLogoUrls(newLogoUrls)
+      setIsLoading(false)
     }
 
-    generateLogoUrls()
+    if (organizations.length > 0) {
+      fetchAllLogoUrls()
+    } else {
+      setLogoUrls({})
+      setIsLoading(false)
+    }
   }, [organizations])
 
-  return logoUrls
+  return { logoUrls, isLoading }
 } 

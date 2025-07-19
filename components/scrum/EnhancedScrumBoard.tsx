@@ -29,6 +29,7 @@ import {
   Search
 } from 'lucide-react'
 import { TaskCardModern } from '@/components/scrum/TaskCardModern'
+import { ItemModalRedesigned } from '@/components/scrum/ItemModalRedesigned'
 import { ComprehensiveInlineForm } from '@/components/scrum/ComprehensiveInlineForm'
 import { 
   DndContext, 
@@ -131,6 +132,7 @@ export default function EnhancedScrumBoard({
   const [draggedTask, setDraggedTask] = useState<Task | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterPriority, setFilterPriority] = useState<string[]>([])
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   
   // Sprint creation state
   const [isCreateSprintOpen, setIsCreateSprintOpen] = useState(false)
@@ -582,6 +584,7 @@ export default function EnhancedScrumBoard({
                           } : undefined}
                           labels={[]}
                           status="todo"
+                          onClick={() => setSelectedTask(task)}
                         />
                       </div>
                     ))}
@@ -635,6 +638,7 @@ export default function EnhancedScrumBoard({
                                 labels={[]}
                                 status={column.name.toLowerCase().includes('done') ? 'done' : 
                                        column.name.toLowerCase().includes('progress') ? 'in_progress' : 'todo'}
+                                onClick={() => setSelectedTask(task)}
                               />
                             </div>
                           ))}
@@ -699,6 +703,18 @@ export default function EnhancedScrumBoard({
           )}
         </DragOverlay>
       </div>
+
+      {/* Task Modal */}
+      {selectedTask && (
+        <ItemModalRedesigned
+          isOpen={!!selectedTask}
+          onClose={() => setSelectedTask(null)}
+          taskId={selectedTask.id}
+          onUpdate={() => {
+            setSelectedTask(null);
+          }}
+        />
+      )}
     </DndContext>
   )
 }

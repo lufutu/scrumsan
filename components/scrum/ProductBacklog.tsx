@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { Column } from './Column'
 import { TaskCardModern } from './TaskCardModern'
 import { TaskTypeSelector } from './TaskTypeSelector'
-import { ItemModal } from './ItemModal'
+import { ItemModalRedesigned } from './ItemModalRedesigned'
 import BacklogTable from './BacklogTable'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -723,30 +723,12 @@ export default function ProductBacklog({
 
       {/* Item Modal */}
       {selectedTask && (
-        <ItemModal
+        <ItemModalRedesigned
           isOpen={!!selectedTask}
           onClose={() => setSelectedTask(null)}
-          boardId={boardId}
-          item={{
-            id: selectedTask.id,
-            itemCode: selectedTask.id,
-            title: selectedTask.title,
-            description: selectedTask.description,
-            taskType: selectedTask.taskType,
-            storyPoints: selectedTask.storyPoints,
-            assignee: selectedTask.assignee ? {
-              id: 'temp-id',
-              name: selectedTask.assignee.fullName,
-              initials: selectedTask.assignee.fullName.split(' ').map(n => n[0]).join('')
-            } : undefined,
-            status: selectedTask.status
-          }}
-          onUpdate={(updates) => {
-            updateTask(selectedTask.id, updates)
-            setSelectedTask(null)
-          }}
-          onDelete={() => {
-            handleDeleteTask(selectedTask.id)
+          taskId={selectedTask.id}
+          onUpdate={() => {
+            // Refresh data
             setSelectedTask(null)
           }}
         />

@@ -9,6 +9,7 @@ import { GripVertical, Plus } from 'lucide-react'
 import { TaskCardModern } from '@/components/scrum/TaskCardModern'
 import TaskCreationDialog from '@/components/common/TaskCreationDialog'
 import { ComprehensiveInlineForm } from '@/components/scrum/ComprehensiveInlineForm'
+import { ItemModalRedesigned } from '@/components/scrum/ItemModalRedesigned'
 import { useUsers } from '@/hooks/useUsers'
 import { useLabels } from '@/hooks/useLabels'
 
@@ -90,6 +91,7 @@ export default function StandaloneBoardView({ board, onUpdate }: StandaloneBoard
   const [draggedTask, setDraggedTask] = useState<string | null>(null)
   const [draggedOver, setDraggedOver] = useState<string | null>(null)
   const [showInlineForm, setShowInlineForm] = useState<{[key: string]: boolean}>({})
+  const [selectedTask, setSelectedTask] = useState<any | null>(null)
   const { users } = useUsers({ organizationId: board.organizationId })
   const { labels } = useLabels(board.id)
 
@@ -253,6 +255,7 @@ export default function StandaloneBoardView({ board, onUpdate }: StandaloneBoard
                               avatar: task.assignee.avatarUrl
                             } : undefined}
                             status={task.status === 'todo' ? 'todo' : task.status === 'done' ? 'done' : 'in_progress'}
+                            onClick={() => setSelectedTask(task)}
                           />
                         </div>
                       ))}
@@ -404,6 +407,7 @@ export default function StandaloneBoardView({ board, onUpdate }: StandaloneBoard
                         avatar: task.assignee.avatarUrl
                       } : undefined}
                       status={task.status === 'todo' ? 'todo' : task.status === 'done' ? 'done' : 'in_progress'}
+                      onClick={() => setSelectedTask(task)}
                     />
                   </div>
                 ))}
@@ -490,6 +494,19 @@ export default function StandaloneBoardView({ board, onUpdate }: StandaloneBoard
           </div>
         ))}
       </div>
+
+      {/* Task Modal */}
+      {selectedTask && (
+        <ItemModalRedesigned
+          isOpen={!!selectedTask}
+          onClose={() => setSelectedTask(null)}
+          taskId={selectedTask.id}
+          onUpdate={() => {
+            onUpdate();
+            setSelectedTask(null);
+          }}
+        />
+      )}
     </div>
   )
 } 

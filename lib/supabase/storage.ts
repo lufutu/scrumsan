@@ -1,72 +1,12 @@
 import { createClient } from '@/lib/supabase/client'
+import { 
+  uploadFileToS3, 
+  deleteFileFromS3ByUrl, 
+  uploadOrganizationLogoToS3,
+  extractS3KeyFromUrl 
+} from '@/lib/aws/s3'
 
-/**
- * Generate a signed URL for an organization logo
- * @param organizationId - The organization ID
- * @param logoPath - The logo filename or path (e.g., "1750840733141_SnapZen 2.png")
- * @param expiresIn - Expiration time in seconds (default: 1 hour)
- */
-export async function getOrganizationLogoUrl(
-  organizationId: string, 
-  logoPath: string, 
-  expiresIn: number = 3600
-): Promise<string | null> {
-  try {
-    const supabase = createClient()
-    
-    // Construct the full path: organizationId/logo/filename
-    const fullPath = `${organizationId}/logo/${logoPath}`
-    
-    const { data, error } = await supabase.storage
-      .from('organizations')
-      .createSignedUrl(fullPath, expiresIn)
-    
-    if (error) {
-      console.error('Error creating signed URL:', error)
-      return null
-    }
-    
-    return data.signedUrl
-  } catch (error) {
-    console.error('Error generating organization logo URL:', error)
-    return null
-  }
-}
-
-/**
- * Get signed URL for organization logo (private bucket)
- * All logo access must go through signed URLs for security
- * @param organizationId - The organization ID  
- * @param logoPath - The logo filename or path
- * @param expiresIn - Expiration time in seconds (default: 24 hours)
- */
-export async function getOrganizationLogoSignedUrl(
-  organizationId: string,
-  logoPath: string,
-  expiresIn: number = 86400 // 24 hours
-): Promise<string | null> {
-  try {
-    const supabase = createClient()
-    
-    // Construct the full path: organizationId/logo/filename
-    const fullPath = `${organizationId}/logo/${logoPath}`
-    
-    // Create signed URL for private bucket access
-    const { data, error } = await supabase.storage
-      .from('organizations')
-      .createSignedUrl(fullPath, expiresIn)
-    
-    if (error) {
-      console.error('Error creating signed URL:', error)
-      return null
-    }
-    
-    return data.signedUrl
-  } catch (error) {
-    console.error('Error generating organization logo URL:', error)
-    return null
-  }
-}
+// Organization logo URL generation is now handled client-side in useOrganizationLogo hook
 
 /**
  * Upload organization logo and return just the filename
@@ -77,96 +17,53 @@ export async function uploadOrganizationLogo(
   organizationId: string,
   file: File
 ): Promise<{ filename: string; publicUrl: string }> {
-  const supabase = createClient()
-  
-  // Create filename with timestamp - avoid special characters
-  const timestamp = Date.now()
-  const fileExt = file.name.split('.').pop()
-  // Replace spaces and special characters with underscores
-  const cleanFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_')
-  const fileName = `${timestamp}_${cleanFileName}`
-  const filePath = `${organizationId}/logo/${fileName}`
-  
-
-  
-  const { data, error } = await supabase.storage
-    .from('organizations')
-    .upload(filePath, file, {
-      cacheControl: '3600',
-      upsert: false,
-    })
-  
-  if (error) {
-    throw new Error(`Failed to upload logo: ${error.message}`)
+  try {
+    const result = await uploadOrganizationLogoToS3(organizationId, file)
+    
+    return {
+      filename: result.filename,
+      publicUrl: result.url
+    }
+  } catch (error) {
+    throw new Error(`Failed to upload logo: ${error instanceof Error ? error.message : 'Unknown error'}`)
   }
-  
-  // Get signed URL for immediate display
-  const signedUrl = await getOrganizationLogoSignedUrl(organizationId, fileName)
-  
-  return {
-    filename: fileName,
-    publicUrl: signedUrl || ''
+}
+
+// Organization logo existence checking removed - not needed for S3 public URLs
+
+/**
+ * Upload a file to S3
+ * @param file - The file to upload
+ * @param folder - The folder path (replaces bucket concept)
+ * @param path - Optional additional path within the folder
+ */
+export async function uploadFile(
+  file: File,
+  folder: string,
+  path?: string
+): Promise<{ url: string; path: string }> {
+  try {
+    const fullFolder = path ? `${folder}/${path}` : folder
+    const result = await uploadFileToS3(file, fullFolder)
+    
+    return {
+      url: result.url,
+      path: result.key
+    }
+  } catch (error) {
+    throw new Error(`Failed to upload file: ${error instanceof Error ? error.message : 'Unknown error'}`)
   }
 }
 
 /**
- * List files in organization logo storage (for debugging)
- * @param organizationId - The organization ID
+ * Delete a file from S3 storage
+ * @param url - The file URL to delete
+ * @param bucket - Unused parameter, kept for compatibility
  */
-export async function listOrganizationLogos(organizationId: string) {
+export async function deleteFile(url: string, bucket?: string): Promise<void> {
   try {
-    const supabase = createClient()
-    
-    const { data, error } = await supabase.storage
-      .from('organizations')
-      .list(`${organizationId}/logo`, {
-        limit: 100,
-        offset: 0,
-      })
-    
-    if (error) {
-      console.error('Error listing organization logos:', error)
-      return []
-    }
-    
-
-    return data
+    await deleteFileFromS3ByUrl(url)
   } catch (error) {
-    console.error('Error listing organization logos:', error)
-    return []
-  }
-}
-
-/**
- * Check if organization logo file exists
- * @param organizationId - The organization ID
- * @param logoPath - The logo filename
- */
-export async function checkOrganizationLogoExists(
-  organizationId: string,
-  logoPath: string
-): Promise<boolean> {
-  try {
-    const supabase = createClient()
-    
-    const fullPath = `${organizationId}/logo/${logoPath}`
-    
-    const { data, error } = await supabase.storage
-      .from('organizations')
-      .list(`${organizationId}/logo`, {
-        limit: 100,
-        offset: 0,
-      })
-    
-    if (error) {
-      console.error('Error checking file existence:', error)
-      return false
-    }
-    
-    const fileExists = data.some(file => file.name === logoPath)
-    return fileExists
-  } catch (error) {
-    console.error('Error checking file existence:', error)
-    return false
+    throw new Error(`Failed to delete file: ${error instanceof Error ? error.message : 'Unknown error'}`)
   }
 } 

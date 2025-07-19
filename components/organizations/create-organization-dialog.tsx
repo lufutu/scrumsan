@@ -18,7 +18,8 @@ import { Textarea } from '@/components/ui/textarea'
 import { Upload, X, Image as ImageIcon } from 'lucide-react'
 import Image from 'next/image'
 import { toast } from 'sonner'
-import { uploadOrganizationLogo } from '@/lib/supabase/storage'
+import { FileUploadQueue, QueuedFile } from '@/components/ui/file-upload-queue'
+// Removed uploadOrganizationLogo import - now using API endpoint
 
 interface CreateOrganizationDialogProps {
   open: boolean
@@ -38,31 +39,23 @@ export function CreateOrganizationDialog({
   })
   const [logoFile, setLogoFile] = useState<File | null>(null)
   const [logoPreview, setLogoPreview] = useState<string | null>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      // Validate file type
-      const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml']
-      if (!allowedTypes.includes(file.type)) {
-        toast.error('Invalid file type. Please select a PNG, JPG, WebP or SVG image.')
-        return
-      }
+  const handleLogoUpload = async (file: File) => {
+    // Just return the file - we'll handle actual upload during form submission
+    return { file }
+  }
 
-      // Validate file size (5MB max)
-      const maxSizeMB = 5
-      const fileSizeInMB = file.size / (1024 * 1024)
-      if (fileSizeInMB > maxSizeMB) {
-        toast.error(`File size exceeds the maximum allowed size of ${maxSizeMB}MB`)
-        return
-      }
+  const handleLogoUploadComplete = (queuedFile: QueuedFile, result: any) => {
+    setLogoFile(queuedFile.file)
+    // Create preview URL
+    const previewUrl = URL.createObjectURL(queuedFile.file)
+    setLogoPreview(previewUrl)
+  }
 
-      setLogoFile(file)
-      // Create preview URL
-      const previewUrl = URL.createObjectURL(file)
-      setLogoPreview(previewUrl)
-    }
+  const handleLogoUploadError = (queuedFile: QueuedFile, error: string) => {
+    toast.error(`Failed to process logo: ${error}`)
   }
 
   const handleRemoveLogo = () => {
@@ -70,9 +63,6 @@ export function CreateOrganizationDialog({
     if (logoPreview) {
       URL.revokeObjectURL(logoPreview)
       setLogoPreview(null)
-    }
-    if (fileInputRef.current) {
-      fileInputRef.current.value = ''
     }
   }
 
@@ -95,20 +85,19 @@ export function CreateOrganizationDialog({
 
       const newOrg = await response.json()
 
-      // If there's a logo file, upload it and store only the filename
+      // If there's a logo file, upload it via API
       if (logoFile) {
-        const { filename } = await uploadOrganizationLogo(newOrg.id, logoFile)
-
-        // Update organization with just the filename (not full URL)
-        const updateResponse = await fetch(`/api/organizations/${newOrg.id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ logo: filename }),
+        const logoFormData = new FormData()
+        logoFormData.append('logo', logoFile)
+        
+        const logoResponse = await fetch(`/api/organizations/${newOrg.id}/logo`, {
+          method: 'POST',
+          body: logoFormData,
         })
-
-        if (!updateResponse.ok) {
-          const error = await updateResponse.json()
-          throw new Error(error.message || 'Failed to update organization logo')
+        
+        if (!logoResponse.ok) {
+          const logoError = await logoResponse.json()
+          throw new Error(logoError.error || 'Failed to upload logo')
         }
       }
 
@@ -182,8 +171,8 @@ export function CreateOrganizationDialog({
 
             <div className="space-y-2">
               <Label htmlFor="logo">Logo</Label>
-              <div className="flex items-center gap-4">
-                {logoPreview ? (
+              {logoPreview ? (
+                <div className="flex items-center gap-4">
                   <div className="relative">
                     <div className="w-16 h-16 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center overflow-hidden">
                       <Image
@@ -204,39 +193,50 @@ export function CreateOrganizationDialog({
                       <X className="w-3 h-3" />
                     </Button>
                   </div>
-                ) : (
-                  <div
-                    className="w-16 h-16 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center cursor-pointer hover:border-gray-400 transition-colors"
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    <ImageIcon className="w-6 h-6 text-gray-400" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">{logoFile?.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {logoFile ? `${(logoFile.size / 1024 / 1024).toFixed(2)} MB` : ''}
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleRemoveLogo}
+                      className="mt-2"
+                    >
+                      Change Logo
+                    </Button>
                   </div>
-                )}
-                
-                <div className="flex-1">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={isLoading}
-                    className="w-full"
-                  >
-                    <Upload className="w-4 h-4 mr-2" />
-                    {logoFile ? 'Change Logo' : 'Upload Logo'}
-                  </Button>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    PNG, JPG, WebP or SVG. Max 5MB.
-                  </p>
                 </div>
-              </div>
-              
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleFileSelect}
-                className="hidden"
-              />
+              ) : (
+                <FileUploadQueue
+                  onFileUpload={handleLogoUpload}
+                  onUploadComplete={handleLogoUploadComplete}
+                  onUploadError={handleLogoUploadError}
+                  multiple={false}
+                  accept="image/*"
+                  maxSize={5}
+                  maxFiles={1}
+                  disabled={isLoading}
+                  autoUpload={true}
+                  showQueue={false}
+                  className="h-32"
+                >
+                  <div className="flex flex-col items-center justify-center text-center">
+                    <ImageIcon className="h-8 w-8 mb-2 text-muted-foreground" />
+                    <p className="text-sm font-medium">
+                      Drag & drop your logo here
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      or click to browse
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      PNG, JPG, WebP or SVG • Max 5MB
+                    </p>
+                  </div>
+                </FileUploadQueue>
+              )}
             </div>
           </div>
 

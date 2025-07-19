@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label'
 import { Plus, MoreHorizontal, Trash2, GripVertical, Loader2 } from 'lucide-react'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { TaskCardModern } from '@/components/scrum/TaskCardModern'
+import { ItemModalRedesigned } from '@/components/scrum/ItemModalRedesigned'
 import { ComprehensiveInlineForm } from '@/components/scrum/ComprehensiveInlineForm'
 import ProjectScrumBoard from '@/components/projects/project-scrum-board'
 import EnhancedScrumBoard from '@/components/scrum/EnhancedScrumBoard'
@@ -59,6 +60,7 @@ export default function ProjectBoard({ projectId }: ProjectBoardProps) {
   const [newColumnName, setNewColumnName] = useState('')
   const [isCreatingColumn, setIsCreatingColumn] = useState(false)
   const [showInlineForm, setShowInlineForm] = useState<{[key: string]: boolean}>({})
+  const [selectedTask, setSelectedTask] = useState<any | null>(null)
 
 
   // Task drag handlers (for Kanban board only)
@@ -490,6 +492,7 @@ export default function ProjectBoard({ projectId }: ProjectBoardProps) {
                         avatar: task.assignee.avatarUrl
                       } : undefined}
                       status={task.status === 'todo' ? 'todo' : task.status === 'done' ? 'done' : 'in_progress'}
+                      onClick={() => setSelectedTask(task)}
                     />
                   </div>
                 ))}
@@ -576,6 +579,18 @@ export default function ProjectBoard({ projectId }: ProjectBoardProps) {
           </div>
         ))}
       </div>
+
+      {/* Task Modal */}
+      {selectedTask && (
+        <ItemModalRedesigned
+          isOpen={!!selectedTask}
+          onClose={() => setSelectedTask(null)}
+          taskId={selectedTask.id}
+          onUpdate={() => {
+            setSelectedTask(null);
+          }}
+        />
+      )}
     </div>
   )
 } 

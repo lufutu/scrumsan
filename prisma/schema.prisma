@@ -32,10 +32,14 @@ model User {
   reviewedTasks       Task[]               @relation("TaskReviewer")
   createdTasks        Task[]               @relation("TaskCreator")
   comments            Comment[]
-  attachments         Attachment[]
+  attachments         Attachment[]         @relation
   createdTaskRelations TaskRelation[]      @relation("TaskRelationCreator")
   taskAssignments     TaskAssignee[]
   taskReviews         TaskReviewer[]
+  createdChecklists   TaskChecklist[]
+  createdChecklistItems TaskChecklistItem[]
+  completedChecklistItems TaskChecklistItem[] @relation("ChecklistItemCompletedBy")
+  worklogEntries      TaskWorklog[]
 
   @@map("users")
 }
@@ -228,6 +232,8 @@ model Task {
   taskAssignees     TaskAssignee[]
   taskReviewers     TaskReviewer[]
   customFieldValues TaskCustomFieldValue[]
+  checklists        TaskChecklist[]
+  worklogEntries    TaskWorklog[]
 
   @@map("tasks")
 }
@@ -323,14 +329,70 @@ model Attachment {
   taskId     String?  @map("task_id") @db.Uuid
   url        String
   name       String?
+  size       Int?     @default(0)
+  type       String?  @default("application/octet-stream")
   uploadedBy String?  @map("uploaded_by") @db.Uuid
+  uploadedAt DateTime @default(now()) @map("uploaded_at") @db.Timestamptz
   createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   // Relationships
-  task     Task? @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  uploader User? @relation(fields: [uploadedBy], references: [id])
+  task         Task? @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  uploadedByUser User? @relation(fields: [uploadedBy], references: [id])
 
   @@map("attachments")
+}
+
+// Task Checklists
+model TaskChecklist {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  taskId    String   @map("task_id") @db.Uuid
+  name      String
+  createdBy String   @map("created_by") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relationships
+  task      Task                @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  creator   User                @relation(fields: [createdBy], references: [id])
+  items     TaskChecklistItem[]
+
+  @@map("task_checklists")
+}
+
+// Task Checklist Items
+model TaskChecklistItem {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  checklistId String    @map("checklist_id") @db.Uuid
+  content     String
+  completed   Boolean   @default(false)
+  completedAt DateTime? @map("completed_at") @db.Timestamptz
+  completedBy String?   @map("completed_by") @db.Uuid
+  createdBy   String    @map("created_by") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relationships
+  checklist     TaskChecklist @relation(fields: [checklistId], references: [id], onDelete: Cascade)
+  creator       User          @relation(fields: [createdBy], references: [id])
+  completedByUser User?       @relation("ChecklistItemCompletedBy", fields: [completedBy], references: [id])
+
+  @@map("task_checklist_items")
+}
+
+// Task Worklog
+model TaskWorklog {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  taskId      String   @map("task_id") @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  description String
+  hoursLogged Float    @map("hours_logged")
+  dateLogged  DateTime @map("date_logged") @db.Timestamptz
+  startDate   DateTime @map("start_date") @db.Timestamptz
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relationships
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("task_worklog")
 }
 
 

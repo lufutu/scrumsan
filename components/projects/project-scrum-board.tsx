@@ -19,6 +19,7 @@ const Progress = ({ value, className }: { value: number; className?: string }) =
 )
 import { Calendar, Clock, Target, Plus, Activity, ArrowRight, X, Timer, BarChart3, Users } from 'lucide-react'
 import { TaskCardModern } from '@/components/scrum/TaskCardModern'
+import { ItemModalRedesigned } from '@/components/scrum/ItemModalRedesigned'
 import { ComprehensiveInlineForm } from '@/components/scrum/ComprehensiveInlineForm'
 import SprintForm from '@/components/sprints/sprint-form'
 import { Tables } from '@/types/database'
@@ -69,6 +70,7 @@ export default function ProjectScrumBoard({ projectId, board, onUpdate }: Projec
   const [draggedTask, setDraggedTask] = useState<Task | null>(null)
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null)
   const [showEnhancedForm, setShowEnhancedForm] = useState<{[key: string]: boolean}>({})
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null)
 
   useEffect(() => {
     if (projectId && board?.id) {
@@ -680,6 +682,7 @@ export default function ProjectScrumBoard({ projectId, board, onUpdate }: Projec
                                   color: l.color || '#6B7280'
                                 })) : []}
                                 status={task.status === 'todo' ? 'todo' : task.status === 'done' ? 'done' : 'in_progress'}
+                              onClick={() => setSelectedTask(task)}
                               />
                               {activeSprint.status === 'planning' && (
                                 <Button
@@ -803,6 +806,18 @@ export default function ProjectScrumBoard({ projectId, board, onUpdate }: Projec
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Task Modal */}
+      {selectedTask && (
+        <ItemModalRedesigned
+          isOpen={!!selectedTask}
+          onClose={() => setSelectedTask(null)}
+          taskId={selectedTask.id}
+          onUpdate={() => {
+            setSelectedTask(null);
+          }}
+        />
+      )}
     </div>
   )
 } 
