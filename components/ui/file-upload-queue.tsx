@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useRef, useState, useCallback } from 'react'
+import React, { useRef, useState, useCallback, useEffect } from 'react'
 import { Upload, X, FileText, Image, Video, Archive, File, Check, AlertCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -30,6 +30,8 @@ interface FileUploadQueueProps {
   children?: React.ReactNode
   showQueue?: boolean
   autoUpload?: boolean
+  autoClearCompleted?: boolean // Clear completed files automatically
+  autoClearDelay?: number // Delay in ms before clearing (default 2000)
 }
 
 const getFileIcon = (type: string, size: 'sm' | 'md' | 'lg' = 'md') => {
@@ -70,12 +72,25 @@ export function FileUploadQueue({
   className,
   children,
   showQueue = true,
-  autoUpload = true
+  autoUpload = true,
+  autoClearCompleted = false,
+  autoClearDelay = 2000
 }: FileUploadQueueProps) {
   const [isDragOver, setIsDragOver] = useState(false)
-  const [dragCounter, setDragCounter] = useState(0)
   const [fileQueue, setFileQueue] = useState<QueuedFile[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const dragCounterRef = useRef(0)
+
+  // Track timers for auto-clearing
+  const clearTimersRef = useRef<Map<string, NodeJS.Timeout>>(new Map())
+
+  // Clean up timers on unmount
+  useEffect(() => {
+    return () => {
+      clearTimersRef.current.forEach(timer => clearTimeout(timer))
+      clearTimersRef.current.clear()
+    }
+  }, [])
 
   const validateFile = useCallback((file: File): string | null => {
     // Check file size
@@ -144,16 +159,18 @@ export function FileUploadQueue({
     if (validFiles.length > 0) {
       setFileQueue(prev => {
         const newQueue = multiple ? [...prev, ...validFiles] : validFiles
-        
-        // Auto-upload if enabled
-        if (autoUpload) {
-          validFiles.forEach(queuedFile => {
-            uploadFile(queuedFile.id, newQueue)
-          })
-        }
-        
         return newQueue
       })
+      
+      // Auto-upload if enabled (moved outside setFileQueue to avoid dependency issues)
+      if (autoUpload) {
+        // Use setTimeout to ensure state is updated before uploading
+        setTimeout(() => {
+          validFiles.forEach(queuedFile => {
+            uploadFile(queuedFile.id)
+          })
+        }, 0)
+      }
     }
   }, [fileQueue.length, maxFiles, validateFile, multiple, autoUpload])
 
@@ -196,6 +213,15 @@ export function FileUploadQueue({
       const updatedFile = { ...queuedFile, status: 'completed' as const, progress: 100, result }
       onUploadComplete?.(updatedFile, result)
 
+      // Auto-clear completed file after delay if enabled
+      if (autoClearCompleted) {
+        const timer = setTimeout(() => {
+          setFileQueue(prev => prev.filter(f => f.id !== fileId))
+          clearTimersRef.current.delete(fileId)
+        }, autoClearDelay)
+        clearTimersRef.current.set(fileId, timer)
+      }
+
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Upload failed'
       
@@ -210,9 +236,16 @@ export function FileUploadQueue({
       const updatedFile = { ...queuedFile, status: 'error' as const, error: errorMessage }
       onUploadError?.(updatedFile, errorMessage)
     }
-  }, [fileQueue, onFileUpload, onUploadComplete, onUploadError])
+  }, [fileQueue, onFileUpload, onUploadComplete, onUploadError, autoClearCompleted, autoClearDelay])
 
   const removeFile = useCallback((fileId: string) => {
+    // Clear any pending auto-clear timer
+    const timer = clearTimersRef.current.get(fileId)
+    if (timer) {
+      clearTimeout(timer)
+      clearTimersRef.current.delete(fileId)
+    }
+    
     setFileQueue(prev => prev.filter(f => f.id !== fileId))
     onFileRemove?.(fileId)
   }, [onFileRemove])
@@ -227,7 +260,7 @@ export function FileUploadQueue({
   const handleDragEnter = useCallback((e: React.DragEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    setDragCounter(prev => prev + 1)
+    dragCounterRef.current += 1
     if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
       setIsDragOver(true)
     }
@@ -236,13 +269,10 @@ export function FileUploadQueue({
   const handleDragLeave = useCallback((e: React.DragEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    setDragCounter(prev => {
-      const newCount = prev - 1
-      if (newCount === 0) {
-        setIsDragOver(false)
-      }
-      return newCount
-    })
+    dragCounterRef.current -= 1
+    if (dragCounterRef.current === 0) {
+      setIsDragOver(false)
+    }
   }, [])
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -255,7 +285,7 @@ export function FileUploadQueue({
     e.stopPropagation()
     
     setIsDragOver(false)
-    setDragCounter(0)
+    dragCounterRef.current = 0
     
     if (disabled) return
 

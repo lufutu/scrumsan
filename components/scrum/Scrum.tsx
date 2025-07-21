@@ -8,6 +8,7 @@ interface ScrumProps {
   boardId: string
   projectId?: string
   organizationId?: string
+  initialTaskId?: string | null
 }
 
 interface Sprint {

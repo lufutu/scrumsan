@@ -57,6 +57,7 @@ import { useSupabase } from '@/providers/supabase-provider';
 import { useToast } from '@/hooks/use-toast';
 import { Tables } from '@/types/database';
 import { FileUploadQueue } from '@/components/ui/file-upload-queue';
+import { RelationsTab } from '@/components/scrum/RelationsTab';
 import { toast } from 'sonner';
 
 type Task = Tables<'tasks'> & {
@@ -129,26 +130,27 @@ interface Attachment {
   name: string;
   size: number;
   type: string;
-  url: string;
+  url: string | null;
   uploadedAt: string;
   uploadedByUser: {
     id: string;
     fullName: string;
     avatarUrl?: string;
   };
+  error?: string;
 }
 
 interface WorklogEntry {
   id: string;
   description: string;
-  hours: number;
-  date: string;
+  hoursLogged: number;
+  dateLogged: string;
   user: {
     id: string;
-    full_name: string | null;
-    avatar_url: string | null;
+    fullName: string;
+    avatarUrl: string | null;
   };
-  created_at: string;
+  createdAt: string;
 }
 
 export function ItemModal({
@@ -179,6 +181,7 @@ export function ItemModal({
   const [worklogEntries, setWorklogEntries] = useState<WorklogEntry[]>([]);
   const [newWorklogDescription, setNewWorklogDescription] = useState('');
   const [newWorklogHours, setNewWorklogHours] = useState('');
+  const [imageLoadErrors, setImageLoadErrors] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (taskId && isOpen) {
@@ -410,8 +413,8 @@ export function ItemModal({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           description: newWorklogDescription.trim(),
-          hours: parseFloat(newWorklogHours),
-          date: new Date().toISOString().split('T')[0]
+          hoursLogged: parseFloat(newWorklogHours),
+          dateLogged: new Date().toISOString().split('T')[0]
         })
       });
 
@@ -430,6 +433,10 @@ export function ItemModal({
   };
 
   const handleFileUpload = async (file: File) => {
+    if (!taskId) {
+      throw new Error('No task ID available');
+    }
+    
     const formData = new FormData();
     formData.append('files', file);
     const response = await fetch(`/api/tasks/${taskId}/attachments`, {
@@ -474,12 +481,93 @@ export function ItemModal({
     return itemType?.icon || '📋';
   };
 
+  // Dropdown menu handlers
+  const handleOpenInNewTab = () => {
+    if (taskId && task?.board?.id) {
+      // Open the board with task selected via URL parameter
+      const url = `${window.location.origin}/boards/${task.board.id}?task=${taskId}`;
+      window.open(url, '_blank');
+    }
+  };
+
+  const handleCopyLink = async () => {
+    if (taskId && task?.board?.id) {
+      // Copy link to board with task parameter
+      const url = `${window.location.origin}/boards/${task.board.id}?task=${taskId}`;
+      try {
+        await navigator.clipboard.writeText(url);
+        toast.success('Link copied to clipboard');
+      } catch (error) {
+        console.error('Failed to copy link:', error);
+        toast.error('Failed to copy link');
+      }
+    }
+  };
+
+  const handleArchive = async () => {
+    if (!taskId) return;
+    
+    try {
+      await updateTask({ archived: true });
+      toast.success('Task archived');
+      onClose(); // Close modal after archiving
+    } catch (error) {
+      console.error('Error archiving task:', error);
+      toast.error('Failed to archive task');
+    }
+  };
+
+  const handleToggleFavorite = async () => {
+    if (!taskId) return;
+    
+    try {
+      await updateTask({ is_favorite: !task?.is_favorite });
+      toast.success(task?.is_favorite ? 'Removed from favorites' : 'Added to favorites');
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+      toast.error('Failed to update favorite status');
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!taskId) return;
+    
+    if (confirm('Are you sure you want to delete this task? This action cannot be undone.')) {
+      try {
+        const response = await fetch(`/api/tasks/${taskId}`, {
+          method: 'DELETE',
+        });
+        
+        if (!response.ok) {
+          throw new Error('Failed to delete task');
+        }
+        
+        toast.success('Task deleted');
+        onUpdate?.();
+        onClose();
+      } catch (error) {
+        console.error('Error deleting task:', error);
+        toast.error('Failed to delete task');
+      }
+    }
+  };
+
   if (!task && !isLoading) return null;
 
+  // Handle dialog close only when user explicitly wants to close
+  const handleDialogOpenChange = (open: boolean) => {
+    // Only close when dialog is being closed (open = false) AND not during other state changes
+    if (!open) {
+      onClose();
+    }
+  };
+
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={handleDialogOpenChange}>
       <DialogContent 
-        className="h-[95vh] p-0 gap-0 max-w-[1400px] w-[95vw]"
+        className="[&>button:last-child]:hidden h-[95vh] p-0 gap-0 w-[95vw] max-w-[95vw] sm:max-w-[65vw]"
+        onInteractOutside={(e) => e.preventDefault()} // Prevent closing when clicking outside
+        onEscapeKeyDown={(e) => e.preventDefault()} // Prevent closing on ESC key
       >
         <VisuallyHidden>
           <DialogTitle>Task Details</DialogTitle>
@@ -514,8 +602,17 @@ export function ItemModal({
           </div>
           
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" className="h-9 w-9 hover:bg-white/80">
-              <Flag className="h-4 w-4 text-slate-500" />
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-9 w-9 hover:bg-white/80"
+              onClick={handleToggleFavorite}
+              title={task?.is_favorite ? "Remove from favorites" : "Add to favorites"}
+            >
+              <Flag className={cn(
+                "h-4 w-4",
+                task?.is_favorite ? "text-yellow-500 fill-yellow-500" : "text-slate-500"
+              )} />
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -524,20 +621,20 @@ export function ItemModal({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuItem className="gap-2">
+                <DropdownMenuItem className="gap-2" onClick={handleOpenInNewTab}>
                   <ExternalLink className="h-4 w-4" />
                   Open in new tab
                 </DropdownMenuItem>
-                <DropdownMenuItem className="gap-2">
+                <DropdownMenuItem className="gap-2" onClick={handleCopyLink}>
                   <Copy className="h-4 w-4" />
                   Copy link
                 </DropdownMenuItem>
-                <DropdownMenuItem className="gap-2">
+                <DropdownMenuItem className="gap-2" onClick={handleArchive}>
                   <Archive className="h-4 w-4" />
                   Archive
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem className="text-red-600 gap-2">
+                <DropdownMenuItem className="text-red-600 gap-2" onClick={handleDelete}>
                   <Trash2 className="h-4 w-4" />
                   Delete
                 </DropdownMenuItem>
@@ -767,18 +864,18 @@ export function ItemModal({
                         <CardContent className="p-4">
                           <div className="flex gap-3">
                             <Avatar className="h-8 w-8">
-                              <AvatarImage src={comment.user.avatar_url || ''} />
+                              <AvatarImage src={comment.user.avatarUrl || ''} />
                               <AvatarFallback className="text-xs bg-slate-500 text-white">
-                                {comment.user.full_name?.charAt(0) || 'U'}
+                                {comment.user.fullName?.charAt(0) || 'U'}
                               </AvatarFallback>
                             </Avatar>
                             <div className="flex-1">
                               <div className="flex items-center gap-2 mb-2">
                                 <span className="font-medium text-slate-900">
-                                  {comment.user.full_name || 'Unknown User'}
+                                  {comment.user.fullName || 'Unknown User'}
                                 </span>
                                 <span className="text-xs text-slate-500">
-                                  {new Date(comment.created_at).toLocaleString()}
+                                  {new Date(comment.createdAt).toLocaleString()}
                                 </span>
                               </div>
                               <p className="text-slate-700 whitespace-pre-wrap">{comment.content}</p>
@@ -873,21 +970,21 @@ export function ItemModal({
                       <CardContent className="p-4">
                         <div className="flex items-start gap-3">
                           <Avatar className="h-8 w-8">
-                            <AvatarImage src={entry.user.avatar_url || ''} />
+                            <AvatarImage src={entry.user.avatarUrl || ''} />
                             <AvatarFallback className="text-xs bg-blue-500 text-white">
-                              {entry.user.full_name?.charAt(0) || 'U'}
+                              {entry.user.fullName?.charAt(0) || 'U'}
                             </AvatarFallback>
                           </Avatar>
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-1">
                               <span className="font-medium text-slate-900">
-                                {entry.user.full_name || 'Unknown User'}
+                                {entry.user.fullName || 'Unknown User'}
                               </span>
                               <Badge variant="outline" className="text-xs">
-                                {entry.hours}h
+                                {entry.hoursLogged}h
                               </Badge>
                               <span className="text-xs text-slate-500">
-                                {new Date(entry.date).toLocaleDateString()}
+                                {new Date(entry.dateLogged).toLocaleDateString()}
                               </span>
                             </div>
                             <p className="text-slate-700">{entry.description}</p>
@@ -900,17 +997,17 @@ export function ItemModal({
               </TabsContent>
 
               <TabsContent value="relations" className="space-y-6">
-                <div className="text-center py-12 text-slate-500">
-                  <LinkIcon className="h-12 w-12 mx-auto mb-3 text-slate-300" />
-                  <p>Task relations coming soon</p>
-                  <p className="text-sm">Subtasks, dependencies, and blocking relationships</p>
-                </div>
+                <RelationsTab 
+                  taskId={taskId!} 
+                  task={task}
+                  onUpdate={onUpdate}
+                />
               </TabsContent>
 
               <TabsContent value="files" className="space-y-6">
                 {/* File Upload */}
                 <FileUploadQueue
-                  onUpload={handleFileUpload}
+                  onFileUpload={handleFileUpload}
                   onUploadComplete={handleUploadComplete}
                   onUploadError={handleUploadError}
                   multiple={true}
@@ -918,6 +1015,8 @@ export function ItemModal({
                   maxSize={50}
                   maxFiles={20}
                   autoUpload={true}
+                  autoClearCompleted={true}
+                  autoClearDelay={3000}
                   className="min-h-[120px] border-slate-200 rounded-lg"
                 />
 
@@ -927,37 +1026,65 @@ export function ItemModal({
                     <h4 className="text-sm font-semibold text-slate-700">
                       Uploaded Files ({attachments.length})
                     </h4>
-                    <div className="grid gap-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
                       {attachments.map((file) => (
-                        <Card key={file.id} className="group border-slate-200">
-                          <CardContent className="p-4">
-                            <div className="flex items-center gap-3">
-                              <div className="flex-shrink-0">
-                                {file.type.startsWith('image/') ? (
-                                  <ImageIcon className="w-8 h-8 text-blue-500" />
-                                ) : (
-                                  <FileText className="w-8 h-8 text-slate-500" />
-                                )}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium text-slate-900 truncate">
-                                  {file.name}
-                                </p>
-                                <p className="text-xs text-slate-500">
-                                  {(file.size / 1024 / 1024).toFixed(2)} MB • 
-                                  Uploaded by {file.uploadedByUser.fullName} • 
-                                  {new Date(file.uploadedAt).toLocaleDateString()}
-                                </p>
-                              </div>
+                        <Card key={file.id} className="group relative overflow-hidden border-slate-200 hover:shadow-lg transition-shadow">
+                          {!file.url ? (
+                            <div className="aspect-square relative bg-slate-50 flex flex-col items-center justify-center p-4">
+                              <AlertCircle className="w-12 h-12 text-slate-400 mb-2" />
+                              <p className="text-xs text-slate-500 text-center">File not found</p>
                               <Button
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => deleteAttachment(file.id)}
-                                className="opacity-0 group-hover:opacity-100 transition-opacity text-red-600 hover:text-red-700 hover:bg-red-50"
+                                className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-black/50 hover:bg-black/70 text-white hover:text-white p-1.5"
                               >
                                 <Trash2 className="w-4 h-4" />
                               </Button>
                             </div>
+                          ) : file.type && file.type.startsWith('image/') && !imageLoadErrors.has(file.id) ? (
+                            <div className="aspect-square relative bg-slate-50">
+                              <img 
+                                src={file.url}
+                                alt={file.name}
+                                className="w-full h-full object-cover"
+                                onError={() => {
+                                  console.error('Failed to load image:', file.name, 'URL:', file.url);
+                                  setImageLoadErrors(prev => new Set(prev).add(file.id));
+                                }}
+                              />
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => deleteAttachment(file.id)}
+                                className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-black/50 hover:bg-black/70 text-white hover:text-white p-1.5"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <div className="aspect-square relative bg-slate-50 flex flex-col items-center justify-center p-4">
+                              <FileText className="w-12 h-12 text-slate-400 mb-2" />
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => deleteAttachment(file.id)}
+                                className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-black/50 hover:bg-black/70 text-white hover:text-white p-1.5"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          )}
+                          <CardContent className="p-3">
+                            <p className="text-xs font-medium text-slate-900 truncate mb-1">
+                              {file.name}
+                            </p>
+                            <p className="text-xs text-slate-500">
+                              {(file.size / 1024 / 1024).toFixed(2)} MB
+                            </p>
+                            <p className="text-xs text-slate-500 truncate">
+                              {file.uploadedByUser.fullName}
+                            </p>
                           </CardContent>
                         </Card>
                       ))}
@@ -1035,8 +1162,8 @@ export function ItemModal({
                   </SelectTrigger>
                   <SelectContent>
                     {STORY_POINTS.map((point) => (
-                      <SelectItem key={point.value} value={point.value.toString()}>
-                        {point.label}
+                      <SelectItem key={point} value={point.toString()}>
+                        {point}
                       </SelectItem>
                     ))}
                   </SelectContent>

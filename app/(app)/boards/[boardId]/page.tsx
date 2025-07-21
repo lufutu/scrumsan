@@ -1,6 +1,6 @@
 "use client"
 
-import { useParams } from 'next/navigation'
+import { useParams, useSearchParams } from 'next/navigation'
 import useSWR from 'swr'
 import { Card, CardContent } from '@/components/ui/card'
 import { Loader2, ArrowLeft, MoreHorizontal } from 'lucide-react'
@@ -77,7 +77,9 @@ type Board = {
 
 export default function StandaloneBoardPage() {
   const params = useParams()
+  const searchParams = useSearchParams()
   const boardId = params?.boardId as string
+  const taskId = searchParams?.get('task')
   
   const { data: board, error, isLoading, mutate } = useSWR<Board>(
     boardId ? `/api/boards/${boardId}` : null,
@@ -208,6 +210,7 @@ export default function StandaloneBoardPage() {
           <Scrum 
             boardId={board.id}
             organizationId={board.organizationId}
+            initialTaskId={taskId}
           />
         ) : (
           <StandaloneBoardView board={board} onUpdate={mutate} />
