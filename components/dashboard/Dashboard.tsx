@@ -170,7 +170,7 @@ export default function Dashboard() {
       if (projectIds.length > 0) {
         const { data: allTasks } = await supabase
           .from('tasks')
-          .select('id, status')
+          .select('id, column(name)')
           .in('project_id', projectIds)
 
         const currentDate = new Date().toISOString().split('T')[0]
@@ -180,7 +180,9 @@ export default function Dashboard() {
           .in('project_id', projectIds)
           .gte('end_date', currentDate)
 
-        const completedTasks = allTasks?.filter(task => task.status === 'done').length || 0
+        const completedTasks = allTasks?.filter(task => 
+          task.column?.name?.toLowerCase().includes('done')
+        ).length || 0
 
         setStats({
           totalProjects: allProjects?.length || 0,

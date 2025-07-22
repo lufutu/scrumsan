@@ -91,12 +91,6 @@ export default function TaskCard({ task, onUpdate, onDelete, className = "" }: T
             </span>
           </div>
           
-          {/* Status indicator */}
-          {task.status === 'done' && (
-            <div className="w-4 h-4 bg-emerald-500 rounded-full flex items-center justify-center">
-              <span className="text-white text-xs">✓</span>
-            </div>
-          )}
         </div>
       </div>
 

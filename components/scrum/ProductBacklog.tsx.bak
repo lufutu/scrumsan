@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useMemo, useEffect } from 'react'
+import { cn } from '@/lib/utils'
 import { Column } from './Column'
 import { TaskCardModern } from './TaskCardModern'
 import { TaskTypeSelector } from './TaskTypeSelector'
@@ -23,6 +24,8 @@ import {
   DragOverlay,
   DragStartEvent,
   PointerSensor,
+  MouseSensor,
+  TouchSensor,
   useSensor,
   useSensors,
   closestCenter,
@@ -84,8 +87,11 @@ function DraggableTask({
 
   const style = {
     transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
+    transition: isDragging ? 'none' : transition,
+    opacity: isDragging ? 0.8 : 1,
+    zIndex: isDragging ? 50 : 'auto',
+    rotate: isDragging ? '3deg' : '0deg',
+    scale: isDragging ? 1.02 : 1,
   }
 
   return (
@@ -113,8 +119,7 @@ function DraggableTask({
           color: l.color || '#6B7280'
         })) : []}
         url={task.url}
-        status={task.status === 'backlog' ? 'todo' : task.status === 'done' ? 'done' : 'in_progress'}
-        onClick={() => onTaskClick?.(task)}
+        onClick={!isDragging ? () => onTaskClick?.(task) : undefined}
       />
     </div>
   )
@@ -162,12 +167,18 @@ function DroppableColumn({
   }>
   boardColor?: string | null
 }) {
-  const { setNodeRef } = useDroppable({ id })
+  const { setNodeRef, isOver } = useDroppable({ id })
   
   const totalPoints = tasks.reduce((sum, task) => sum + (task.storyPoints || 0), 0)
 
   return (
-    <div ref={setNodeRef} className="h-full">
+    <div 
+      ref={setNodeRef} 
+      className={cn(
+        "h-full transition-all duration-200 ease-out",
+        isOver && "scale-[1.02] bg-blue-50 rounded-lg border-2 border-blue-300 border-dashed shadow-lg"
+      )}
+    >
       <Column
         title={title}
         itemCount={tasks.length}
@@ -181,9 +192,19 @@ function DroppableColumn({
         useEnhancedForm={true}
         boardColor={boardColor}
       >
-        <SortableContext items={tasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
-          {children}
-        </SortableContext>
+        <div className={cn(
+          "space-y-3 transition-all duration-200",
+          isOver && "transform scale-[0.98]"
+        )}>
+          <SortableContext items={tasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
+            {children}
+          </SortableContext>
+          {isOver && tasks.length === 0 && (
+            <div className="h-24 border-2 border-dashed border-blue-300 bg-blue-50/50 rounded-lg flex items-center justify-center animate-pulse">
+              <span className="text-blue-500 text-sm font-medium">Drop task here</span>
+            </div>
+          )}
+        </div>
       </Column>
     </div>
   )
@@ -251,6 +272,17 @@ export default function ProductBacklog({
   }, [initialTaskId, tasks])
 
   const sensors = useSensors(
+    useSensor(MouseSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 250,
+        tolerance: 5,
+      },
+    }),
     useSensor(PointerSensor, {
       activationConstraint: {
         distance: 8,
@@ -268,62 +300,109 @@ export default function ProductBacklog({
   }, [tasks, searchTerm])
 
   const handleDragStart = (event: DragStartEvent) => {
-    const task = filteredTasks.find(t => t.id === event.active.id)
+    console.log('Drag started:', event.active.id)
+    const task = tasks.find(t => t.id === event.active.id)
     if (task) {
+      console.log('Found task:', task.title)
       setActiveTask(task)
+    } else {
+      console.log('Task not found in:', tasks.map(t => ({ id: t.id, title: t.title })))
     }
   }
 
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event
+    console.log('Drag ended:', { activeId: active.id, overId: over?.id })
     setActiveTask(null)
 
-    if (!over) return
+    if (!over) {
+      console.log('No drop target')
+      return
+    }
 
     const taskId = active.id as string
     const targetId = over.id as string
 
-    // Find the current task and its current status
-    const currentTask = filteredTasks.find(task => task.id === taskId)
+    // Find the current task
+    const currentTask = tasks.find(task => task.id === taskId)
     if (!currentTask) return
 
     // Check if we're dropping on a column or on another task
     const isColumnTarget = ['backlog', 'sprint', 'followup'].includes(targetId)
-    const targetTask = isColumnTarget ? null : filteredTasks.find(task => task.id === targetId)
+    const targetTask = isColumnTarget ? null : tasks.find(task => task.id === targetId)
 
     // Determine if this is a column change or position change within same column
     let isColumnChange = false
-    let newStatus = currentTask.status // Keep current status by default
+    let targetLocation: 'backlog' | 'sprint' | 'followup' = 'backlog'
+
+    // Helper function to determine task's current location
+    const getTaskLocation = (task: any): 'backlog' | 'sprint' | 'followup' => {
+      if (task.sprintColumnId || task.sprintId || task.labels?.includes('__sprint__')) return 'sprint'
+      if (!task.columnId && !task.sprintColumnId && task.labels?.includes('__followup__')) return 'followup'
+      if (!task.columnId && !task.sprintColumnId && !task.labels?.includes('__followup__') && !task.labels?.includes('__sprint__')) return 'backlog'
+      return 'backlog' // default fallback
+    }
+
+    const currentLocation = getTaskLocation(currentTask)
 
     if (isColumnTarget) {
       // Dropping on a column - check if it's a different column
-      if (targetId === 'backlog' && currentTask.status !== 'backlog') {
+      console.log('Column target detected:', { targetId, currentLocation, isColumnTarget })
+      if (targetId === 'backlog' && currentLocation !== 'backlog') {
+        console.log('Moving to backlog')
         isColumnChange = true
-        newStatus = 'backlog'
-      } else if (targetId === 'sprint' && currentTask.status !== 'in_sprint') {
+        targetLocation = 'backlog'
+      } else if (targetId === 'sprint' && currentLocation !== 'sprint') {
+        console.log('Moving to sprint')
         isColumnChange = true
-        newStatus = 'in_sprint'
-      } else if (targetId === 'followup' && currentTask.status !== 'followup') {
+        targetLocation = 'sprint'
+      } else if (targetId === 'followup' && currentLocation !== 'followup') {
+        console.log('Moving to followup')
         isColumnChange = true
-        newStatus = 'followup'
+        targetLocation = 'followup'
+      } else {
+        console.log('No column change detected:', { targetId, currentLocation })
       }
     } else if (targetTask) {
       // Dropping on another task - check if they're in different columns
-      if (currentTask.status !== targetTask.status) {
+      const targetTaskLocation = getTaskLocation(targetTask)
+      if (currentLocation !== targetTaskLocation) {
         isColumnChange = true
-        newStatus = targetTask.status
+        targetLocation = targetTaskLocation
       }
     }
 
     try {
       if (isColumnChange) {
+        // Optimistic update for column change
+        mutateTasks((currentTasks: ScrumTask[] = []) => {
+          return currentTasks.map(task => {
+            if (task.id === taskId) {
+              if (targetLocation === 'backlog') {
+                return { ...task, columnId: null, sprintColumnId: null, labels: (task.labels || []).filter(l => l !== '__followup__' && l !== '__sprint__') }
+              } else if (targetLocation === 'sprint') {
+                const sprintLabels = (task.labels || []).filter(l => l !== '__followup__')
+                const finalLabels = activeSprint?.id ? sprintLabels : [...sprintLabels, '__sprint__']
+                return { ...task, columnId: null, sprintColumnId: null, sprintId: activeSprint?.id || undefined, labels: finalLabels }
+              } else if (targetLocation === 'followup') {
+                const cleanLabels = (task.labels || []).filter(l => l !== '__sprint__')
+                const followupLabels = cleanLabels.includes('__followup__') 
+                  ? cleanLabels 
+                  : [...cleanLabels, '__followup__']
+                return { ...task, columnId: null, sprintColumnId: null, labels: followupLabels }
+              }
+            }
+            return task
+          })
+        }, false)
+        
         // Handle column change
-        await moveTask(taskId, newStatus as 'backlog' | 'sprint' | 'followup', activeSprint?.id)
+        await moveTask(taskId, targetLocation, activeSprint?.id)
         toast.success('Task moved successfully')
       } else if (targetTask && targetTask.id !== taskId) {
         // Handle position change within the same column
         // Get tasks in the same column as the current task
-        const sameColumnTasks = filteredTasks.filter(task => task.status === currentTask.status)
+        const sameColumnTasks = tasks.filter(task => getTaskLocation(task) === currentLocation)
         const currentTaskIndex = sameColumnTasks.findIndex(task => task.id === taskId)
         const targetTaskIndex = sameColumnTasks.findIndex(task => task.id === targetTask.id)
         
@@ -340,8 +419,8 @@ export default function ProductBacklog({
           // Optimistically update local state immediately for smooth UX
           mutateTasks((currentTasks: ScrumTask[] = []) => {
             // Find tasks in the same column
-            const columnTasks = currentTasks.filter(task => task.status === currentTask.status)
-            const otherTasks = currentTasks.filter(task => task.status !== currentTask.status)
+            const columnTasks = currentTasks.slice(0, Math.ceil(currentTasks.length / 2))
+            const otherTasks = currentTasks.slice(Math.ceil(currentTasks.length / 2))
             
             // Reorder just the column tasks
             const reorderedColumnTasks = [...columnTasks]
@@ -404,7 +483,6 @@ export default function ProductBacklog({
         title,
         description: '',
         taskType: selectedTaskType.id as 'story' | 'bug' | 'task' | 'epic' | 'improvement',
-        status: 'backlog',
         storyPoints: 0
       })
       toast.success('Task created successfully')
@@ -426,7 +504,6 @@ export default function ProductBacklog({
         title: data.title,
         description: '',
         taskType: data.taskType as 'story' | 'bug' | 'task' | 'epic' | 'improvement',
-        status: 'backlog',
         storyPoints: data.storyPoints || 0,
         assigneeId: data.assigneeId,
         labels: data.labels || [],
@@ -530,7 +607,7 @@ export default function ProductBacklog({
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <h2 className="text-lg font-semibold">Product Backlog</h2>
-            {activeSprint && activeSprint.status === 'planning' && (
+            {activeSprint && (
               <Button 
                 variant="outline" 
                 onClick={handleStartSprint}
@@ -560,7 +637,7 @@ export default function ProductBacklog({
             </div>
             {activeSprint && (
               <Badge variant="outline" className="ml-2">
-                {activeSprint.name} ({activeSprint.status})
+                {activeSprint.name} (active)
               </Badge>
             )}
           </div>
@@ -715,26 +792,38 @@ export default function ProductBacklog({
               </DroppableColumn>
             </div>
 
-            <DragOverlay>
+            <DragOverlay 
+              dropAnimation={{
+                duration: 300,
+                easing: 'cubic-bezier(0.18, 0.67, 0.6, 1.22)',
+              }}
+            >
               {activeTask && (
-                <TaskCardModern
-                  id={activeTask.id}
-                  title={activeTask.title}
-                  description={activeTask.description}
-                  taskType={activeTask.taskType as 'story' | 'bug' | 'task' | 'epic' | 'improvement' | 'idea' | 'note'}
-                  storyPoints={activeTask.storyPoints}
-                  assignee={activeTask.assignee ? {
-                    name: activeTask.assignee.fullName,
-                    initials: activeTask.assignee.fullName.split(' ').map(n => n[0]).join(''),
-                    avatar: activeTask.assignee.avatar
-                  } : undefined}
-                  labels={activeTask.labels ? labels.filter(l => activeTask.labels?.includes(l.id)).map(l => ({
-                    name: l.name,
-                    color: l.color || '#6B7280'
-                  })) : []}
-                  url={activeTask.url}
-                  status={activeTask.status === 'backlog' ? 'todo' : activeTask.status === 'done' ? 'done' : 'in_progress'}
-                />
+                <div 
+                  className="rotate-6 scale-105 shadow-2xl"
+                  style={{
+                    filter: 'drop-shadow(0 20px 25px rgb(0 0 0 / 0.15)) drop-shadow(0 10px 10px rgb(0 0 0 / 0.04))',
+                  }}
+                >
+                  <TaskCardModern
+                    id={activeTask.id}
+                    title={activeTask.title}
+                    description={activeTask.description}
+                    taskType={activeTask.taskType as 'story' | 'bug' | 'task' | 'epic' | 'improvement' | 'idea' | 'note'}
+                    storyPoints={activeTask.storyPoints}
+                    assignee={activeTask.assignee ? {
+                      name: activeTask.assignee.fullName,
+                      initials: activeTask.assignee.fullName.split(' ').map(n => n[0]).join(''),
+                      avatar: activeTask.assignee.avatar
+                    } : undefined}
+                    labels={activeTask.labels ? labels.filter(l => activeTask.labels?.includes(l.id)).map(l => ({
+                      name: l.name,
+                      color: l.color || '#6B7280'
+                    })) : []}
+                    url={activeTask.url}
+                    status={'todo'}
+                  />
+                </div>
               )}
             </DragOverlay>
           </DndContext>

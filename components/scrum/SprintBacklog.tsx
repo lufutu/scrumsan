@@ -67,6 +67,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { toast } from 'sonner'
+import { ComprehensiveInlineForm } from './ComprehensiveInlineForm'
+import { ItemModal } from './ItemModal'
 import { getPriorityColor } from '@/lib/constants'
 
 interface Task {
@@ -106,11 +108,11 @@ interface Sprint {
 
 interface SprintBacklogProps {
   sprint: Sprint
-  onBackToBacklog: () => void
+  onBackToBacklog?: () => void // Make optional since AppHeader handles this
 }
 
 // Sortable Task Component
-function SortableTask({ task }: { task: Task }) {
+function SortableTask({ task, onTaskClick }: { task: Task; onTaskClick: (task: Task) => void }) {
   const {
     attributes,
     listeners,
@@ -154,6 +156,7 @@ function SortableTask({ task }: { task: Task }) {
       {...attributes} 
       {...listeners}
       className={`border-l-4 rounded-lg p-3 shadow-sm hover:shadow-md transition-all cursor-grab active:cursor-grabbing ${getPriorityBorderColor(task.priority)}`}
+      onDoubleClick={() => !isDragging && onTaskClick(task)}
     >
       <div className="flex items-start gap-3">
         <div className="flex-shrink-0 text-sm">
@@ -205,7 +208,10 @@ function SprintColumnComponent({
   onDeleteColumn,
   onSetWipLimit,
   onMarkAsDone,
-  onExport
+  onExport,
+  onAddTask,
+  users,
+  labels
 }: { 
   column: SprintColumn
   onAddColumn: () => void
@@ -214,7 +220,12 @@ function SprintColumnComponent({
   onSetWipLimit: (id: string, limit?: number) => void
   onMarkAsDone: (id: string, isDone: boolean) => void
   onExport: (id: string, format: 'csv' | 'json') => void
+  onAddTask: (columnId: string, data: any) => void
+  users: any[]
+  labels: any[]
 }) {
+  const [showInlineForm, setShowInlineForm] = useState(false)
+  
   const { setNodeRef, isOver } = useDroppable({
     id: column.id,
   })
@@ -297,13 +308,41 @@ function SprintColumnComponent({
       <CardContent className="space-y-3">
         <SortableContext items={column.tasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
           {column.tasks.map((task) => (
-            <SortableTask key={task.id} task={task} />
+            <SortableTask key={task.id} task={task} onTaskClick={setSelectedTask} />
           ))}
         </SortableContext>
-        {column.tasks.length === 0 && (
+        {column.tasks.length === 0 && !showInlineForm && (
           <div className="text-center text-sm text-muted-foreground py-8 border-2 border-dashed border-gray-200 rounded-lg">
             Drop tasks here
           </div>
+        )}
+        
+        {/* Inline Form */}
+        {showInlineForm && (
+          <div className="pt-2">
+            <ComprehensiveInlineForm
+              onAdd={async (data) => {
+                await onAddTask(column.id, data)
+                setShowInlineForm(false)
+              }}
+              onCancel={() => setShowInlineForm(false)}
+              placeholder="What needs to be done?"
+              users={users}
+              labels={labels}
+            />
+          </div>
+        )}
+        
+        {/* Add Task Button */}
+        {!showInlineForm && (
+          <Button 
+            variant="ghost" 
+            className="w-full justify-start text-muted-foreground hover:text-foreground mt-2"
+            onClick={() => setShowInlineForm(true)}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Item
+          </Button>
         )}
       </CardContent>
     </Card>
@@ -311,6 +350,7 @@ function SprintColumnComponent({
 }
 
 export default function SprintBacklog({ sprint, onBackToBacklog }: SprintBacklogProps) {
+  
   const [activeTab, setActiveTab] = useState('board')
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState<string[]>([])
@@ -326,70 +366,100 @@ export default function SprintBacklog({ sprint, onBackToBacklog }: SprintBacklog
     endDate: sprint.endDate || ''
   })
 
-  // Mock data
-  const [columns, setColumns] = useState<SprintColumn[]>([
-    {
-      id: 'todo',
-      name: 'To Do',
-      position: 1,
-      isDone: false,
-      tasks: [
+  // Sprint columns data
+  const [columns, setColumns] = useState<SprintColumn[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  
+  // Users and labels data
+  const [users, setUsers] = useState<Array<{ id: string; fullName: string; email: string }>>([])
+  const [labels, setLabels] = useState<Array<{ id: string; name: string; color: string | null }>>([])
+  const [dataLoading, setDataLoading] = useState(true)
+  
+  // Task modal state
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null)
+  
+  // Fetch columns from API
+  const fetchColumns = async () => {
+    try {
+      setIsLoading(true)
+      const response = await fetch(`/api/sprints/${sprint.id}/columns`)
+      if (!response.ok) {
+        throw new Error('Failed to fetch sprint columns')
+      }
+      const data = await response.json()
+      setColumns(data)
+    } catch (error) {
+      console.error('Error fetching sprint columns:', error)
+      // Fallback to default columns if API fails
+      setColumns([
         {
-          id: '1',
-          title: 'User registration form',
-          description: 'Create a responsive user registration form with validation',
-          priority: 'high',
-          storyPoints: 5,
-          taskType: 'story',
-          assignee: { id: '1', fullName: 'John Doe' }
+          id: 'todo',
+          name: 'To Do',
+          position: 1,
+          isDone: false,
+          tasks: []
         },
         {
-          id: '2',
-          title: 'Fix login bug',
-          description: 'Users cannot login with special characters in password',
-          priority: 'critical',
-          storyPoints: 2,
-          taskType: 'bug',
-          assignee: { id: '2', fullName: 'Jane Smith' }
-        }
-      ]
-    },
-    {
-      id: 'in-progress',
-      name: 'In Progress',
-      position: 2,
-      isDone: false,
-      wipLimit: 3,
-      tasks: [
+          id: 'in-progress',
+          name: 'In Progress',
+          position: 2,
+          isDone: false,
+          tasks: []
+        },
         {
-          id: '3',
-          title: 'Dashboard UI components',
-          description: 'Implement dashboard charts and widgets',
-          priority: 'medium',
-          storyPoints: 8,
-          taskType: 'story',
-          assignee: { id: '3', fullName: 'Bob Wilson' }
+          id: 'done',
+          name: 'Done',
+          position: 3,
+          isDone: true,
+          tasks: []
         }
-      ]
-    },
-    {
-      id: 'done',
-      name: 'Done',
-      position: 3,
-      isDone: true,
-      tasks: [
-        {
-          id: '4',
-          title: 'Setup project structure',
-          description: 'Initialize project with necessary dependencies',
-          priority: 'high',
-          storyPoints: 3,
-          taskType: 'task',
-          assignee: { id: '1', fullName: 'John Doe' }
-        }
-      ]
+      ])
+    } finally {
+      setIsLoading(false)
     }
-  ])
+  }
+  
+  // Fetch users and labels data
+  const fetchUsersAndLabels = async () => {
+    try {
+      setDataLoading(true)
+      
+      // Get the sprint to find boardId
+      const sprintResponse = await fetch(`/api/sprints/${sprint.id}`)
+      if (!sprintResponse.ok) throw new Error('Failed to fetch sprint')
+      const sprintData = await sprintResponse.json()
+      
+      // Fetch users and labels for the board
+      const [usersResponse, labelsResponse] = await Promise.all([
+        fetch(`/api/boards/${sprintData.board.id}/users`),
+        fetch(`/api/boards/${sprintData.board.id}/labels`)
+      ])
+      
+      if (usersResponse.ok) {
+        const usersData = await usersResponse.json()
+        setUsers(usersData)
+      }
+      
+      if (labelsResponse.ok) {
+        const labelsData = await labelsResponse.json()
+        setLabels(labelsData)
+      }
+    } catch (error) {
+      console.error('Error fetching users and labels:', error)
+      // Set empty arrays as fallback
+      setUsers([])
+      setLabels([])
+    } finally {
+      setDataLoading(false)
+    }
+  }
+  
+  // Load data on component mount
+  useEffect(() => {
+    fetchColumns()
+    fetchUsersAndLabels()
+  }, [sprint.id])
+
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -424,7 +494,7 @@ export default function SprintBacklog({ sprint, onBackToBacklog }: SprintBacklog
     setActiveTask(task || null)
   }
 
-  const handleDragEnd = (event: DragEndEvent) => {
+  const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event
     setActiveTask(null)
 
@@ -433,7 +503,14 @@ export default function SprintBacklog({ sprint, onBackToBacklog }: SprintBacklog
     const taskId = active.id as string
     const targetColumnId = over.id as string
 
-    // Move task between columns
+    // Find the task being moved
+    const taskToMove = allTasks.find(task => task.id === taskId)
+    if (!taskToMove) return
+
+    // Check if task is already in the target column
+    if (taskToMove.sprintColumnId === targetColumnId) return
+
+    // Optimistically update UI
     setColumns(prev => {
       const newColumns = prev.map(col => ({
         ...col,
@@ -441,65 +518,229 @@ export default function SprintBacklog({ sprint, onBackToBacklog }: SprintBacklog
       }))
 
       const targetColumn = newColumns.find(col => col.id === targetColumnId)
-      const taskToMove = allTasks.find(task => task.id === taskId)
-
-      if (targetColumn && taskToMove) {
-        targetColumn.tasks.push(taskToMove)
+      if (targetColumn) {
+        targetColumn.tasks.push({ ...taskToMove, sprintColumnId: targetColumnId })
       }
 
       return newColumns
     })
 
-    toast.success('Task moved successfully')
+    try {
+      // Update task in database
+      const response = await fetch(`/api/tasks/${taskId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sprintColumnId: targetColumnId })
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to update task')
+      }
+
+      toast.success('Task moved successfully')
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to move task')
+      // Revert optimistic update on error
+      fetchColumns()
+    }
   }
 
-  const handleAddColumn = () => {
+  const handleAddTask = async (columnId: string, data: {
+    title: string;
+    taskType: string;
+    assigneeId?: string;
+    labels?: string[];
+    storyPoints?: number;
+    priority?: string;
+  }) => {
+    try {
+      const taskData = {
+        title: data.title,
+        description: '',
+        taskType: data.taskType as 'story' | 'bug' | 'task' | 'epic' | 'improvement',
+        storyPoints: data.storyPoints || 0,
+        assigneeId: data.assigneeId,
+        labels: data.labels || [],
+        priority: data.priority,
+        // Sprint Backlog context: assign task to specific sprint column
+        sprintColumnId: columnId,
+        sprintId: sprint.id
+      }
+
+      const response = await fetch('/api/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(taskData)
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to create task')
+      }
+
+      // Refresh the columns data
+      fetchColumns()
+      toast.success('Task created successfully')
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to create task')
+    }
+  }
+
+  const handleAddColumn = async () => {
     if (!newColumnName.trim()) return
     
-    const newColumn: SprintColumn = {
-      id: `custom_${Date.now()}`,
-      name: newColumnName.trim(),
-      position: columns.length + 1,
-      isDone: false,
-      tasks: []
+    try {
+      const response = await fetch(`/api/sprints/${sprint.id}/columns`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: newColumnName.trim(),
+          position: columns.length,
+          isDone: false
+        })
+      })
+      
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to create column')
+      }
+      
+      const newColumn = await response.json()
+      setColumns(prev => [...prev, newColumn])
+      setNewColumnName('')
+      setIsAddColumnOpen(false)
+      toast.success('Column added successfully')
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to add column')
     }
-    
-    setColumns(prev => [...prev, newColumn])
-    setNewColumnName('')
-    setIsAddColumnOpen(false)
-    toast.success('Column added successfully')
   }
 
-  const handleEditColumn = (id: string, name: string) => {
-    setColumns(prev => prev.map(col => 
-      col.id === id ? { ...col, name } : col
-    ))
-    toast.success('Column renamed successfully')
+  const handleEditColumn = async (id: string, name: string) => {
+    try {
+      const response = await fetch(`/api/sprints/${sprint.id}/columns/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name })
+      })
+      
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to update column')
+      }
+      
+      const updatedColumn = await response.json()
+      setColumns(prev => prev.map(col => 
+        col.id === id ? { ...col, ...updatedColumn } : col
+      ))
+      toast.success('Column renamed successfully')
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to rename column')
+    }
   }
 
-  const handleDeleteColumn = (id: string) => {
+  const handleDeleteColumn = async (id: string) => {
     const column = columns.find(col => col.id === id)
     if (column && column.tasks.length > 0) {
       toast.error('Cannot delete column with tasks')
       return
     }
     
-    setColumns(prev => prev.filter(col => col.id !== id))
-    toast.success('Column deleted successfully')
+    try {
+      const response = await fetch(`/api/sprints/${sprint.id}/columns/${id}`, {
+        method: 'DELETE'
+      })
+      
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to delete column')
+      }
+      
+      setColumns(prev => prev.filter(col => col.id !== id))
+      toast.success('Column deleted successfully')
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to delete column')
+    }
   }
 
-  const handleSetWipLimit = (id: string, limit?: number) => {
-    setColumns(prev => prev.map(col => 
-      col.id === id ? { ...col, wipLimit: limit } : col
-    ))
-    toast.success('WIP limit updated')
+  const handleSetWipLimit = async (id: string, limit?: number) => {
+    try {
+      const response = await fetch(`/api/sprints/${sprint.id}/columns/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ wipLimit: limit })
+      })
+      
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to update WIP limit')
+      }
+      
+      const updatedColumn = await response.json()
+      setColumns(prev => prev.map(col => 
+        col.id === id ? { ...col, ...updatedColumn } : col
+      ))
+      toast.success('WIP limit updated')
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to update WIP limit')
+    }
   }
 
-  const handleMarkAsDone = (id: string, isDone: boolean) => {
-    setColumns(prev => prev.map(col => 
-      col.id === id ? { ...col, isDone } : col
-    ))
-    toast.success(`Column marked as ${isDone ? 'done' : 'not done'}`)
+  const handleMarkAsDone = async (id: string, isDone: boolean) => {
+    try {
+      const response = await fetch(`/api/sprints/${sprint.id}/columns/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isDone })
+      })
+      
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to update column')
+      }
+      
+      const updatedColumn = await response.json()
+      setColumns(prev => prev.map(col => 
+        col.id === id ? { ...col, ...updatedColumn } : col
+      ))
+      toast.success(`Column marked as ${isDone ? 'done' : 'not done'}`)
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to update column')
+    }
+  }
+
+  const handleReorderColumn = async (columnId: string, newPosition: number) => {
+    try {
+      const response = await fetch(`/api/sprints/${sprint.id}/columns/${columnId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ position: newPosition })
+      })
+      
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to reorder column')
+      }
+      
+      // Update local state - reorder columns based on new positions
+      const reorderedColumns = [...columns]
+      const movedColumn = reorderedColumns.find(col => col.id === columnId)
+      if (movedColumn) {
+        // Remove from current position
+        const currentIndex = reorderedColumns.indexOf(movedColumn)
+        reorderedColumns.splice(currentIndex, 1)
+        // Insert at new position
+        reorderedColumns.splice(newPosition, 0, { ...movedColumn, position: newPosition })
+        // Update positions for all affected columns
+        reorderedColumns.forEach((col, index) => {
+          col.position = index
+        })
+        setColumns(reorderedColumns)
+      }
+      
+      toast.success('Column reordered successfully')
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to reorder column')
+    }
   }
 
   const handleExport = (columnId: string, format: 'csv' | 'json') => {
@@ -550,6 +791,18 @@ export default function SprintBacklog({ sprint, onBackToBacklog }: SprintBacklog
     })
   }))
 
+  // Show loading state while data is loading
+  if (isLoading || dataLoading) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading sprint data...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <DndContext
       sensors={sensors}
@@ -558,63 +811,8 @@ export default function SprintBacklog({ sprint, onBackToBacklog }: SprintBacklog
       onDragEnd={handleDragEnd}
     >
       <div className="h-full">
-        {/* Sprint Header */}
-        <div className="mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-4">
-              <Button variant="ghost" size="sm" onClick={onBackToBacklog}>
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to Backlog
-              </Button>
-              <div>
-                <h1 className="text-2xl font-bold">{sprint.name}</h1>
-                <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                  <div className="flex items-center gap-1">
-                    <Calendar className="h-4 w-4" />
-                    {sprint.startDate && sprint.endDate && (
-                      <span>
-                        {new Date(sprint.startDate).toLocaleDateString()} - {new Date(sprint.endDate).toLocaleDateString()}
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Clock className="h-4 w-4" />
-                    <span>{daysRemaining} days remaining</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Badge variant="default" className="bg-green-500">
-                Active Sprint
-              </Badge>
-              
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline">
-                    <MoreHorizontal className="h-4 w-4 mr-2" />
-                    Actions
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => setIsEditSprintOpen(true)}>
-                    <Settings className="h-4 w-4 mr-2" />
-                    Edit Sprint
-                  </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    <BarChart3 className="h-4 w-4 mr-2" />
-                    Sprint Report
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => setIsFinishSprintOpen(true)}>
-                    <Square className="h-4 w-4 mr-2" />
-                    Complete Sprint
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          </div>
+        {/* Sprint Content */}
+        <div className="space-y-6">
 
           {/* Sprint Goal */}
           {sprint.goal && (
@@ -758,6 +956,9 @@ export default function SprintBacklog({ sprint, onBackToBacklog }: SprintBacklog
                     onSetWipLimit={handleSetWipLimit}
                     onMarkAsDone={handleMarkAsDone}
                     onExport={handleExport}
+                    onAddTask={handleAddTask}
+                    users={users || []}
+                    labels={labels || []}
                   />
                 ))}
               </div>
@@ -1019,10 +1220,23 @@ export default function SprintBacklog({ sprint, onBackToBacklog }: SprintBacklog
       <DragOverlay>
         {activeTask ? (
           <div className="opacity-90 rotate-2 scale-105">
-            <SortableTask task={activeTask} />
+            <SortableTask task={activeTask} onTaskClick={() => {}} />
           </div>
         ) : null}
       </DragOverlay>
+
+      {/* Task Modal */}
+      {selectedTask && (
+        <ItemModal
+          isOpen={!!selectedTask}
+          onClose={() => setSelectedTask(null)}
+          taskId={selectedTask.id}
+          onUpdate={() => {
+            fetchColumns()
+            setSelectedTask(null)
+          }}
+        />
+      )}
     </DndContext>
   )
 }

@@ -28,22 +28,28 @@ export async function POST(
     // Check if user has access to the sprint
     const sprint = await prisma.sprint.findUnique({
       where: { id: sprintId },
-      select: { projectId: true }
+      select: { boardId: true }
     })
     
     if (!sprint) {
       return NextResponse.json({ error: 'Sprint not found' }, { status: 404 })
     }
     
-    if (sprint.projectId) {
-      const projectMember = await prisma.projectMember.findFirst({
+    // Check if user has access to the board through organization membership
+    const board = await prisma.board.findUnique({
+      where: { id: sprint.boardId },
+      select: { organizationId: true }
+    })
+    
+    if (board) {
+      const orgMember = await prisma.organizationMember.findFirst({
         where: {
-          projectId: sprint.projectId,
+          organizationId: board.organizationId,
           userId: user.id
         }
       })
       
-      if (!projectMember) {
+      if (!orgMember) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
       }
     }
@@ -76,9 +82,7 @@ export async function POST(
     
     // Update task's sprint column
     const updateData: any = {
-      sprintColumnId: targetColumnId,
-      // Update status based on column
-      status: targetColumn.isDone ? 'done' : 'in_progress'
+      sprintColumnId: targetColumnId
     }
 
     // Include position if provided

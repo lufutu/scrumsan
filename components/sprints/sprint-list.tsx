@@ -25,7 +25,6 @@ type Sprint = Tables<'sprints'> & {
     tasks: {
       id: string
       title: string
-      status: string | null
     } | null
   }>
   _count?: {
@@ -61,7 +60,9 @@ export default function SprintList({ projectId }: SprintListProps) {
             tasks (
               id,
               title,
-              status
+              column (
+                name
+              )
             )
           )
         `)
@@ -73,7 +74,9 @@ export default function SprintList({ projectId }: SprintListProps) {
              // Transform data to include task counts
        const transformedSprints = (sprintsData || []).map(sprint => {
          const tasks = sprint.sprint_tasks?.map(st => st.tasks).filter(Boolean) || []
-         const completedTasks = tasks.filter(task => task?.status === 'done')
+         const completedTasks = tasks.filter(task => 
+           task?.column?.name?.toLowerCase().includes('done')
+         )
          
          return {
            ...sprint,

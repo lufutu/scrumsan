@@ -26,10 +26,10 @@ export async function POST(
           }
         },
         sprintColumns: true,
-        project: {
+        board: {
           select: {
             id: true,
-            boardId: true
+            organizationId: true
           }
         }
       }
@@ -39,18 +39,21 @@ export async function POST(
       return NextResponse.json({ error: 'Sprint not found' }, { status: 404 })
     }
     
+    // Check if sprint is active
+    if (sprint.status !== 'active') {
+      return NextResponse.json({ error: 'Can only finish active sprints' }, { status: 400 })
+    }
+    
     // Check permissions
-    if (sprint.projectId) {
-      const projectMember = await prisma.projectMember.findFirst({
-        where: {
-          projectId: sprint.projectId,
-          userId: user.id
-        }
-      })
-      
-      if (!projectMember) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    const orgMember = await prisma.organizationMember.findFirst({
+      where: {
+        organizationId: sprint.board.organizationId,
+        userId: user.id
       }
+    })
+    
+    if (!orgMember) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
     
     // Get done columns
@@ -63,52 +66,108 @@ export async function POST(
     )
     
     // Start transaction to finish sprint
-    await prisma.$transaction(async (tx) => {
-      // Update sprint status to completed
+    const result = await prisma.$transaction(async (tx) => {
+      // Update sprint status to completed and mark as finished
       await tx.sprint.update({
         where: { id: sprintId },
         data: {
           status: 'completed',
-          endDate: new Date()
+          endDate: new Date(),
+          isFinished: true
         }
       })
       
-      // Move unfinished tasks back to product backlog
+      let newSprint = null
+      
+      // Create follow-up sprint if there are unfinished tasks
       if (unfinishedTasks.length > 0) {
-        // Remove tasks from sprint columns
-        await tx.task.updateMany({
-          where: {
-            id: {
-              in: unfinishedTasks.map(st => st.task.id)
-            }
+        // Get the next position for the new sprint
+        const lastSprint = await tx.sprint.findFirst({
+          where: { 
+            boardId: sprint.boardId,
+            isDeleted: false,
+            isBacklog: false
           },
+          orderBy: { position: 'desc' }
+        })
+        
+        const nextPosition = (lastSprint?.position ?? 0) + 1
+        
+        // Create the follow-up sprint
+        newSprint = await tx.sprint.create({
           data: {
-            sprintColumnId: null,
-            status: 'todo' // Reset status for backlog
+            boardId: sprint.boardId,
+            name: `${sprint.name} - not finished Items`,
+            goal: `Complete unfinished items from ${sprint.name}`,
+            status: 'planning',
+            position: nextPosition,
+            parentSprintId: sprintId
           }
         })
         
-        // Remove from sprint
+        // Create default columns for the new sprint
+        const defaultColumns = [
+          { name: 'To Do', position: 0, isDone: false },
+          { name: 'In Progress', position: 1, isDone: false },
+          { name: 'Done', position: 2, isDone: true }
+        ]
+        
+        await tx.sprintColumn.createMany({
+          data: defaultColumns.map(col => ({
+            ...col,
+            sprintId: newSprint.id
+          }))
+        })
+        
+        // Get the To Do column of the new sprint
+        const todoColumn = await tx.sprintColumn.findFirst({
+          where: {
+            sprintId: newSprint.id,
+            position: 0
+          }
+        })
+        
+        // Move unfinished tasks to the new sprint's To Do column
+        const unfinishedTaskIds = unfinishedTasks.map(st => st.task.id)
+        
+        // Update tasks to point to new sprint's To Do column
+        await tx.task.updateMany({
+          where: {
+            id: { in: unfinishedTaskIds }
+          },
+          data: {
+            sprintColumnId: todoColumn?.id
+          }
+        })
+        
+        // Create sprint tasks for the new sprint
+        await tx.sprintTask.createMany({
+          data: unfinishedTaskIds.map(taskId => ({
+            sprintId: newSprint.id,
+            taskId: taskId
+          }))
+        })
+        
+        // Remove from old sprint
         await tx.sprintTask.deleteMany({
           where: {
             sprintId: sprintId,
-            taskId: {
-              in: unfinishedTasks.map(st => st.task.id)
-            }
+            taskId: { in: unfinishedTaskIds }
           }
         })
       }
       
-      // Clean up sprint columns
-      await tx.sprintColumn.deleteMany({
-        where: { sprintId }
-      })
+      return { newSprint, unfinishedTasksCount: unfinishedTasks.length }
     })
     
     return NextResponse.json({
       success: true,
-      unfinishedTasksCount: unfinishedTasks.length,
-      message: `Sprint finished successfully. ${unfinishedTasks.length} unfinished tasks moved back to Product Backlog.`
+      unfinishedTasksCount: result.unfinishedTasksCount,
+      newSprintId: result.newSprint?.id,
+      newSprintName: result.newSprint?.name,
+      message: result.newSprint 
+        ? `Sprint finished successfully. ${result.unfinishedTasksCount} unfinished tasks moved to "${result.newSprint.name}".`
+        : `Sprint finished successfully. All tasks completed!`
     })
   } catch (error: any) {
     console.error('Error finishing sprint:', error)

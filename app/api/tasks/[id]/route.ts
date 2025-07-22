@@ -8,18 +8,14 @@ import { z } from 'zod'
 const taskUpdateSchema = z.object({
   title: z.string().min(1).optional(),
   description: z.string().optional(),
-  status: z.string().optional(),
   taskType: z.string().optional(),
   priority: z.string().optional(),
   storyPoints: z.number().optional(),
   estimatedHours: z.number().optional(),
-  labels: z.array(z.object({
-    id: z.string(),
-    name: z.string(),
-    color: z.string()
-  })).optional(),
+  labels: z.array(z.string()).optional(), // Allow array of strings (labels are stored as string[])
   boardId: z.string().uuid().optional(),
-  columnId: z.string().uuid().optional(),
+  columnId: z.string().uuid().optional().nullable(), // Allow null for backlog items
+  sprintColumnId: z.string().uuid().optional().nullable(), // Add sprintColumnId field
   assigneeId: z.string().uuid().optional(),
   epicId: z.string().uuid().optional(),
   dueDate: z.string().optional(),
@@ -215,35 +211,19 @@ export async function PATCH(
     const updateData: any = {}
     if (validatedData.title !== undefined) updateData.title = validatedData.title
     if (validatedData.description !== undefined) updateData.description = validatedData.description
-    if (validatedData.status !== undefined) updateData.status = validatedData.status
     if (validatedData.taskType !== undefined) updateData.taskType = validatedData.taskType
     if (validatedData.priority !== undefined) updateData.priority = validatedData.priority
     if (validatedData.storyPoints !== undefined) updateData.storyPoints = validatedData.storyPoints
     if (validatedData.estimatedHours !== undefined) updateData.estimatedHours = validatedData.estimatedHours
     if (validatedData.boardId !== undefined) updateData.boardId = validatedData.boardId
     if (validatedData.columnId !== undefined) updateData.columnId = validatedData.columnId
+    if (validatedData.sprintColumnId !== undefined) updateData.sprintColumnId = validatedData.sprintColumnId
     if (validatedData.assigneeId !== undefined) updateData.assigneeId = validatedData.assigneeId
     if (validatedData.epicId !== undefined) updateData.epicId = validatedData.epicId
     if (validatedData.dueDate !== undefined) updateData.dueDate = validatedData.dueDate ? new Date(validatedData.dueDate) : null
     if (validatedData.position !== undefined) updateData.position = validatedData.position
-
-    // Handle labels separately using transaction
-    if (validatedData.labels !== undefined) {
-      // Delete existing label associations
-      await prisma.taskLabel.deleteMany({
-        where: { taskId: id }
-      })
-      
-      // Create new label associations
-      if (validatedData.labels.length > 0) {
-        await prisma.taskLabel.createMany({
-          data: validatedData.labels.map(label => ({
-            taskId: id,
-            labelId: label.id
-          }))
-        })
-      }
-    }
+    // Handle labels directly (stored as string array in Prisma)
+    if (validatedData.labels !== undefined) updateData.labels = validatedData.labels
     
     // Update task
     const task = await prisma.task.update({

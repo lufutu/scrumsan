@@ -7,7 +7,7 @@ import {
   motion,
   type HTMLMotionProps,
   type Transition,
-} from 'motion/react';
+} from 'framer-motion';
 import { cva, type VariantProps } from 'class-variance-authority';
 import { X } from 'lucide-react';
 

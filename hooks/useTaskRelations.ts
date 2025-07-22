@@ -5,35 +5,30 @@ interface TaskRelations {
     id: string
     title: string
     taskType: string
-    status: string
     itemCode?: string
   } | null
   subitems: Array<{
     id: string
     title: string
     taskType: string
-    status: string
     itemCode?: string
   }>
   blocking: Array<{
     id: string
     title: string
     taskType: string
-    status: string
     itemCode?: string
   }>
   blockedBy: Array<{
     id: string
     title: string
     taskType: string
-    status: string
     itemCode?: string
   }>
   related: Array<{
     id: string
     title: string
     taskType: string
-    status: string
     itemCode?: string
     relationType: string
     direction: 'incoming' | 'outgoing'
@@ -108,8 +103,8 @@ export function useTaskRelations(taskId: string | null) {
   const hasParent = !!relations.parent
   const hasSubitems = relations.subitems.length > 0
   const isBlocking = relations.blocking.length > 0
-  const isBlocked = relations.blockedBy.some(item => item.status !== 'done')
-  const hasIncompleteBlockers = relations.blockedBy.filter(item => item.status !== 'done').length
+  const isBlocked = relations.blockedBy.length > 0
+  const hasIncompleteBlockers = relations.blockedBy.length
 
   return {
     relations,

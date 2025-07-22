@@ -1,7 +1,6 @@
 interface TaskRelations {
   blockedBy: Array<{
     id: string
-    status: string
   }>
 }
 
@@ -9,7 +8,7 @@ interface TaskRelations {
  * Checks if a task can be moved to a new status/column based on blocking relationships
  */
 export function canMoveTask(
-  task: { id: string; status?: string },
+  task: { id: string },
   targetColumnName: string,
   taskRelations?: TaskRelations
 ): { canMove: boolean; reason?: string } {
@@ -19,9 +18,7 @@ export function canMoveTask(
   }
 
   // Check if task is blocked by incomplete items
-  const incompleteBlockers = taskRelations.blockedBy.filter(
-    blocker => blocker.status !== 'done' && blocker.status !== 'completed'
-  )
+  const incompleteBlockers = taskRelations.blockedBy
 
   // If trying to move to a "done" column while blocked by incomplete items
   if (
@@ -55,9 +52,7 @@ export function canMoveTask(
 export function getBlockingWarning(taskRelations?: TaskRelations): string | null {
   if (!taskRelations) return null
 
-  const incompleteBlockers = taskRelations.blockedBy.filter(
-    blocker => blocker.status !== 'done' && blocker.status !== 'completed'
-  )
+  const incompleteBlockers = taskRelations.blockedBy
 
   if (incompleteBlockers.length > 0) {
     return `This item is blocked by ${incompleteBlockers.length} incomplete item${incompleteBlockers.length > 1 ? 's' : ''}`

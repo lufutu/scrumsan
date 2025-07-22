@@ -8,7 +8,6 @@ import { z } from 'zod'
 const taskSchema = z.object({
   title: z.string().min(1),
   description: z.string().optional(),
-  status: z.string().optional(),
   taskType: z.string().optional(),
   priority: z.string().optional(),
   storyPoints: z.number().optional(),
@@ -16,11 +15,7 @@ const taskSchema = z.object({
   estimationType: z.enum(['story_points', 'effort_units']).optional(),
   itemValue: z.string().optional(),
   estimatedHours: z.number().optional(),
-  labels: z.array(z.object({
-    id: z.string(),
-    name: z.string(),
-    color: z.string()
-  })).optional(),
+  labels: z.array(z.string()).optional(), // Allow array of strings
   assignees: z.array(z.object({
     id: z.string()
   })).optional(),
@@ -32,7 +27,9 @@ const taskSchema = z.object({
     value: z.string()
   })).optional(),
   boardId: z.string().uuid().optional(),
-  columnId: z.string().uuid().optional(),
+  columnId: z.string().uuid().optional().nullable(), // Allow null
+  sprintId: z.string().uuid().optional(), // Add sprint ID support
+  sprintColumnId: z.string().uuid().optional(), // Add sprint column ID support
   assigneeId: z.string().uuid().optional(),
   epicId: z.string().uuid().optional(),
   dueDate: z.string().optional(),
@@ -47,7 +44,6 @@ export async function GET(req: NextRequest) {
     const url = new URL(req.url)
     const boardId = url.searchParams.get('boardId')
     const assigneeId = url.searchParams.get('assigneeId')
-    const status = url.searchParams.get('status')
     
     const whereClause: any = {}
     
@@ -59,11 +55,6 @@ export async function GET(req: NextRequest) {
     // Filter by assignee if provided
     if (assigneeId) {
       whereClause.assigneeId = assigneeId
-    }
-    
-    // Filter by status if provided
-    if (status) {
-      whereClause.status = status
     }
     
     // Add user access check - user must be member of organization
@@ -205,12 +196,23 @@ export async function POST(req: NextRequest) {
       }
     }
     
+    // If task is assigned to a sprint but no sprint column specified, assign to first sprint column
+    let sprintColumnId = validatedData.sprintColumnId
+    if (validatedData.sprintId && !sprintColumnId) {
+      const firstSprintColumn = await prisma.sprintColumn.findFirst({
+        where: { sprintId: validatedData.sprintId },
+        orderBy: { position: 'asc' }
+      })
+      if (firstSprintColumn) {
+        sprintColumnId = firstSprintColumn.id
+      }
+    }
+    
     // Create task
     const task = await prisma.task.create({
       data: {
         title: validatedData.title,
         description: validatedData.description,
-        status: validatedData.status,
         taskType: validatedData.taskType || 'story',
         priority: validatedData.priority,
         storyPoints: validatedData.storyPoints,
@@ -218,9 +220,11 @@ export async function POST(req: NextRequest) {
         estimationType: validatedData.estimationType || 'story_points',
         itemValue: validatedData.itemValue,
         estimatedHours: validatedData.estimatedHours || 0,
-        labels: validatedData.labels?.map(l => l.name) || [],
+        labels: validatedData.labels || [],
         boardId: validatedData.boardId,
         columnId: validatedData.columnId,
+        sprintColumnId: sprintColumnId, // Use calculated sprint column ID
+        sprintId: validatedData.sprintId, // Add sprint ID
         // Use first assignee as primary assignee for backward compatibility
         assigneeId: validatedData.assignees?.[0]?.id || validatedData.assigneeId,
         epicId: validatedData.epicId,
@@ -293,38 +297,7 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    // Handle labels (create TaskLabel relationships)
-    if (validatedData.labels && validatedData.labels.length > 0) {
-      // Find or create labels
-      for (const labelData of validatedData.labels) {
-        // Check if label exists
-        let label = await prisma.label.findFirst({
-          where: {
-            boardId: validatedData.boardId!,
-            name: labelData.name
-          }
-        })
-
-        // Create label if it doesn't exist
-        if (!label) {
-          label = await prisma.label.create({
-            data: {
-              boardId: validatedData.boardId!,
-              name: labelData.name,
-              color: labelData.color
-            }
-          })
-        }
-
-        // Create TaskLabel relationship
-        await prisma.taskLabel.create({
-          data: {
-            taskId: task.id,
-            labelId: label.id
-          }
-        })
-      }
-    }
+    // Labels are now handled directly as string array in the task creation above
 
     // Handle custom field values
     if (validatedData.customFieldValues && validatedData.customFieldValues.length > 0) {
@@ -337,6 +310,8 @@ export async function POST(req: NextRequest) {
         skipDuplicates: true
       })
     }
+
+    // Sprint assignment is already handled by the sprintId field in the task creation above
 
     // Real-time updates are automatically handled by Supabase when data changes
 

@@ -17,7 +17,7 @@ import {
   Eye,
   EyeOff
 } from 'lucide-react'
-import ProductBacklog from './ProductBacklog'
+import ProductBacklog from './ProductBacklog.tsx.bak'
 // import SprintView from './SprintView' // TODO: Create SprintView component
 import SprintBacklog from './SprintBacklog'
 import { useBoards } from '@/hooks/useBoards'

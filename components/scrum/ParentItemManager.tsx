@@ -18,8 +18,7 @@ interface ParentItemManagerProps {
     id: string
     title: string
     taskType: string
-    status: string
-    itemCode?: string
+      itemCode?: string
   }>
   onParentChanged?: () => void
 }
@@ -28,7 +27,6 @@ interface ParentItem {
   id: string
   title: string
   taskType: string
-  status: string
   itemCode?: string
 }
 
@@ -118,14 +116,6 @@ export function ParentItemManager({
     }
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'done': return 'bg-green-100 text-green-800 border-green-200'
-      case 'in_progress': return 'bg-blue-100 text-blue-800 border-blue-200'
-      case 'todo': return 'bg-gray-100 text-gray-800 border-gray-200'
-      default: return 'bg-gray-100 text-gray-800 border-gray-200'
-    }
-  }
 
   const filteredAvailableTasks = availableTasks.filter(task =>
     task.id !== taskId && // Don't include self
@@ -184,9 +174,9 @@ export function ParentItemManager({
                     )}
                     <Badge 
                       variant="outline" 
-                      className={cn("text-xs", getStatusColor(parentItem.status))}
+                      className="text-xs bg-gray-100 text-gray-800 border-gray-200"
                     >
-                      {parentItem.status}
+                      item
                     </Badge>
                   </div>
                   <Button
@@ -288,9 +278,9 @@ export function ParentItemManager({
                           )}
                           <Badge 
                             variant="outline" 
-                            className={cn("text-xs", getStatusColor(task.status))}
+                            className="text-xs bg-gray-100 text-gray-800 border-gray-200"
                           >
-                            {task.status}
+                            item
                           </Badge>
                         </div>
                       </div>

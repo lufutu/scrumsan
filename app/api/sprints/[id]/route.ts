@@ -9,6 +9,9 @@ const sprintUpdateSchema = z.object({
   goal: z.string().optional(),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
+  status: z.enum(['planning', 'active', 'completed']).optional(),
+  position: z.number().optional(),
+  maxColumns: z.number().optional(),
 })
 
 export async function GET(
@@ -30,30 +33,26 @@ export async function GET(
             organizationId: true
           }
         },
-        sprintTasks: {
-          include: {
-            task: {
+        tasks: {
+          select: {
+            id: true,
+            title: true,
+            description: true,
+            priority: true,
+            storyPoints: true,
+            estimatedHours: true,
+            assignee: {
               select: {
                 id: true,
-                title: true,
-                description: true,
-                priority: true,
-                storyPoints: true,
-                estimatedHours: true,
-                assignee: {
-                  select: {
-                    id: true,
-                    fullName: true,
-                    avatarUrl: true
-                  }
-                },
-                creator: {
-                  select: {
-                    id: true,
-                    fullName: true,
-                    avatarUrl: true
-                  }
-                }
+                fullName: true,
+                avatarUrl: true
+              }
+            },
+            creator: {
+              select: {
+                id: true,
+                fullName: true,
+                avatarUrl: true
               }
             }
           }
@@ -63,7 +62,7 @@ export async function GET(
         },
         _count: {
           select: {
-            sprintTasks: true
+            tasks: true
           }
         }
       }
@@ -117,7 +116,14 @@ export async function PATCH(
     const existingSprint = await prisma.sprint.findUnique({
       where: { id },
       select: {
-        projectId: true
+        boardId: true,
+        isBacklog: true,
+        status: true,
+        board: {
+          select: {
+            organizationId: true
+          }
+        }
       }
     })
     
@@ -128,19 +134,43 @@ export async function PATCH(
       )
     }
     
-    // Check if user is a member of the project (only if sprint has projectId)
-    if (existingSprint.projectId) {
-      const projectMember = await prisma.projectMember.findFirst({
+    // Check if user is a member of the organization
+    const orgMember = await prisma.organizationMember.findFirst({
+      where: {
+        organizationId: existingSprint.board.organizationId,
+        userId: user.id
+      }
+    })
+    
+    if (!orgMember) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 403 }
+      )
+    }
+    
+    // Prevent updating backlog sprint
+    if (existingSprint.isBacklog && (validatedData.name || validatedData.status)) {
+      return NextResponse.json(
+        { error: 'Cannot modify the Backlog sprint' },
+        { status: 400 }
+      )
+    }
+    
+    // Check if trying to start a sprint when another is active
+    if (validatedData.status === 'active' && existingSprint.status !== 'active') {
+      const activeSprint = await prisma.sprint.findFirst({
         where: {
-          projectId: existingSprint.projectId,
-          userId: user.id
+          boardId: existingSprint.boardId,
+          status: 'active',
+          isDeleted: false
         }
       })
       
-      if (!projectMember) {
+      if (activeSprint) {
         return NextResponse.json(
-          { error: 'Unauthorized' },
-          { status: 403 }
+          { error: 'Another sprint is already active. Please finish it before starting a new one.' },
+          { status: 400 }
         )
       }
     }
@@ -151,39 +181,41 @@ export async function PATCH(
     if (validatedData.goal !== undefined) updateData.goal = validatedData.goal
     if (validatedData.startDate !== undefined) updateData.startDate = validatedData.startDate ? new Date(validatedData.startDate) : null
     if (validatedData.endDate !== undefined) updateData.endDate = validatedData.endDate ? new Date(validatedData.endDate) : null
+    if (validatedData.status !== undefined) updateData.status = validatedData.status
+    if (validatedData.position !== undefined) updateData.position = validatedData.position
+    if (validatedData.maxColumns !== undefined) updateData.maxColumns = validatedData.maxColumns
     
     // Update sprint
     const sprint = await prisma.sprint.update({
       where: { id },
       data: updateData,
       include: {
-        project: {
+        board: {
           select: {
             id: true,
             name: true
           }
         },
-        sprintTasks: {
-          include: {
-            task: {
+        sprintColumns: {
+          orderBy: { position: 'asc' }
+        },
+        tasks: {
+          select: {
+            id: true,
+            title: true,
+            storyPoints: true,
+            assignee: {
               select: {
                 id: true,
-                title: true,
-                storyPoints: true,
-                assignee: {
-                  select: {
-                    id: true,
-                    fullName: true,
-                    avatarUrl: true
-                  }
-                }
+                fullName: true,
+                avatarUrl: true
               }
             }
           }
         },
         _count: {
           select: {
-            sprintTasks: true
+            tasks: true
           }
         }
       }
@@ -218,7 +250,13 @@ export async function DELETE(
     const existingSprint = await prisma.sprint.findUnique({
       where: { id },
       select: {
-        projectId: true
+        boardId: true,
+        isBacklog: true,
+        board: {
+          select: {
+            organizationId: true
+          }
+        }
       }
     })
     
@@ -229,26 +267,33 @@ export async function DELETE(
       )
     }
     
-    // Check if user is a member of the project (only if sprint has projectId)
-    if (existingSprint.projectId) {
-      const projectMember = await prisma.projectMember.findFirst({
-        where: {
-          projectId: existingSprint.projectId,
-          userId: user.id
-        }
-      })
-      
-      if (!projectMember) {
-        return NextResponse.json(
-          { error: 'Unauthorized' },
-          { status: 403 }
-        )
-      }
+    // Prevent deleting backlog sprint
+    if (existingSprint.isBacklog) {
+      return NextResponse.json(
+        { error: 'Cannot delete the Backlog sprint' },
+        { status: 400 }
+      )
     }
     
-    // Delete sprint (cascade will handle related data)
-    await prisma.sprint.delete({
-      where: { id }
+    // Check if user is a member of the organization
+    const orgMember = await prisma.organizationMember.findFirst({
+      where: {
+        organizationId: existingSprint.board.organizationId,
+        userId: user.id
+      }
+    })
+    
+    if (!orgMember) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 403 }
+      )
+    }
+    
+    // Soft delete sprint
+    await prisma.sprint.update({
+      where: { id },
+      data: { isDeleted: true }
     })
     
     return NextResponse.json({ success: true })

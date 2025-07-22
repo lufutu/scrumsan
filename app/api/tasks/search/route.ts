@@ -79,7 +79,6 @@ export async function GET(req: NextRequest) {
             title: task.title,
             itemCode: task.itemCode,
             taskType: task.taskType,
-            status: task.status,
             boardName: task.board.name,
             assignee: task.assignee
           })

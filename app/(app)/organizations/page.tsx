@@ -9,6 +9,9 @@ import { EditOrganizationDialog } from '@/components/organizations/edit-organiza
 import { AppHeader } from '@/components/dashboard/app-header'
 import { useState } from 'react'
 import { Organization } from '@/hooks/useOrganizations'
+import { PageLoadingState } from '@/components/ui/loading-state'
+import { PageErrorState } from '@/components/ui/error-state'
+import { OrganizationEmptyState } from '@/components/ui/empty-state'
 
 export default function OrganizationsPage() {
   const { organizations, isLoading, error } = useOrganization()
@@ -22,11 +25,45 @@ export default function OrganizationsPage() {
   }
 
   if (isLoading) {
-    return <div>Loading...</div>
+    return (
+      <>
+        <AppHeader 
+          title="Organizations"
+          breadcrumbs={[
+            { label: 'Home', href: '/' },
+            { label: 'Organizations', icon: <Building2 className="w-4 h-4" />, isCurrentPage: true }
+          ]}
+        />
+        <main className="flex-1 overflow-auto">
+          <div className="container px-4 py-6">
+            <PageLoadingState message="Loading organizations..." />
+          </div>
+        </main>
+      </>
+    )
   }
 
   if (error) {
-    return <div>Error: {error}</div>
+    return (
+      <>
+        <AppHeader 
+          title="Organizations"
+          breadcrumbs={[
+            { label: 'Home', href: '/' },
+            { label: 'Organizations', icon: <Building2 className="w-4 h-4" />, isCurrentPage: true }
+          ]}
+        />
+        <main className="flex-1 overflow-auto">
+          <div className="container px-4 py-6">
+            <PageErrorState 
+              error={error}
+              onRetry={() => window.location.reload()}
+              onGoHome={() => window.location.href = '/'}
+            />
+          </div>
+        </main>
+      </>
+    )
   }
 
   return (
@@ -38,18 +75,29 @@ export default function OrganizationsPage() {
           { label: 'Organizations', icon: <Building2 className="w-4 h-4" />, isCurrentPage: true }
         ]}
         actions={
-          <Button onClick={() => setIsCreateDialogOpen(true)}>
+          <Button onClick={() => setIsCreateDialogOpen(true)} data-org-creation-trigger>
             <Plus className="w-4 h-4 mr-2" />
             New Organization
           </Button>
         }
       />
       <main className="flex-1 overflow-auto">
-        <div className="container mx-auto px-4 py-6">
+        <div className="container px-4 py-6">
           <div className="space-y-6">
 
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {organizations?.map((org) => (
+        {organizations && organizations.length === 0 ? (
+          <OrganizationEmptyState
+            onCreateOrg={() => {
+              const createButton = document.querySelector('[data-org-creation-trigger]')
+              if (createButton instanceof HTMLElement) {
+                createButton.click()
+              }
+            }}
+            className="min-h-[60vh]"
+          />
+        ) : (
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {organizations?.map((org) => (
             <Card key={org.id} className="flex flex-col">
               <CardHeader className="flex-1">
                 <CardTitle className="flex items-center justify-between">
@@ -73,8 +121,9 @@ export default function OrganizationsPage() {
                 </div>
               </CardContent>
             </Card>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
 
             <CreateOrganizationDialog
               open={isCreateDialogOpen}

@@ -10,6 +10,7 @@ import {
     Search,
     HelpCircle,
     Building2,
+    ChevronRight,
 } from "lucide-react"
 import { usePathname } from "next/navigation"
 import Link from "next/link"
@@ -26,6 +27,7 @@ import {
     SidebarMenu,
     SidebarMenuButton,
     SidebarMenuItem,
+    SidebarRail,
 } from "@/components/animate-ui/radix/sidebar"
 import { OrgSwitcher } from "@/components/dashboard/org-switcher"
 import { CreateOrganizationDialog } from "@/components/organizations/create-organization-dialog"
@@ -136,6 +138,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             <SidebarFooter>
                 <NavUser user={userData} />
             </SidebarFooter>
+            <SidebarRail />
 
             <CreateOrganizationDialog
                 open={isCreateDialogOpen}

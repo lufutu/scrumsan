@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useToast } from '@/hooks/use-toast'
+import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -28,7 +29,6 @@ type BoardColumn = {
     id: string
     title: string
     description: string | null
-    status: string | null
     taskType: string | null
     priority: string | null
     storyPoints: number | null
@@ -48,6 +48,7 @@ interface ProjectBoardProps {
 
 export default function ProjectBoard({ projectId }: ProjectBoardProps) {
   const { toast } = useToast()
+  const router = useRouter()
   const { boards, isLoading, mutate } = useBoards(undefined, projectId)
   const board = boards?.[0] || null
   const { users } = useUsers({ projectId })
@@ -62,6 +63,16 @@ export default function ProjectBoard({ projectId }: ProjectBoardProps) {
   const [showInlineForm, setShowInlineForm] = useState<{[key: string]: boolean}>({})
   const [selectedTask, setSelectedTask] = useState<any | null>(null)
 
+  // Redirect handler for board creation
+  const handleBoardCreatedWithRedirect = async (newBoard?: { id?: string }) => {
+    // Refresh the data first
+    await mutate()
+    
+    // Then redirect to the new board
+    if (newBoard?.id) {
+      router.push(`/boards/${newBoard.id}`)
+    }
+  }
 
   // Task drag handlers (for Kanban board only)
   const handleTaskDragStart = (e: React.DragEvent, taskId: string) => {
@@ -116,23 +127,13 @@ export default function ProjectBoard({ projectId }: ProjectBoardProps) {
       const targetColumn = ((board as any).board_columns || []).find((col: any) => col.id === targetColumnId)
       if (!targetColumn) return
 
-      // Map column names to status values
-      const getStatusFromColumn = (columnName: string) => {
-        const name = columnName.toLowerCase()
-        if (name.includes('progress') || name.includes('doing')) return 'in_progress'
-        if (name.includes('done') || name.includes('complete')) return 'done'
-        return 'todo'
-      }
-
-      const newStatus = getStatusFromColumn(targetColumn.name)
 
       // Update task via API
       const response = await fetch(`/api/tasks/${draggedTask}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          columnId: targetColumnId,
-          status: newStatus
+          columnId: targetColumnId
         }),
       })
 
@@ -345,7 +346,7 @@ export default function ProjectBoard({ projectId }: ProjectBoardProps) {
             <p className="text-muted-foreground">
               Create your first board to start organizing your project
             </p>
-            <BoardCreationWizard projectId={projectId} onSuccess={() => mutate()} />
+            <BoardCreationWizard projectId={projectId} onSuccess={handleBoardCreatedWithRedirect} />
           </div>
         </CardContent>
       </Card>
@@ -491,7 +492,7 @@ export default function ProjectBoard({ projectId }: ProjectBoardProps) {
                         initials: task.assignee.fullName?.split(' ').map(n => n[0]).join('') || '',
                         avatar: task.assignee.avatarUrl
                       } : undefined}
-                      status={task.status === 'todo' ? 'todo' : task.status === 'done' ? 'done' : 'in_progress'}
+                      status={'todo'}
                       onClick={() => setSelectedTask(task)}
                     />
                   </div>
@@ -529,7 +530,6 @@ export default function ProjectBoard({ projectId }: ProjectBoardProps) {
                               labels: data.labels || [],
                               priority: data.priority,
                               storyPoints: data.storyPoints,
-                              status: 'todo'
                             })
                           });
                           
@@ -554,12 +554,7 @@ export default function ProjectBoard({ projectId }: ProjectBoardProps) {
                       }}
                       onCancel={() => setShowInlineForm(prev => ({ ...prev, [column.id]: false }))}
                       placeholder="What needs to be done?"
-                      users={users.map(u => ({
-                        id: u.id,
-                        name: u.fullName || 'Unknown',
-                        initials: u.fullName?.split(' ').map(n => n[0]).join('').toUpperCase() || 'U',
-                        avatar: u.avatarUrl
-                      }))}
+                      users={users}
                       labels={labels.map(l => ({
                         id: l.id,
                         name: l.name,

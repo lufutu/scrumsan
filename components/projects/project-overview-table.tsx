@@ -34,6 +34,8 @@ import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import ProjectBoardLinker from './project-board-linker'
 import ProjectForm from './project-form'
+import { CardLoadingState, PageErrorState } from '@/components/ui/loading-state'
+import { ProjectEmptyState } from '@/components/ui/empty-state'
 
 interface ProjectMember {
   id: string
@@ -176,10 +178,7 @@ export default function ProjectOverviewTable() {
           <CardTitle>Projects Overview</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
-            <p className="text-muted-foreground mt-2">Loading projects...</p>
-          </div>
+          <CardLoadingState message="Loading projects..." />
         </CardContent>
       </Card>
     )
@@ -199,7 +198,7 @@ export default function ProjectOverviewTable() {
             </p>
           </div>
           <ProjectForm onSuccess={fetchProjects}>
-            <Button>
+            <Button data-project-creation-trigger>
               <Plus className="h-4 w-4 mr-2" />
               Create Project
             </Button>
@@ -208,19 +207,15 @@ export default function ProjectOverviewTable() {
       </CardHeader>
       <CardContent>
         {projects.length === 0 ? (
-          <div className="text-center py-12">
-            <Calendar className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-            <h3 className="text-xl font-semibold mb-2">No projects yet</h3>
-            <p className="text-muted-foreground mb-6">
-              Create your first project to coordinate team work and link boards.
-            </p>
-            <ProjectForm onSuccess={fetchProjects}>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Create Project
-              </Button>
-            </ProjectForm>
-          </div>
+          <ProjectEmptyState
+            onCreateProject={() => {
+              // Find the create project trigger element
+              const createButton = document.querySelector('[data-project-creation-trigger]')
+              if (createButton instanceof HTMLElement) {
+                createButton.click()
+              }
+            }}
+          />
         ) : (
           <div className="overflow-x-auto">
             <Table>

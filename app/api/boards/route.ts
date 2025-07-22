@@ -130,39 +130,74 @@ export async function POST(req: NextRequest) {
         }
       })
       
-      // Create default columns based on board type
-      let defaultColumns
+      // Create default structure based on board type
       if (validatedData.boardType === 'scrum') {
-        defaultColumns = [
-          { name: 'Product Backlog', position: 0 },
-          { name: 'Sprint Backlog', position: 1 },
-          { name: 'In Progress', position: 2 },
-          { name: 'Testing', position: 3 },
-          { name: 'Done', position: 4 }
+        // Create Backlog sprint
+        const backlogSprint = await tx.sprint.create({
+          data: {
+            boardId: board.id,
+            name: 'Backlog',
+            position: 0,
+            isBacklog: true,
+            status: 'planning'
+          }
+        })
+        
+        // Create Sprint 1
+        const sprint1 = await tx.sprint.create({
+          data: {
+            boardId: board.id,
+            name: 'Sprint 1',
+            position: 1,
+            status: 'planning'
+          }
+        })
+        
+        // Create default columns for Sprint 1
+        const defaultSprintColumns = [
+          { name: 'To Do', position: 0, isDone: false },
+          { name: 'In Progress', position: 1, isDone: false },
+          { name: 'Done', position: 2, isDone: true }
         ]
+        
+        await tx.sprintColumn.createMany({
+          data: defaultSprintColumns.map(col => ({
+            ...col,
+            sprintId: sprint1.id
+          }))
+        })
       } else {
         // Kanban board columns
-        defaultColumns = [
+        const defaultColumns = [
           { name: 'To Do', position: 0 },
           { name: 'In Progress', position: 1 },
           { name: 'Done', position: 2 }
         ]
+        
+        // Create columns
+        await tx.boardColumn.createMany({
+          data: defaultColumns.map(col => ({
+            ...col,
+            boardId: board.id
+          }))
+        })
       }
       
-      // Create columns
-      await tx.boardColumn.createMany({
-        data: defaultColumns.map(col => ({
-          ...col,
-          boardId: board.id
-        }))
-      })
-      
-      // Return board with columns
+      // Return board with columns and sprints
       return await tx.board.findUnique({
         where: { id: board.id },
         include: {
           columns: {
             orderBy: { position: 'asc' }
+          },
+          sprints: {
+            where: { isDeleted: false },
+            orderBy: { position: 'asc' },
+            include: {
+              sprintColumns: {
+                orderBy: { position: 'asc' }
+              }
+            }
           }
         }
       })

@@ -40,7 +40,6 @@ type Board = {
       id: string
       title: string
       description: string | null
-      status: string | null
       taskType: string | null
       priority: string | null
       storyPoints: number | null
@@ -147,22 +146,13 @@ export default function StandaloneBoardView({ board, onUpdate }: StandaloneBoard
       const targetColumn = board.columns.find(col => col.id === targetColumnId)
       if (!targetColumn) return
 
-      const getStatusFromColumn = (columnName: string) => {
-        const name = columnName.toLowerCase()
-        if (name.includes('progress') || name.includes('doing')) return 'in_progress'
-        if (name.includes('done') || name.includes('complete')) return 'done'
-        return 'todo'
-      }
-
-      const newStatus = getStatusFromColumn(targetColumn.name)
 
       // Update task via API
       const response = await fetch(`/api/tasks/${draggedTask}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          columnId: targetColumnId,
-          status: newStatus
+          columnId: targetColumnId
         }),
       })
 
@@ -254,7 +244,7 @@ export default function StandaloneBoardView({ board, onUpdate }: StandaloneBoard
                               initials: task.assignee.fullName?.split(' ').map(n => n[0]).join('') || '',
                               avatar: task.assignee.avatarUrl
                             } : undefined}
-                            status={task.status === 'todo' ? 'todo' : task.status === 'done' ? 'done' : 'in_progress'}
+                            status={'todo'}
                             onClick={() => setSelectedTask(task)}
                           />
                         </div>
@@ -291,7 +281,6 @@ export default function StandaloneBoardView({ board, onUpdate }: StandaloneBoard
                                     labels: data.labels || [],
                                     priority: data.priority,
                                     storyPoints: data.storyPoints,
-                                    status: 'todo'
                                   })
                                 });
                                 
@@ -316,12 +305,7 @@ export default function StandaloneBoardView({ board, onUpdate }: StandaloneBoard
                             }}
                             onCancel={() => setShowInlineForm(prev => ({ ...prev, [column.id]: false }))}
                             placeholder="What needs to be done?"
-                            users={users.map(u => ({
-                              id: u.id,
-                              name: u.fullName || 'Unknown',
-                              initials: u.fullName?.split(' ').map(n => n[0]).join('').toUpperCase() || 'U',
-                              avatar: u.avatarUrl
-                            }))}
+                            users={users}
                             labels={labels.map(l => ({
                               id: l.id,
                               name: l.name,
@@ -469,12 +453,7 @@ export default function StandaloneBoardView({ board, onUpdate }: StandaloneBoard
                       }}
                       onCancel={() => setShowInlineForm(prev => ({ ...prev, [column.id]: false }))}
                       placeholder="What needs to be done?"
-                      users={users.map(u => ({
-                        id: u.id,
-                        name: u.fullName || 'Unknown',
-                        initials: u.fullName?.split(' ').map(n => n[0]).join('').toUpperCase() || 'U',
-                        avatar: u.avatarUrl
-                      }))}
+                      users={users}
                       labels={labels.map(l => ({
                         id: l.id,
                         name: l.name,

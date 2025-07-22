@@ -67,7 +67,7 @@ export function TaskCardModern({
     <div 
       className={cn(
         "group bg-white rounded-lg border border-gray-200 hover:shadow-md transition-all cursor-pointer",
-        "shadow-sm",
+        "shadow-sm hover:shadow-lg hover:-translate-y-0.5 transform duration-200 ease-out",
         status === 'done' && "opacity-75"
       )}
       onClick={onClick}

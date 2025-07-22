@@ -2,7 +2,6 @@
 
 import { useParams, useSearchParams } from 'next/navigation'
 import { useState, useEffect, Suspense } from 'react'
-import useSWR from 'swr'
 import { Card, CardContent } from '@/components/ui/card'
 import { Loader2, ArrowLeft, MoreHorizontal, Kanban, Calendar } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -13,6 +12,7 @@ import Scrum from '@/components/scrum/Scrum'
 import BoardEditForm from '@/components/boards/board-edit-form'
 import BoardDeleteDialog from '@/components/boards/board-delete-dialog'
 import { AppHeader } from '@/components/dashboard/app-header'
+import { useBoardData } from '@/hooks/useBoardData'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -91,10 +91,8 @@ function BoardContent() {
     }
   }, [searchParams])
   
-  const { data: board, error, isLoading, mutate } = useSWR<Board>(
-    boardId ? `/api/boards/${boardId}` : null,
-    fetcher
-  )
+  const { data: boardData, error, isLoading, mutate } = useBoardData(boardId)
+  const board = boardData?.board
 
   if (!boardId) {
     return (
@@ -233,6 +231,8 @@ function BoardContent() {
                 organizationId={board.organizationId}
                 initialTaskId={initialTaskId}
                 boardColor={board.color}
+                boardData={boardData}
+                onDataChange={mutate}
               />
             ) : (
               <StandaloneBoardView board={board} onUpdate={mutate} />

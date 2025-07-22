@@ -19,8 +19,7 @@ interface BlockingItemsManagerProps {
     id: string
     title: string
     taskType: string
-    status: string
-    itemCode?: string
+      itemCode?: string
   }>
   onBlockingRelationAdded?: () => void
   onBlockingRelationRemoved?: () => void
@@ -30,7 +29,6 @@ interface BlockingRelation {
   id: string
   title: string
   taskType: string
-  status: string
   itemCode?: string
 }
 
@@ -132,14 +130,6 @@ export function BlockingItemsManager({
     }
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'done': return 'bg-green-100 text-green-800 border-green-200'
-      case 'in_progress': return 'bg-blue-100 text-blue-800 border-blue-200'
-      case 'todo': return 'bg-gray-100 text-gray-800 border-gray-200'
-      default: return 'bg-gray-100 text-gray-800 border-gray-200'
-    }
-  }
 
   const filteredAvailableTasks = availableTasks.filter(task =>
     task.id !== taskId && // Don't include self
@@ -147,7 +137,7 @@ export function BlockingItemsManager({
      task.itemCode?.toLowerCase().includes(searchQuery.toLowerCase()))
   )
 
-  const isBlocked = relations.blockedBy.some(item => item.status !== 'done')
+  const isBlocked = relations.blockedBy.length > 0
 
   return (
     <div className="space-y-4">
@@ -196,9 +186,9 @@ export function BlockingItemsManager({
                           )}
                           <Badge 
                             variant="outline" 
-                            className={cn("text-xs", getStatusColor(item.status))}
+                            className={cn("text-xs", "bg-gray-100 text-gray-800 border-gray-200")}
                           >
-                            {item.status}
+                            item
                           </Badge>
                         </div>
                         <Button
@@ -254,7 +244,7 @@ export function BlockingItemsManager({
             {relations.blockedBy.map((item) => (
               <Card key={item.id} className={cn(
                 "border",
-                item.status !== 'done' ? "border-red-200 bg-red-50" : "border-gray-200"
+                "border-red-200 bg-red-50"
               )}>
                 <CardContent className="p-3">
                   <div className="flex items-center space-x-3">
@@ -276,11 +266,11 @@ export function BlockingItemsManager({
                           )}
                           <Badge 
                             variant="outline" 
-                            className={cn("text-xs", getStatusColor(item.status))}
+                            className={cn("text-xs", "bg-gray-100 text-gray-800 border-gray-200")}
                           >
-                            {item.status}
+                            item
                           </Badge>
-                          {item.status !== 'done' && (
+                          {(
                             <AlertTriangle className="w-3 h-3 text-red-500" />
                           )}
                         </div>
@@ -368,9 +358,9 @@ export function BlockingItemsManager({
                           )}
                           <Badge 
                             variant="outline" 
-                            className={cn("text-xs", getStatusColor(task.status))}
+                            className={cn("text-xs", "bg-gray-100 text-gray-800 border-gray-200")}
                           >
-                            {task.status}
+                            item
                           </Badge>
                         </div>
                       </div>

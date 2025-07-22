@@ -131,7 +131,7 @@ export async function GET(
       totalTasks: tasks.length,
       totalPoints,
       totalLoggedTime,
-      completedTasks: tasks.filter(task => task.status === 'done' || task.column?.name?.toLowerCase().includes('done')).length,
+      completedTasks: tasks.filter(task => task.column?.name?.toLowerCase().includes('done')).length,
       assignees
     }
 

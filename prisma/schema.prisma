@@ -186,6 +186,7 @@ model Task {
   boardId          String    @map("board_id") @db.Uuid // Required - tasks always belong to a board
   columnId         String?   @map("column_id") @db.Uuid
   sprintColumnId   String?   @map("sprint_column_id") @db.Uuid
+  sprintId         String?   @map("sprint_id") @db.Uuid // Direct sprint relationship
   title            String
   description      String?
   taskType         String?   @default("story") @map("task_type")
@@ -215,6 +216,7 @@ model Task {
   board             Board          @relation(fields: [boardId], references: [id], onDelete: Cascade)
   column            BoardColumn?   @relation(fields: [columnId], references: [id], onDelete: SetNull)
   sprintColumn      SprintColumn?  @relation("SprintColumnTasks", fields: [sprintColumnId], references: [id], onDelete: SetNull)
+  sprint            Sprint?        @relation(fields: [sprintId], references: [id], onDelete: SetNull)
   epic              Task?          @relation("EpicTasks", fields: [epicId], references: [id])
   subtasks          Task[]         @relation("EpicTasks")
   parent            Task?          @relation("ParentSubitems", fields: [parentId], references: [id])
@@ -224,7 +226,6 @@ model Task {
   creator           User?          @relation("TaskCreator", fields: [createdBy], references: [id])
   comments          Comment[]
   attachments       Attachment[]
-  sprintTasks       SprintTask[]
   relationsAsSource TaskRelation[] @relation("SourceTask")
   relationsAsTarget TaskRelation[] @relation("TargetTask")
   taskLabels        TaskLabel[]
@@ -258,36 +259,32 @@ model TaskRelation {
 
 // Sprints - Belong to boards only
 model Sprint {
-  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  boardId   String    @map("board_id") @db.Uuid // Required - sprints belong to boards
-  name      String
-  goal      String?
-  status    String?   @default("planning") // planning, active, completed
-  startDate DateTime? @map("start_date") @db.Date
-  endDate   DateTime? @map("end_date") @db.Date
-  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  boardId        String    @map("board_id") @db.Uuid // Required - sprints belong to boards
+  name           String
+  goal           String?
+  status         String?   @default("planning") // planning, active, completed
+  startDate      DateTime? @map("start_date") @db.Date
+  endDate        DateTime? @map("end_date") @db.Date
+  position       Int       @default(0) // For ordering sprints
+  isBacklog      Boolean   @default(false) @map("is_backlog") // True for the default Backlog sprint
+  isDeleted      Boolean   @default(false) @map("is_deleted") // Soft delete
+  isFinished     Boolean   @default(false) @map("is_finished") // Mark finished sprints
+  maxColumns     Int?      @map("max_columns") // Maximum columns allowed in sprint
+  parentSprintId String?   @map("parent_sprint_id") @db.Uuid // For "not finished items" sprints
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   // Relationships
   board         Board             @relation(fields: [boardId], references: [id], onDelete: Cascade)
-  sprintTasks   SprintTask[]
+  parentSprint  Sprint?           @relation("ParentChildSprints", fields: [parentSprintId], references: [id])
+  childSprints  Sprint[]          @relation("ParentChildSprints")
+  tasks         Task[]            // Direct relationship to tasks
   sprintColumns SprintColumn[]
 
   @@map("sprints")
 }
 
-// Sprint tasks
-model SprintTask {
-  id       String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  sprintId String @map("sprint_id") @db.Uuid
-  taskId   String @map("task_id") @db.Uuid
-
-  // Relationships
-  sprint Sprint @relation(fields: [sprintId], references: [id], onDelete: Cascade)
-  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
-
-  @@unique([sprintId, taskId])
-  @@map("sprint_tasks")
-}
 
 
 // Sprint columns (for Sprint Backlog customization)

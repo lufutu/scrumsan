@@ -126,7 +126,9 @@ export default function ProjectAnalytics({ projectId }: ProjectAnalyticsProps) {
       // Calculate member stats
       const memberStats = membersData?.map(member => {
         const userTasks = tasksData?.filter(task => task.assignee_id === member.user?.id) || []
-        const completedTasks = userTasks.filter(task => task.status === 'done')
+        const completedTasks = userTasks.filter(task => 
+          task.column?.name?.toLowerCase().includes('done')
+        )
         
         return {
           user: member.user!,
@@ -137,9 +139,13 @@ export default function ProjectAnalytics({ projectId }: ProjectAnalyticsProps) {
 
       // Calculate stats
       const totalTasks = tasksData?.length || 0
-      const completedTasks = tasksData?.filter(task => task.status === 'done').length || 0
-      const inProgressTasks = tasksData?.filter(task => task.status === 'in_progress').length || 0
-      const todoTasks = tasksData?.filter(task => task.status === 'todo').length || 0
+      const completedTasks = tasksData?.filter(task => 
+        task.column?.name?.toLowerCase().includes('done')
+      ).length || 0
+      const inProgressTasks = tasksData?.filter(task => 
+        task.column?.name?.toLowerCase().includes('progress')
+      ).length || 0
+      const todoTasks = (tasksData?.length || 0) - completedTasks - inProgressTasks
       
       const totalSprints = sprintsData?.length || 0
       const now = new Date()
@@ -198,7 +204,9 @@ export default function ProjectAnalytics({ projectId }: ProjectAnalyticsProps) {
 
   const getSprintProgress = (sprint: Sprint) => {
     const tasks = sprint.sprint_tasks?.map(st => st.task) || []
-    const completed = tasks.filter(task => task.status === 'done').length
+    const completed = tasks.filter(task => 
+      task.column?.name?.toLowerCase().includes('done')
+    ).length
     return tasks.length > 0 ? Math.round((completed / tasks.length) * 100) : 0
   }
 
@@ -345,7 +353,9 @@ export default function ProjectAnalytics({ projectId }: ProjectAnalyticsProps) {
                         
                         <div className="space-y-2">
                           <div className="flex items-center justify-between text-sm">
-                            <span>{tasks.filter(t => t.status === 'done').length} of {tasks.length} tasks completed</span>
+                            <span>{tasks.filter(t => 
+              t.column?.name?.toLowerCase().includes('done')
+            ).length} of {tasks.length} tasks completed</span>
                             <span className="font-medium">{progress}%</span>
                           </div>
                           <Progress value={progress} className="h-2" />

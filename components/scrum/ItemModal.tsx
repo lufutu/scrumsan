@@ -672,24 +672,6 @@ export function ItemModal({
           
           <ChevronDown className="h-4 w-4 text-slate-400" />
           
-          <div className="flex items-center gap-3">
-            <Label className="text-sm font-medium text-slate-600">Status:</Label>
-            <Select 
-              value={task?.status || 'todo'}
-              onValueChange={(value) => updateTask({ status: value })}
-            >
-              <SelectTrigger className="w-36 h-8 bg-slate-100 border-slate-200">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todo">To Do</SelectItem>
-                <SelectItem value="in_progress">In Progress</SelectItem>
-                <SelectItem value="review">In Review</SelectItem>
-                <SelectItem value="done">Done</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          
           <div className="ml-auto flex items-center gap-2 text-sm text-slate-500">
             <Clock className="h-4 w-4" />
             <span>Last updated {task?.updated_at ? new Date(task.updated_at).toLocaleDateString() : 'Never'}</span>

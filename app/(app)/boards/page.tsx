@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Kanban, Calendar, Plus, Users, MoreVertical } from 'lucide-react'
+import { OrganizationEmptyState, BoardEmptyState } from '@/components/ui/empty-state'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { AppHeader } from '@/components/dashboard/app-header'
@@ -112,13 +113,11 @@ export default function BoardsPage() {
           ]}
         />
         <main className="flex-1 overflow-auto">
-          <div className="container mx-auto px-4 py-6">
-            <Card>
-              <CardContent className="p-6 text-center">
-                <h1 className="text-2xl font-bold text-muted-foreground">No Organization Selected</h1>
-                <p className="text-muted-foreground mt-2">Please select an organization to view boards.</p>
-              </CardContent>
-            </Card>
+          <div className="container px-4 py-6">
+            <OrganizationEmptyState
+              onCreateOrg={() => router.push('/organizations')}
+              className="min-h-[60vh]"
+            />
           </div>
         </main>
       </>
@@ -137,7 +136,7 @@ export default function BoardsPage() {
           actions={<Skeleton className="h-10 w-32" />}
         />
         <main className="flex-1 overflow-auto">
-          <div className="container mx-auto px-4 py-6">
+          <div className="container px-4 py-6">
             <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {[...Array(6)].map((_, i) => (
@@ -172,7 +171,7 @@ export default function BoardsPage() {
         ]}
         actions={
           <BoardCreationWizard organizationId={activeOrg.id} onSuccess={handleBoardCreated}>
-            <Button>
+            <Button data-board-creation-trigger>
               <Plus className="h-4 w-4 mr-2" />
               Create Board
             </Button>
@@ -180,7 +179,7 @@ export default function BoardsPage() {
         }
       />
       <main className="flex-1 overflow-auto">
-        <div className="container mx-auto px-4 py-6">
+        <div className="container px-4 py-6">
           <div className="space-y-6">
 
         {error && (
@@ -192,21 +191,16 @@ export default function BoardsPage() {
         )}
 
           {!isLoading && boards.length === 0 ? (
-          <Card>
-            <CardContent className="p-12 text-center">
-              <Kanban className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-xl font-semibold mb-2">No boards yet</h3>
-              <p className="text-muted-foreground mb-6">
-                Create your first board to start organizing work.
-              </p>
-              <BoardCreationWizard organizationId={activeOrg.id} onSuccess={handleBoardCreated}>
-                <Button>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Create Your First Board
-                </Button>
-              </BoardCreationWizard>
-            </CardContent>
-          </Card>
+          <BoardEmptyState
+            onCreateBoard={() => {
+              // Find the create board trigger element
+              const createButton = document.querySelector('[data-board-creation-trigger]')
+              if (createButton instanceof HTMLElement) {
+                createButton.click()
+              }
+            }}
+            className="min-h-[60vh]"
+          />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {boards.map((board) => {

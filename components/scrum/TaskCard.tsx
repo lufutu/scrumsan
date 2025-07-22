@@ -62,7 +62,6 @@ interface TaskCardProps {
     type: string;
   };
   url?: string;
-  status?: 'todo' | 'in_progress' | 'done';
   onClick?: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
@@ -95,7 +94,6 @@ export function TaskCard({
   subitemsCount = 0,
   parentItem,
   url,
-  status = 'todo',
   onClick,
   onEdit,
   onDelete,
@@ -149,11 +147,6 @@ export function TaskCard({
           <div className="flex items-center gap-2">
             {isPriority && (
               <Star className="w-4 h-4 text-yellow-500 fill-current" />
-            )}
-            {status === 'done' && (
-              <div className="w-5 h-5 bg-emerald-500 rounded-full flex items-center justify-center">
-                <Check className="w-3 h-3 text-white" />
-              </div>
             )}
           </div>
         </div>

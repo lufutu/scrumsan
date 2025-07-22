@@ -22,8 +22,11 @@ export async function GET(req: NextRequest) {
     const boardId = url.searchParams.get('boardId')
     const organizationId = url.searchParams.get('organizationId')
     const status = url.searchParams.get('status')
+    const includeDetails = url.searchParams.get('includeDetails') === 'true'
     
-    let whereClause: any = {}
+    let whereClause: any = {
+      isDeleted: false // Always exclude deleted sprints
+    }
     
     // Filter by board
     if (boardId) {
@@ -103,42 +106,46 @@ export async function GET(req: NextRequest) {
       whereClause.status = status
     }
     
-    const sprints = await prisma.sprint.findMany({
-      where: whereClause,
-      include: {
-        board: {
-          select: {
-            id: true,
-            name: true,
-            organizationId: true
-          }
-        },
-        sprintTasks: {
-          include: {
-            task: {
-              include: {
-                assignee: {
-                  select: {
-                    id: true,
-                    fullName: true,
-                    avatarUrl: true
-                  }
-                }
-              }
+    const includeClause = includeDetails ? {
+      board: {
+        select: {
+          id: true,
+          name: true,
+          organizationId: true
+        }
+      },
+      tasks: {
+        include: {
+          assignee: {
+            select: {
+              id: true,
+              fullName: true,
+              avatarUrl: true
             }
-          }
-        },
-        sprintColumns: {
-          orderBy: { position: 'asc' }
-        },
-        _count: {
-          select: {
-            sprintTasks: true
           }
         }
       },
+      sprintColumns: {
+        orderBy: { position: 'asc' }
+      },
+      _count: {
+        select: {
+          tasks: true
+        }
+      }
+    } : {
+      _count: {
+        select: {
+          tasks: true
+        }
+      }
+    }
+    
+    const sprints = await prisma.sprint.findMany({
+      where: whereClause,
+      include: includeClause,
       orderBy: {
-        createdAt: 'desc'
+        position: 'asc'
       }
     })
     
@@ -191,29 +198,66 @@ export async function POST(req: NextRequest) {
       )
     }
     
-    // Create sprint
-    const sprint = await prisma.sprint.create({
-      data: {
-        name: validatedData.name,
-        goal: validatedData.goal || null,
+    // Get the highest position for ordering
+    const lastSprint = await prisma.sprint.findFirst({
+      where: { 
         boardId: validatedData.boardId,
-        startDate: validatedData.startDate ? new Date(validatedData.startDate) : null,
-        endDate: validatedData.endDate ? new Date(validatedData.endDate) : null,
-        status: validatedData.status || 'planning',
+        isDeleted: false
       },
-      include: {
-        board: {
-          select: {
-            id: true,
-            name: true
-          }
-        },
-        _count: {
-          select: {
-            sprintTasks: true
+      orderBy: { position: 'desc' }
+    })
+    
+    const nextPosition = (lastSprint?.position ?? 0) + 1
+    
+    // Create sprint with default columns in a transaction
+    const sprint = await prisma.$transaction(async (tx) => {
+      // Create the sprint
+      const newSprint = await tx.sprint.create({
+        data: {
+          name: validatedData.name,
+          goal: validatedData.goal || null,
+          boardId: validatedData.boardId,
+          startDate: validatedData.startDate ? new Date(validatedData.startDate) : null,
+          endDate: validatedData.endDate ? new Date(validatedData.endDate) : null,
+          status: validatedData.status || 'planning',
+          position: nextPosition,
+        }
+      })
+      
+      // Create default columns for the sprint
+      const defaultColumns = [
+        { name: 'To Do', position: 0, isDone: false },
+        { name: 'In Progress', position: 1, isDone: false },
+        { name: 'Done', position: 2, isDone: true }
+      ]
+      
+      await tx.sprintColumn.createMany({
+        data: defaultColumns.map(col => ({
+          ...col,
+          sprintId: newSprint.id
+        }))
+      })
+      
+      // Return sprint with all relationships
+      return await tx.sprint.findUnique({
+        where: { id: newSprint.id },
+        include: {
+          board: {
+            select: {
+              id: true,
+              name: true
+            }
+          },
+          sprintColumns: {
+            orderBy: { position: 'asc' }
+          },
+          _count: {
+            select: {
+              tasks: true
+            }
           }
         }
-      }
+      })
     })
 
     return NextResponse.json(sprint)

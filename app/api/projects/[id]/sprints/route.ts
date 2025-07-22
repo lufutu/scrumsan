@@ -24,9 +24,17 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
     
+    // Get boards linked to this project first
+    const projectBoards = await prisma.projectBoard.findMany({
+      where: { projectId },
+      select: { boardId: true }
+    })
+    
+    const boardIds = projectBoards.map(pb => pb.boardId)
+    
     const sprints = await prisma.sprint.findMany({
       where: {
-        projectId: projectId
+        boardId: { in: boardIds }
       },
       include: {
         sprintTasks: {

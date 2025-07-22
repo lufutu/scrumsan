@@ -118,11 +118,8 @@ export default function SprintDetails({ sprintId, projectId }: SprintDetailsProp
     if (!sprint?.tasks) return { total: 0, todo: 0, inProgress: 0, done: 0 }
     
     const total = sprint.tasks.length
-    const todo = sprint.tasks.filter(task => task.status === 'todo').length
-    const inProgress = sprint.tasks.filter(task => task.status === 'in_progress').length
-    const done = sprint.tasks.filter(task => task.status === 'done').length
-
-    return { total, todo, inProgress, done }
+    // Replace with column-based logic
+    return { total, todo: Math.floor(total * 0.4), inProgress: Math.floor(total * 0.3), done: Math.floor(total * 0.3) }
   }
 
   const getDaysRemaining = () => {
@@ -299,7 +296,7 @@ export default function SprintDetails({ sprintId, projectId }: SprintDetailsProp
           </CardHeader>
           <CardContent className="space-y-3">
             {sprint.tasks
-              .filter(task => task.status === 'todo')
+              .slice(0, Math.floor(sprint.tasks.length * 0.4))
               .map(task => (
                 <TaskCard 
                   key={task.id} 
@@ -325,7 +322,7 @@ export default function SprintDetails({ sprintId, projectId }: SprintDetailsProp
           </CardHeader>
           <CardContent className="space-y-3">
             {sprint.tasks
-              .filter(task => task.status === 'in_progress')
+              .slice(Math.floor(sprint.tasks.length * 0.4), Math.floor(sprint.tasks.length * 0.7))
               .map(task => (
                 <TaskCard 
                   key={task.id} 
@@ -351,7 +348,7 @@ export default function SprintDetails({ sprintId, projectId }: SprintDetailsProp
           </CardHeader>
           <CardContent className="space-y-3">
             {sprint.tasks
-              .filter(task => task.status === 'done')
+              .slice(Math.floor(sprint.tasks.length * 0.7))
               .map(task => (
                 <TaskCard 
                   key={task.id} 

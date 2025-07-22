@@ -98,7 +98,7 @@ export default function OrganizationDetailsPage({ params }: { params: Promise<{ 
           ]}
         />
         <main className="flex-1 overflow-auto">
-          <div className="container mx-auto px-4 py-6">
+          <div className="container px-4 py-6">
             <Card>
               <CardContent className="p-6 text-center">
                 <h1 className="text-2xl font-bold text-red-600 mb-4">Organization not found</h1>
@@ -144,7 +144,7 @@ export default function OrganizationDetailsPage({ params }: { params: Promise<{ 
         actions={headerActions}
       />
       <main className="flex-1 overflow-auto">
-        <div className="container mx-auto px-4 py-6">
+        <div className="container px-4 py-6">
           <div className="space-y-6">
         {/* Organization Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

@@ -30,7 +30,7 @@ export async function POST(
     const existingSprint = await prisma.sprint.findUnique({
       where: { id },
       select: {
-        projectId: true
+        boardId: true
       }
     })
     
@@ -41,16 +41,21 @@ export async function POST(
       )
     }
     
-    // Check if user is a member of the project (only if sprint has projectId)
-    if (existingSprint.projectId) {
-      const projectMember = await prisma.projectMember.findFirst({
+    // Check if user has access to the board through organization membership
+    const board = await prisma.board.findUnique({
+      where: { id: existingSprint.boardId },
+      select: { organizationId: true }
+    })
+    
+    if (board) {
+      const orgMember = await prisma.organizationMember.findFirst({
         where: {
-          projectId: existingSprint.projectId,
+          organizationId: board.organizationId,
           userId: user.id
         }
       })
       
-      if (!projectMember) {
+      if (!orgMember) {
         return NextResponse.json(
           { error: 'Unauthorized' },
           { status: 403 }
@@ -60,36 +65,36 @@ export async function POST(
     
     // Handle single task addition
     if (validatedData.taskId) {
-      // Check if task is already in sprint
-      const existingSprintTask = await prisma.sprintTask.findFirst({
-        where: {
-          sprintId: id,
-          taskId: validatedData.taskId
-        }
-      })
-      
-      if (existingSprintTask) {
-        return NextResponse.json({ error: 'Task already in sprint' }, { status: 400 })
-      }
-      
-      // Verify task belongs to the same project
+      // Verify task belongs to the same board as the sprint
       const task = await prisma.task.findUnique({
         where: { id: validatedData.taskId },
-        select: { projectId: true }
+        select: { boardId: true, sprintId: true }
       })
       
-      if (!task || task.projectId !== existingSprint.projectId) {
+      if (!task || task.boardId !== existingSprint.boardId) {
         return NextResponse.json(
-          { error: 'Task does not belong to this project' },
+          { error: 'Task does not belong to this board' },
           { status: 400 }
         )
       }
       
-      // Add task to sprint
-      await prisma.sprintTask.create({
+      // Check if task is already in sprint
+      if (task.sprintId === id) {
+        return NextResponse.json({ error: 'Task already in sprint' }, { status: 400 })
+      }
+      
+      // Get first sprint column to assign task to
+      const firstSprintColumn = await prisma.sprintColumn.findFirst({
+        where: { sprintId: id },
+        orderBy: { position: 'asc' }
+      })
+
+      // Add task to sprint by updating task.sprintId and sprintColumnId
+      await prisma.task.update({
+        where: { id: validatedData.taskId },
         data: {
           sprintId: id,
-          taskId: validatedData.taskId
+          sprintColumnId: firstSprintColumn?.id || null
         }
       })
     } else if (validatedData.taskIds) {
@@ -102,34 +107,47 @@ export async function POST(
         },
         select: {
           id: true,
-          projectId: true
+          boardId: true
         }
       })
       
-      const invalidTasks = tasks.filter(task => task.projectId !== existingSprint.projectId)
+      const invalidTasks = tasks.filter(task => task.boardId !== existingSprint.boardId)
       if (invalidTasks.length > 0) {
         return NextResponse.json(
-          { error: 'Some tasks do not belong to this project' },
+          { error: 'Some tasks do not belong to this board' },
           { status: 400 }
         )
       }
       
-      // Remove existing sprint tasks and add new ones
+      // Get first sprint column to assign tasks to
+      const firstSprintColumn = await prisma.sprintColumn.findFirst({
+        where: { sprintId: id },
+        orderBy: { position: 'asc' }
+      })
+
+      // Replace sprint tasks using direct sprintId updates
       await prisma.$transaction(async (tx) => {
         // Remove existing tasks from sprint
-        await tx.sprintTask.deleteMany({
+        await tx.task.updateMany({
           where: {
             sprintId: id
+          },
+          data: {
+            sprintId: null,
+            sprintColumnId: null
           }
         })
         
         // Add new tasks to sprint
         if (validatedData.taskIds!.length > 0) {
-          await tx.sprintTask.createMany({
-            data: validatedData.taskIds!.map(taskId => ({
+          await tx.task.updateMany({
+            where: {
+              id: { in: validatedData.taskIds! }
+            },
+            data: {
               sprintId: id,
-              taskId: taskId
-            }))
+              sprintColumnId: firstSprintColumn?.id || null
+            }
           })
         }
       })
@@ -139,30 +157,26 @@ export async function POST(
     const sprint = await prisma.sprint.findUnique({
       where: { id },
       include: {
-        sprintTasks: {
-          include: {
-            task: {
+        tasks: {
+          select: {
+            id: true,
+            title: true,
+            description: true,
+            priority: true,
+            storyPoints: true,
+            estimatedHours: true,
+            assignee: {
               select: {
                 id: true,
-                title: true,
-                description: true,
-                priority: true,
-                storyPoints: true,
-                estimatedHours: true,
-                assignee: {
-                  select: {
-                    id: true,
-                    fullName: true,
-                    avatarUrl: true
-                  }
-                }
+                fullName: true,
+                avatarUrl: true
               }
             }
           }
         },
         _count: {
           select: {
-            sprintTasks: true
+            tasks: true
           }
         }
       }
@@ -203,40 +217,38 @@ export async function DELETE(
     // Check if user has access to the sprint
     const sprint = await prisma.sprint.findUnique({
       where: { id: sprintId },
-      select: { projectId: true }
+      select: { boardId: true }
     })
     
     if (!sprint) {
       return NextResponse.json({ error: 'Sprint not found' }, { status: 404 })
     }
     
-    if (sprint.projectId) {
-      const projectMember = await prisma.projectMember.findFirst({
+    // Check if user has access to the board through organization membership
+    const board = await prisma.board.findUnique({
+      where: { id: sprint.boardId },
+      select: { organizationId: true }
+    })
+    
+    if (board) {
+      const orgMember = await prisma.organizationMember.findFirst({
         where: {
-          projectId: sprint.projectId,
+          organizationId: board.organizationId,
           userId: user.id
         }
       })
       
-      if (!projectMember) {
+      if (!orgMember) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
       }
     }
     
-    // Remove task from sprint
-    await prisma.sprintTask.deleteMany({
-      where: {
-        sprintId: sprintId,
-        taskId: taskId
-      }
-    })
-    
-    // Clear sprint column assignment
+    // Remove task from sprint by clearing sprintId
     await prisma.task.update({
       where: { id: taskId },
       data: {
-        sprintColumnId: null,
-        status: 'todo'
+        sprintId: null,
+        sprintColumnId: null
       }
     })
     

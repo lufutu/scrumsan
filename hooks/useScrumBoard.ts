@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import useSWR, { mutate } from 'swr'
 import { useSupabase } from '@/providers/supabase-provider'
 import { useBoardRealtime } from '@/hooks/useSupabaseRealtime'
-import { getTaskStatusFromColumn } from '@/lib/constants'
+// REMOVED: getTaskStatusFromColumn import - no longer needed
 
 export interface ScrumTask {
   id: string
@@ -18,7 +18,13 @@ export interface ScrumTask {
     fullName: string
     email: string
   }
-  status: 'backlog' | 'sprint' | 'followup'
+  columnId?: string | null
+  sprintColumnId?: string | null
+  column?: {
+    id: string
+    name: string
+  } | null
+  labels?: string[] // Add labels field
   position?: number
   dueDate?: string
   url?: string
@@ -189,40 +195,76 @@ export function useScrumBoard(boardId: string, projectId?: string) {
     }
   }, [user, mutateTasks])
 
-  // Move task between columns
-  const moveTask = useCallback(async (taskId: string, newStatus: 'backlog' | 'sprint' | 'followup', sprintId?: string) => {
+  // Move task between columns (using column placement instead of status)
+  const moveTask = useCallback(async (taskId: string, targetLocation: 'backlog' | 'sprint' | 'followup', sprintId?: string) => {
     if (!user) return
 
     setLoading(true)
     setError(null)
 
     try {
-      // Optimistically update the local state first
+      // Get current task for optimistic update
+      const currentTask = tasks?.find(t => t.id === taskId)
+      if (!currentTask) {
+        throw new Error('Task not found')
+      }
+
+      // Prepare update data based on target location
+      let updateData: any = {}
+      let optimisticTask: any = { ...currentTask }
+      
+      if (targetLocation === 'backlog') {
+        // Backlog items have no column assignment and remove followup/sprint labels
+        const backlogLabels = (currentTask.labels || []).filter(label => label !== '__followup__' && label !== '__sprint__')
+        updateData = { columnId: null, sprintColumnId: null, sprintId: null, labels: backlogLabels }
+        optimisticTask = { ...currentTask, columnId: null, sprintColumnId: null, sprintId: null, labels: backlogLabels }
+      } else if (targetLocation === 'sprint') {
+        // Sprint items need to be assigned to a sprint column and remove followup label
+        const sprintLabels = (currentTask.labels || []).filter(label => label !== '__followup__')
+        // Set sprintId if provided, otherwise clear column assignments but mark as sprint item
+        if (sprintId) {
+          updateData = { columnId: null, sprintColumnId: null, sprintId: sprintId, labels: sprintLabels }
+          optimisticTask = { ...currentTask, columnId: null, sprintColumnId: null, sprintId: sprintId, labels: sprintLabels }
+        } else {
+          // No active sprint, but still move to sprint column by adding a special label
+          const sprintLabelsWithMarker = [...sprintLabels, '__sprint__']
+          updateData = { columnId: null, sprintColumnId: null, labels: sprintLabelsWithMarker }
+          optimisticTask = { ...currentTask, columnId: null, sprintColumnId: null, labels: sprintLabelsWithMarker }
+        }
+      } else if (targetLocation === 'followup') {
+        // Followup items - use labels array to mark as followup, remove sprint marker
+        const cleanLabels = (currentTask.labels || []).filter(label => label !== '__sprint__')
+        const followupLabels = cleanLabels.includes('__followup__') 
+          ? cleanLabels 
+          : [...cleanLabels, '__followup__']
+        updateData = { columnId: null, sprintColumnId: null, sprintId: null, labels: followupLabels }
+        optimisticTask = { ...currentTask, columnId: null, sprintColumnId: null, sprintId: null, labels: followupLabels }
+      }
+
+      // Optimistic update for smooth UI
       mutateTasks((currentTasks: ScrumTask[] = []) => {
         return currentTasks.map(task => 
-          task.id === taskId 
-            ? { ...task, status: newStatus }
-            : task
+          task.id === taskId ? optimisticTask : task
         )
       }, false)
 
-      // Update task status in database
+      // Update task in database
       const response = await fetch(`/api/tasks/${taskId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ status: newStatus }),
+        body: JSON.stringify(updateData),
       })
 
       if (!response.ok) {
-        // Revert optimistic update on failure
-        mutateTasks()
-        throw new Error('Failed to update task status')
+        const errorData = await response.text()
+        console.error('Task update failed:', response.status, errorData)
+        throw new Error(`Failed to update task: ${response.status} - ${errorData}`)
       }
 
       // If moving to sprint, add to sprint relationship
-      if (newStatus === 'sprint' && sprintId) {
+      if (targetLocation === 'sprint' && sprintId) {
         const sprintResponse = await fetch(`/api/sprints/${sprintId}/tasks`, {
           method: 'POST',
           headers: {
@@ -232,15 +274,19 @@ export function useScrumBoard(boardId: string, projectId?: string) {
         })
 
         if (!sprintResponse.ok) {
-          console.warn('Failed to add task to sprint, but status updated')
+          const sprintErrorData = await sprintResponse.text()
+          console.error('Sprint API failed:', sprintResponse.status, sprintErrorData)
+          console.warn('Failed to add task to sprint, but task moved')
         }
       }
 
-      // Final revalidation
-      mutateTasks()
-      mutateSprints()
+      // Final revalidation to get fresh data
+      await mutateTasks()
+      await mutateSprints()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to move task')
+      // Revert optimistic update on error
+      await mutateTasks()
       throw err
     } finally {
       setLoading(false)
@@ -314,12 +360,20 @@ export function useScrumBoard(boardId: string, projectId?: string) {
     }
   }, [user, mutateSprints])
 
-  // Filter tasks by status
+  // Filter tasks by status (derived from column placement)
   const getTasksByStatus = useCallback((status: 'backlog' | 'sprint' | 'followup') => {
     return tasks?.filter(task => {
-      // For scrum boards, tasks without a column (columnId = NULL) should be treated as backlog items
-      const derivedStatus = task.column ? getTaskStatusFromColumn(task.column.name) : 'backlog'
-      return derivedStatus === status
+      if (status === 'backlog') {
+        // Backlog items have no column assignment and no followup/sprint labels
+        return !task.columnId && !task.sprintColumnId && !task.labels?.includes('__followup__') && !task.labels?.includes('__sprint__')
+      } else if (status === 'sprint') {
+        // Sprint items have sprintColumnId assigned, are in sprint tasks, or have sprint marker
+        return task.sprintColumnId || task.sprintId || task.labels?.includes('__sprint__')
+      } else if (status === 'followup') {
+        // Followup items have no column assignment but have followup label
+        return !task.columnId && !task.sprintColumnId && task.labels?.includes('__followup__')
+      }
+      return false
     }) || []
   }, [tasks])
 

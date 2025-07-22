@@ -108,40 +108,8 @@ export const FIBONACCI_POINTS: number[] = [0, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89]
 // T-Shirt Size Options
 export const SIZE_OPTIONS: string[] = ['XS', 'S', 'M', 'L', 'XL', 'XXL']
 
-// Task Status Configuration
-export interface TaskStatus {
-  id: string
-  name: string
-  color: string
-  bgColor: string
-}
-
-export const TASK_STATUSES: TaskStatus[] = [
-  {
-    id: 'todo',
-    name: 'To Do',
-    color: 'text-gray-700',
-    bgColor: 'bg-gray-100'
-  },
-  {
-    id: 'in_progress',
-    name: 'In Progress',
-    color: 'text-blue-700',
-    bgColor: 'bg-blue-100'
-  },
-  {
-    id: 'done',
-    name: 'Done',
-    color: 'text-green-700',
-    bgColor: 'bg-green-100'
-  },
-  {
-    id: 'backlog',
-    name: 'Backlog',
-    color: 'text-purple-700',
-    bgColor: 'bg-purple-100'
-  }
-]
+// REMOVED: Task Status Configuration
+// Tasks no longer have a status field - use column placement instead
 
 // Sprint Status Configuration
 export interface SprintStatus {
@@ -201,9 +169,7 @@ export const getPriorityById = (id: string): Priority | undefined => {
   return PRIORITIES.find(priority => priority.id === id)
 }
 
-export const getTaskStatusById = (id: string): TaskStatus | undefined => {
-  return TASK_STATUSES.find(status => status.id === id)
-}
+// REMOVED: getTaskStatusById - no longer needed
 
 export const getSprintStatusById = (id: string): SprintStatus | undefined => {
   return SPRINT_STATUSES.find(status => status.id === id)
@@ -248,13 +214,7 @@ export const getPriorityColor = (priorityId: string): { color: string; bgColor: 
   }
 }
 
-export const getStatusColor = (statusId: string): { color: string; bgColor: string } => {
-  const status = getTaskStatusById(statusId)
-  return {
-    color: status?.color || 'text-gray-700',
-    bgColor: status?.bgColor || 'bg-gray-100'
-  }
-}
+// REMOVED: getStatusColor - no longer needed
 
 // Type Guards
 export const isValidItemType = (type: string): type is string => {
@@ -265,23 +225,7 @@ export const isValidPriority = (priority: string): priority is string => {
   return PRIORITIES.some(p => p.id === priority)
 }
 
-export const isValidTaskStatus = (status: string): status is string => {
-  return TASK_STATUSES.some(s => s.id === status)
-}
+// REMOVED: isValidTaskStatus - no longer needed
 
-// Task Status Derivation from Column
-export const getTaskStatusFromColumn = (columnName: string): string => {
-  const normalizedName = columnName?.toLowerCase() || ''
-  
-  if (normalizedName.includes('done') || normalizedName.includes('complete')) {
-    return 'done'
-  }
-  if (normalizedName.includes('progress') || normalizedName.includes('doing') || normalizedName.includes('review')) {
-    return 'in_progress'
-  }
-  if (normalizedName.includes('backlog')) {
-    return 'backlog'
-  }
-  // Default to 'todo' for any other column
-  return 'todo'
-}
+// REMOVED: getTaskStatusFromColumn - no longer needed
+// Use column placement instead of derived status

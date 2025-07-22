@@ -51,7 +51,6 @@ interface Task {
   priority?: string
   storyPoints?: number
   estimatedHours?: number
-  status?: string
   columnId?: string
   sprintColumnId?: string
   assignee?: {
@@ -394,9 +393,9 @@ export default function EnhancedScrumBoard({
     const allTasks = sprintColumns.flatMap(col => col.tasks)
     return {
       total: allTasks.length,
-      completed: allTasks.filter(t => t.status === 'done').length,
-      inProgress: allTasks.filter(t => t.status === 'in_progress').length,
-      todo: allTasks.filter(t => t.status === 'todo').length
+      completed: 0,
+      inProgress: 0,
+      todo: allTasks.length
     }
   }
 
@@ -583,7 +582,6 @@ export default function EnhancedScrumBoard({
                             avatar: task.assignee.avatarUrl
                           } : undefined}
                           labels={[]}
-                          status="todo"
                           onClick={() => setSelectedTask(task)}
                         />
                       </div>
@@ -636,8 +634,6 @@ export default function EnhancedScrumBoard({
                                   avatar: task.assignee.avatarUrl
                                 } : undefined}
                                 labels={[]}
-                                status={column.name.toLowerCase().includes('done') ? 'done' : 
-                                       column.name.toLowerCase().includes('progress') ? 'in_progress' : 'todo'}
                                 onClick={() => setSelectedTask(task)}
                               />
                             </div>
@@ -697,7 +693,6 @@ export default function EnhancedScrumBoard({
                   avatar: draggedTask.assignee.avatarUrl
                 } : undefined}
                 labels={[]}
-                status="todo"
               />
             </div>
           )}

@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import { useOrganization } from '@/providers/organization-provider'
-import { ChevronRight, ChevronDown, Building2, FolderOpen, Kanban, Calendar, Plus, Zap } from 'lucide-react'
+import { ChevronRight, Building2, FolderOpen, Kanban, Calendar, Plus, Zap } from 'lucide-react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import {
   SidebarGroup,
@@ -51,6 +51,7 @@ interface ExpandableNavProps {
 export function ExpandableNav({ className }: ExpandableNavProps) {
   const { organizations, activeOrg } = useOrganization()
   const pathname = usePathname()
+  const router = useRouter()
   const [expandedOrgs, setExpandedOrgs] = useState<Set<string>>(new Set())
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set())
   const [orgData, setOrgData] = useState<Organization[]>([])
@@ -98,6 +99,17 @@ export function ExpandableNav({ className }: ExpandableNavProps) {
       }
     }
   }, [activeOrg?.id, pathname, orgData])
+
+  // Redirect handler for board creation
+  const handleBoardCreatedWithRedirect = async (newBoard?: { id?: string }) => {
+    // Refresh the data first
+    await fetchOrgData()
+    
+    // Then redirect to the new board
+    if (newBoard?.id) {
+      router.push(`/boards/${newBoard.id}`)
+    }
+  }
 
   const fetchOrgData = async () => {
     try {
@@ -205,12 +217,13 @@ export function ExpandableNav({ className }: ExpandableNavProps) {
             const hasContent = hasProjects || hasStandaloneBoards || hasActiveSprints
 
             return (
-              <Collapsible key={org.id} open={isExpanded} onOpenChange={() => toggleOrgExpansion(org.id)}>
+              <Collapsible key={org.id} open={isExpanded} onOpenChange={() => toggleOrgExpansion(org.id)} className="group/collapsible">
                 <SidebarMenuItem>
                   <CollapsibleTrigger asChild>
                     <SidebarMenuButton
+                      tooltip={org.name}
                       className={cn(
-                        "w-full justify-between",
+                        "w-full justify-between group",
                         activeOrg?.id === org.id && "bg-sidebar-accent text-sidebar-accent-foreground"
                       )}
                     >
@@ -219,7 +232,7 @@ export function ExpandableNav({ className }: ExpandableNavProps) {
                         <span className="truncate">{org.name}</span>
                       </div>
                       {hasContent && (
-                        isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />
+                        <ChevronRight className="h-4 w-4 transition-transform duration-300 group-data-[state=open]/collapsible:rotate-90" />
                       )}
                     </SidebarMenuButton>
                   </CollapsibleTrigger>
@@ -255,11 +268,12 @@ export function ExpandableNav({ className }: ExpandableNavProps) {
                               <Collapsible 
                                 open={isProjectExpanded} 
                                 onOpenChange={() => toggleProjectExpansion(project.id)}
+                                className="group/boards"
                               >
                                 <SidebarMenuSubItem>
                                   <CollapsibleTrigger asChild>
-                                    <SidebarMenuSubButton className="text-muted-foreground">
-                                      {isProjectExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                                    <SidebarMenuSubButton className="text-muted-foreground group/boards">
+                                      <ChevronRight className="h-3 w-3 transition-transform duration-300 group-data-[state=open]/boards:rotate-90" />
                                       <span className="text-xs">Boards ({projectBoards.length})</span>
                                     </SidebarMenuSubButton>
                                   </CollapsibleTrigger>
@@ -295,7 +309,7 @@ export function ExpandableNav({ className }: ExpandableNavProps) {
                                       <SidebarMenuSubItem>
                                         <BoardCreationWizard 
                                           projectId={project.id}
-                                          onSuccess={fetchOrgData}
+                                          onSuccess={handleBoardCreatedWithRedirect}
                                         >
                                           <SidebarMenuSubButton className="text-muted-foreground hover:text-foreground">
                                             <Plus className="h-3 w-3" />
@@ -344,11 +358,11 @@ export function ExpandableNav({ className }: ExpandableNavProps) {
                           <SidebarMenuSubButton
                             asChild
                             className={cn(
-                              pathname === `/sprints/${sprint.id}/backlog` && 
+                              pathname === `/sprints/${sprint.id}/active` && 
                               "bg-sidebar-accent text-sidebar-accent-foreground"
                             )}
                           >
-                            <Link href={`/sprints/${sprint.id}/backlog`} className="flex items-center gap-2">
+                            <Link href={`/sprints/${sprint.id}/active`} className="flex items-center gap-2">
                               <Zap className="h-4 w-4 text-green-600" />
                               <span className="truncate">{sprint.name}</span>
                               <span className="text-xs text-green-600 ml-auto font-medium">
@@ -376,7 +390,7 @@ export function ExpandableNav({ className }: ExpandableNavProps) {
                       <SidebarMenuSubItem>
                         <BoardCreationWizard 
                           organizationId={org.id}
-                          onSuccess={fetchOrgData}
+                          onSuccess={handleBoardCreatedWithRedirect}
                         >
                           <SidebarMenuSubButton className="text-muted-foreground hover:text-foreground">
                             <Plus className="h-4 w-4" />

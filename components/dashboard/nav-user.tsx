@@ -1,11 +1,12 @@
 "use client"
 
 import {
-    BellIcon,
-    CreditCardIcon,
-    LogOutIcon,
-    MoreVerticalIcon,
-    UserCircleIcon,
+    Bell,
+    CreditCard,
+    LogOut,
+    ChevronsUpDown,
+    BadgeCheck,
+    Sparkles,
 } from "lucide-react"
 
 import {
@@ -50,6 +51,7 @@ export function NavUser({
                         <SidebarMenuButton
                             size="lg"
                             className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+                            tooltip={user.name}
                         >
                             <Avatar className="h-8 w-8 rounded-lg">
                                 <AvatarImage src={user.avatar} alt={user.name} />
@@ -61,7 +63,7 @@ export function NavUser({
                                     {user.email}
                                 </span>
                             </div>
-                            <MoreVerticalIcon className="ml-auto size-4" />
+                            <ChevronsUpDown className="ml-auto size-4" />
                         </SidebarMenuButton>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent
@@ -87,15 +89,22 @@ export function NavUser({
                         <DropdownMenuSeparator />
                         <DropdownMenuGroup>
                             <DropdownMenuItem>
-                                <UserCircleIcon />
+                                <Sparkles />
+                                Upgrade to Pro
+                            </DropdownMenuItem>
+                        </DropdownMenuGroup>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuGroup>
+                            <DropdownMenuItem>
+                                <BadgeCheck />
                                 Account
                             </DropdownMenuItem>
                             <DropdownMenuItem>
-                                <CreditCardIcon />
+                                <CreditCard />
                                 Billing
                             </DropdownMenuItem>
                             <DropdownMenuItem>
-                                <BellIcon />
+                                <Bell />
                                 Notifications
                             </DropdownMenuItem>
                         </DropdownMenuGroup>
@@ -104,7 +113,7 @@ export function NavUser({
                             await supabase.auth.signOut()
                             router.refresh()
                         }}>
-                            <LogOutIcon />
+                            <LogOut />
                             Log out
                         </DropdownMenuItem>
                     </DropdownMenuContent>

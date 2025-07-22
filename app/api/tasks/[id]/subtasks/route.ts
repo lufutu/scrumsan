@@ -127,7 +127,6 @@ export async function POST(
         priority: validatedData.priority,
         storyPoints: validatedData.storyPoints,
         itemCode,
-        status: parentTask.status || 'todo',
         createdBy: user.id,
         position: newPosition
       },

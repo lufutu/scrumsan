@@ -11,7 +11,6 @@ export interface Task {
   id: string
   title: string
   description: string | null
-  status: string | null
   taskType: string | null
   priority: string | null
   storyPoints: number | null
@@ -48,7 +47,6 @@ export function useTasks(projectId?: string, boardId?: string, organizationId?: 
     boardId?: string
     columnId?: string
     projectId?: string
-    status?: string
   }) => {
     try {
       const response = await fetch('/api/tasks', {

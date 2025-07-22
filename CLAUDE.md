@@ -238,6 +238,74 @@ This is a **VivifyScrum clone** - a comprehensive project management application
   - After migration is complete, rename to replace the original component
 - **This prevents accidentally updating wrong files** and maintains code consistency
 
+### 🚨 CRITICAL: Task Status Rule (ZERO TOLERANCE)
+- **Tasks DO NOT have a status field** - Task state is determined by column placement ONLY
+- **ABSOLUTELY FORBIDDEN**: Any use of status field for Task model in ANY part of the codebase
+- **Column-based state management ONLY**: Tasks' state is defined by which column they are in
+- **COMPREHENSIVE PROHIBITION**:
+  - ❌ Database queries with task.status
+  - ❌ API endpoints accepting/returning status for tasks
+  - ❌ TypeScript interfaces with status field for tasks
+  - ❌ Frontend components displaying task status
+  - ❌ Task filtering by status
+  - ❌ Status dropdowns for tasks
+  - ❌ Status comparisons or conditions
+  - ❌ Status constants for tasks
+  - ❌ Status-based analytics
+  - ❌ Status imports from task-related utilities
+
+### ✅ APPROVED TASK STATE METHODS:
+1. **Backlog tasks**: `!columnId && !sprintColumnId && !labels.includes('__followup__')`
+2. **Sprint tasks**: `sprintColumnId || sprintId`
+3. **Followup tasks**: `!columnId && !sprintColumnId && labels.includes('__followup__')`
+4. **Board tasks**: `columnId !== null`
+
+### 🛡️ ENFORCEMENT MECHANISMS:
+1. **Comprehensive audit completed**: All 50+ status references removed from codebase
+2. **TypeScript interfaces cleaned**: No status fields in Task-related interfaces  
+3. **API endpoints secured**: All task endpoints reject status parameters
+4. **Constants removed**: All TASK_STATUSES and related utilities deleted
+5. **Documentation updated**: Zero-tolerance policy documented
+
+### ⚠️ IF YOU SEE ANY TASK STATUS REFERENCES:
+1. **STOP IMMEDIATELY** - Do not proceed with implementation
+2. **Remove the status reference** completely
+3. **Replace with column-based logic** if needed
+4. **Update this documentation** if new patterns emerge
+
+This rule has **ZERO TOLERANCE** - any status field usage for tasks will cause Prisma validation errors and application failures.
+
+### IMPORTANT: UI Component Consistency Rule
+- **ALWAYS use standardized UI components** for consistent user experience
+- **Loading States**: Use components from `/components/ui/loading-state.tsx`
+  - `PageLoadingState` for full page loading (60vh min-height)
+  - `CardLoadingState` for card/section loading
+  - `InlineLoadingState` for inline loading indicators
+  - `SkeletonLoadingState` for skeleton placeholders
+- **Error States**: Use components from `/components/ui/error-state.tsx`
+  - `PageErrorState` for full page errors with retry/go home actions
+  - `NetworkErrorState` for connection issues
+  - `PermissionErrorState` for access denied scenarios
+  - `NotFoundErrorState` for 404-type errors
+  - `ValidationErrorState` for form validation errors
+- **Empty States**: Use components from `/components/ui/empty-state.tsx`
+  - `OrganizationEmptyState`, `BoardEmptyState`, `ProjectEmptyState`, etc.
+  - Specialized variants with proper animations and call-to-actions
+
+### IMPORTANT: Replace All Basic Loading/Error Patterns
+- **NEVER use basic patterns like**:
+  ```typescript
+  if (isLoading) return <div>Loading...</div>
+  if (error) return <div>Error: {error}</div>
+  ```
+- **ALWAYS use the standardized components instead**:
+  ```typescript
+  if (isLoading) return <PageLoadingState message="Loading data..." />
+  if (error) return <PageErrorState error={error} onRetry={refetch} />
+  if (data.length === 0) return <EmptyState type="boards" action={{ label: "Create Board", onClick: handleCreate }} />
+  ```
+- **This applies to ALL pages and components** - existing and new
+
 ### IMPORTANT: Modal Behavior Rule
 - **ItemModal must NEVER auto-close** on any action (save, create, etc.)
 - **Use Dialog props to prevent closing**:
@@ -252,7 +320,7 @@ This is a **VivifyScrum clone** - a comprehensive project management application
 - **Subtasks inherit parent properties**:
   - Column assignment (columnId)
   - Sprint assignment (sprintColumnId)
-  - Status if applicable
+  - Board assignment (boardId)
 - **Item codes are auto-generated** using board name initials
 - **Subtasks appear in the same column** as their parent
 - **Moving parent tasks should consider** moving subtasks together

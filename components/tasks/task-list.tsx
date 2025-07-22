@@ -35,7 +35,7 @@ export default function TaskList({ projectId }: TaskListProps) {
   const [tasks, setTasks] = useState<Task[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
-  const [statusFilter, setStatusFilter] = useState('all')
+  const [typeFilter, setTypeFilter] = useState('all')
   const [assigneeFilter, setAssigneeFilter] = useState('all')
 
   useEffect(() => {
@@ -77,47 +77,7 @@ export default function TaskList({ projectId }: TaskListProps) {
     }
   }
 
-  const handleStatusChange = async (taskId: string, newStatus: string) => {
-    try {
-      const { error } = await supabase
-        .from('tasks')
-        .update({ status: newStatus })
-        .eq('id', taskId)
 
-      if (error) throw error
-
-      toast({
-        title: "Success",
-        description: "Task status updated"
-      })
-
-      fetchTasks()
-    } catch (err: any) {
-      console.error('Error updating task status:', err)
-      toast({
-        title: "Error",
-        description: "Failed to update task status"
-      })
-    }
-  }
-
-  const getStatusIcon = (status: string | null) => {
-    switch (status) {
-      case 'todo': return <Clock className="h-4 w-4" />
-      case 'in_progress': return <Play className="h-4 w-4" />
-      case 'done': return <CheckCircle2 className="h-4 w-4" />
-      default: return <AlertCircle className="h-4 w-4" />
-    }
-  }
-
-  const getStatusColor = (status: string | null) => {
-    switch (status) {
-      case 'todo': return 'secondary'
-      case 'in_progress': return 'default'
-      case 'done': return 'outline'
-      default: return 'secondary'
-    }
-  }
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
@@ -132,12 +92,12 @@ export default function TaskList({ projectId }: TaskListProps) {
   const filteredTasks = tasks.filter(task => {
     const matchesSearch = task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          task.description?.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesStatus = statusFilter === 'all' || task.status === statusFilter
+    const matchesType = typeFilter === 'all' || task.task_type === typeFilter
     const matchesAssignee = assigneeFilter === 'all' || 
                            (assigneeFilter === 'unassigned' && !task.assignee_id) ||
                            task.assignee_id === assigneeFilter
 
-    return matchesSearch && matchesStatus && matchesAssignee
+    return matchesSearch && matchesType && matchesAssignee
   })
 
   // Get unique assignees for filter
@@ -200,16 +160,16 @@ export default function TaskList({ projectId }: TaskListProps) {
             />
           </div>
           
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <Select value={typeFilter} onValueChange={setTypeFilter}>
             <SelectTrigger className="w-32">
               <Filter className="h-4 w-4 mr-2" />
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="todo">To Do</SelectItem>
-              <SelectItem value="in_progress">In Progress</SelectItem>
-              <SelectItem value="done">Done</SelectItem>
+              <SelectItem value="all">All Types</SelectItem>
+              <SelectItem value="story">Story</SelectItem>
+              <SelectItem value="bug">Bug</SelectItem>
+              <SelectItem value="task">Task</SelectItem>
             </SelectContent>
           </Select>
           
@@ -252,28 +212,13 @@ export default function TaskList({ projectId }: TaskListProps) {
                     )}
                   </div>
                   
-                  <div className="flex items-center gap-2 ml-4">
-                    <Select 
-                      value={task.status || 'todo'} 
-                      onValueChange={(value) => handleStatusChange(task.id, value)}
-                    >
-                      <SelectTrigger className="w-32">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="todo">To Do</SelectItem>
-                        <SelectItem value="in_progress">In Progress</SelectItem>
-                        <SelectItem value="done">Done</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
                 </div>
                 
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                    <Badge variant={getStatusColor(task.status)} className="flex items-center gap-1">
-                      {getStatusIcon(task.status)}
-                      {task.status || 'todo'}
+                    <Badge variant="secondary" className="flex items-center gap-1">
+                      <AlertCircle className="h-4 w-4" />
+                      {task.task_type || 'task'}
                     </Badge>
                     
                     {task.due_date && (

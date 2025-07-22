@@ -15,24 +15,30 @@ export async function POST(
     // Check if user has access to the sprint
     const sprint = await prisma.sprint.findUnique({
       where: { id: sprintId },
-      include: {
-        project: {
+      select: {
+        id: true,
+        boardId: true
+      }
+    })
+    
+    if (!sprint) {
+      return NextResponse.json({ error: 'Sprint not found' }, { status: 404 })
+    }
+    
+    // Check if user has access to the board through organization membership
+    const board = await prisma.board.findUnique({
+      where: { id: sprint.boardId },
+      select: {
+        organizationId: true,
+        predefinedItems: {
           include: {
-            boards: {
+            task: {
               include: {
-                predefinedItems: {
-                  include: {
-                    task: {
-                      include: {
-                        assignee: {
-                          select: {
-                            id: true,
-                            fullName: true,
-                            avatarUrl: true
-                          }
-                        }
-                      }
-                    }
+                assignee: {
+                  select: {
+                    id: true,
+                    fullName: true,
+                    avatarUrl: true
                   }
                 }
               }
@@ -42,19 +48,15 @@ export async function POST(
       }
     })
     
-    if (!sprint) {
-      return NextResponse.json({ error: 'Sprint not found' }, { status: 404 })
-    }
-    
-    if (sprint.projectId) {
-      const projectMember = await prisma.projectMember.findFirst({
+    if (board) {
+      const orgMember = await prisma.organizationMember.findFirst({
         where: {
-          projectId: sprint.projectId,
+          organizationId: board.organizationId,
           userId: user.id
         }
       })
       
-      if (!projectMember) {
+      if (!orgMember) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
       }
     }
@@ -71,10 +73,8 @@ export async function POST(
       return NextResponse.json({ error: 'Column not found' }, { status: 404 })
     }
     
-    // Get predefined items from the project's boards
-    const predefinedItems = sprint.project?.boards.flatMap(board => 
-      board.predefinedItems.map(item => item.task)
-    ) || []
+    // Get predefined items from the board
+    const predefinedItems = board?.predefinedItems.map(item => item.task) || []
     
     if (predefinedItems.length === 0) {
       return NextResponse.json({ message: 'No predefined items available' })
@@ -105,9 +105,7 @@ export async function POST(
           estimatedHours: predefinedTask.estimatedHours,
           sprintColumnId: columnId,
           boardId: predefinedTask.boardId,
-          projectId: predefinedTask.projectId,
-          createdBy: user.id,
-          status: targetColumn.isDone ? 'done' : 'todo'
+          createdBy: user.id
         },
         include: {
           assignee: {
