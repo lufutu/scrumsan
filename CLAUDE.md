@@ -74,10 +74,11 @@ This is a **VivifyScrum clone** - a comprehensive project management application
 - **Scrum and Kanban boards** with drag-and-drop
 - **Sprint management** with analytics and dedicated Sprint Backlog views
 - **Sprint Backlog** with customizable columns, WIP limits, and export functionality
-- **Task types**: Story, Bug, Task, Epic, Improvement, Note, Idea
-- **Task relationships**: parent-child, blocking, dependencies
+- **Six task types**: Story (new functionality), Bug (errors/flaws), Task (technical work), Improvement (existing features needing work), Note (valuable information), Idea (product improvement thoughts)
+- **Task relationships**: parent-child (subtasks), blocking items, dependencies
+- **Subtask management**: Add existing items or create new subtasks inline
 - **Time tracking** with worklog entries
-- **File attachments** and document management
+- **File attachments** with S3 storage and signed URLs for secure access
 
 ### VivifyScrum Implementation
 - **Authentic VivifyScrum experience** - UI and UX matches VivifyScrum exactly
@@ -107,6 +108,23 @@ This is a **VivifyScrum clone** - a comprehensive project management application
 - **Live board updates** when tasks are moved
 - **Real-time notifications** for task changes
 - **Collaborative editing** with activity feeds
+
+### Task Relations & Hierarchy
+- **Parent-Child Relationships**: Tasks can have subtasks that inherit parent's column and sprint
+- **Blocking Relationships**: Tasks can block or be blocked by other tasks
+- **Relations Tab** in ItemModal with four sections:
+  - Parent Item: Shows and allows changing parent task
+  - Subitems: List of child tasks with inline creation
+  - This Item Is Blocking: Tasks blocked by current item
+  - This Item Is Blocked By: Tasks blocking current item
+- **Search Integration**: Find existing tasks to add as relations
+- **Circular Reference Prevention**: API validates against circular dependencies
+
+### Deep Linking & URL Parameters
+- **Task URLs**: `/boards/[boardId]?task=[taskId]` auto-opens task dialog
+- **Copy Link**: Generate shareable task URLs from dropdown menu
+- **Auto-open behavior**: Board detects task parameter and opens dialog on load
+- **Suspense boundaries**: Required for useSearchParams to prevent hydration issues
 
 ## Development Patterns
 
@@ -140,6 +158,17 @@ This is a **VivifyScrum clone** - a comprehensive project management application
 - `middleware.ts` - Route protection and authentication
 - `tsconfig.json` - TypeScript configuration with `@/*` path aliases
 - `components.json` - shadcn/ui configuration
+
+### API Endpoints
+- `/api/tasks/[id]/relations` - Manage task relationships (GET, POST, PUT, DELETE)
+- `/api/tasks/search` - Search tasks by title or item code
+- `/api/tasks/[id]/subtasks` - Create subtasks with inherited properties
+- `/api/tasks/[id]/attachments` - File upload with S3 integration and signed URLs
+
+### Key Components
+- `components/scrum/RelationsTab.tsx` - Complete UI for task relations management
+- `components/scrum/ItemModal.tsx` - Task dialog with no auto-close behavior
+- `components/ui/file-upload-queue.tsx` - File upload with auto-clear and S3 integration
 
 ### Database
 - `prisma/schema.prisma` - Prisma schema definition
@@ -209,6 +238,42 @@ This is a **VivifyScrum clone** - a comprehensive project management application
   - After migration is complete, rename to replace the original component
 - **This prevents accidentally updating wrong files** and maintains code consistency
 
+### IMPORTANT: Modal Behavior Rule
+- **ItemModal must NEVER auto-close** on any action (save, create, etc.)
+- **Use Dialog props to prevent closing**:
+  ```typescript
+  onInteractOutside={(e) => e.preventDefault()}
+  onEscapeKeyDown={(e) => e.preventDefault()}
+  ```
+- **Only close when user explicitly clicks close button**
+- **This ensures users can perform multiple actions** without reopening
+
+### IMPORTANT: Subtask Inheritance Rule
+- **Subtasks inherit parent properties**:
+  - Column assignment (columnId)
+  - Sprint assignment (sprintColumnId)
+  - Status if applicable
+- **Item codes are auto-generated** using board name initials
+- **Subtasks appear in the same column** as their parent
+- **Moving parent tasks should consider** moving subtasks together
+
+### IMPORTANT: File Upload & S3 Integration
+- **Always generate signed URLs** for S3 file access
+- **Handle image preview errors** with React state, not DOM manipulation
+- **Auto-clear completed uploads** after 3 seconds
+- **Use proper cleanup** with useRef for timers
+- **Support drag-and-drop** and click-to-upload
+
+### IMPORTANT: Hydration & Suspense Patterns
+- **Wrap useSearchParams in Suspense** to prevent hydration errors:
+  ```typescript
+  <Suspense fallback={<BoardSkeleton />}>
+    <BoardContent initialTaskId={null} />
+  </Suspense>
+  ```
+- **Extract client components** when using browser-only APIs
+- **Use useEffect for URL parameter handling** after hydration
+
 #### Example: Adding a Comments Feature
 BAD (UI only):
 - ✗ Create comment UI component
@@ -273,6 +338,9 @@ GOOD (Complete functionality):
    - Create, read, update, delete operations
    - Edge cases and error scenarios
    - Real-time updates if applicable
+   - Task relations and circular dependency prevention
+   - File uploads with proper S3 integration
+   - URL deep linking functionality
 
 ### Database Changes
 1. **Update Prisma schema** in `prisma/schema.prisma`

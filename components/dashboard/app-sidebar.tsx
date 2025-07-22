@@ -26,7 +26,7 @@ import {
     SidebarMenu,
     SidebarMenuButton,
     SidebarMenuItem,
-} from "@/components/ui/sidebar"
+} from "@/components/animate-ui/radix/sidebar"
 import { OrgSwitcher } from "@/components/dashboard/org-switcher"
 import { CreateOrganizationDialog } from "@/components/organizations/create-organization-dialog"
 import { useOrganization } from "@/providers/organization-provider"

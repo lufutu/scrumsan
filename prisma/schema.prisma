@@ -188,7 +188,6 @@ model Task {
   sprintColumnId   String?   @map("sprint_column_id") @db.Uuid
   title            String
   description      String?
-  status           String?
   taskType         String?   @default("story") @map("task_type")
   itemCode         String?   @unique @map("item_code") // e.g., "SPDR-1"
   epicId           String?   @map("epic_id") @db.Uuid

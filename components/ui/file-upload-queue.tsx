@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { Card, CardContent } from '@/components/ui/card'
+import { toast } from 'sonner'
 
 export interface QueuedFile {
   id: string
@@ -151,8 +152,9 @@ export function FileUploadQueue({
 
     // Show errors if any
     if (errors.length > 0) {
-      console.error('File validation errors:', errors)
-      // You can replace this with toast notifications
+      toast.error('File validation errors:', {
+        description: errors.join('\n')
+      })
     }
 
     // Add valid files to queue

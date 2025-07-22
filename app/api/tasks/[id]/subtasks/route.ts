@@ -46,7 +46,6 @@ export async function POST(
             sprint: {
               select: {
                 id: true,
-                status: true
               }
             }
           }

@@ -37,7 +37,6 @@ export async function GET(
                 id: true,
                 title: true,
                 description: true,
-                status: true,
                 priority: true,
                 storyPoints: true,
                 estimatedHours: true,
@@ -170,7 +169,6 @@ export async function PATCH(
               select: {
                 id: true,
                 title: true,
-                status: true,
                 storyPoints: true,
                 assignee: {
                   select: {

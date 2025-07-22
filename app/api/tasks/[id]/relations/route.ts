@@ -84,7 +84,6 @@ export async function GET(
           id: true,
           title: true,
           taskType: true,
-          status: true,
           itemCode: true
         }
       }) : null,
@@ -96,7 +95,6 @@ export async function GET(
           id: true,
           title: true,
           taskType: true,
-          status: true,
           itemCode: true,
           assignee: {
             select: {
@@ -121,8 +119,7 @@ export async function GET(
               id: true,
               title: true,
               taskType: true,
-              status: true,
-              itemCode: true
+                  itemCode: true
             }
           }
         }
@@ -140,8 +137,7 @@ export async function GET(
               id: true,
               title: true,
               taskType: true,
-              status: true,
-              itemCode: true
+                  itemCode: true
             }
           }
         }
@@ -161,8 +157,7 @@ export async function GET(
               id: true,
               title: true,
               taskType: true,
-              status: true,
-              itemCode: true
+                  itemCode: true
             }
           },
           targetTask: {
@@ -170,8 +165,7 @@ export async function GET(
               id: true,
               title: true,
               taskType: true,
-              status: true,
-              itemCode: true
+                  itemCode: true
             }
           }
         }
@@ -290,8 +284,7 @@ export async function POST(
             id: true,
             title: true,
             taskType: true,
-            status: true,
-            itemCode: true
+              itemCode: true
           }
         }
       }
@@ -423,8 +416,7 @@ export async function PUT(
             id: true,
             title: true,
             taskType: true,
-            status: true,
-            itemCode: true
+              itemCode: true
           }
         }
       }

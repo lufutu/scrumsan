@@ -268,3 +268,20 @@ export const isValidPriority = (priority: string): priority is string => {
 export const isValidTaskStatus = (status: string): status is string => {
   return TASK_STATUSES.some(s => s.id === status)
 }
+
+// Task Status Derivation from Column
+export const getTaskStatusFromColumn = (columnName: string): string => {
+  const normalizedName = columnName?.toLowerCase() || ''
+  
+  if (normalizedName.includes('done') || normalizedName.includes('complete')) {
+    return 'done'
+  }
+  if (normalizedName.includes('progress') || normalizedName.includes('doing') || normalizedName.includes('review')) {
+    return 'in_progress'
+  }
+  if (normalizedName.includes('backlog')) {
+    return 'backlog'
+  }
+  // Default to 'todo' for any other column
+  return 'todo'
+}

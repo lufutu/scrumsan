@@ -49,6 +49,7 @@ interface ProductBacklogProps {
   onFinishSprint?: (sprintId: string) => void
   onRefresh?: () => void
   onMoveTask?: (taskId: string, fromLocation: string, toLocation: string) => void
+  initialTaskId?: string | null
 }
 
 // Draggable Task Component
@@ -197,7 +198,8 @@ export default function ProductBacklog({
   onStartSprint,
   onFinishSprint,
   onRefresh,
-  onMoveTask
+  onMoveTask,
+  initialTaskId
 }: ProductBacklogProps) {
   const {
     tasks,
@@ -232,6 +234,16 @@ export default function ProductBacklog({
     icon: '●',
     color: 'bg-emerald-500'
   })
+
+  // Auto-open task dialog if initialTaskId is provided
+  useEffect(() => {
+    if (initialTaskId && tasks.length > 0) {
+      const task = tasks.find(t => t.id === initialTaskId)
+      if (task) {
+        setSelectedTask(task)
+      }
+    }
+  }, [initialTaskId, tasks])
 
   const sensors = useSensors(
     useSensor(PointerSensor, {

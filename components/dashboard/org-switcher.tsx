@@ -22,7 +22,7 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
     useSidebar,
-} from "@/components/ui/sidebar"
+} from "@/components/animate-ui/radix/sidebar"
 
 export function OrgSwitcher() {
     const { isMobile } = useSidebar()

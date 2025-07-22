@@ -72,7 +72,6 @@ export async function GET(
           select: {
             id: true,
             title: true,
-            status: true,
             priority: true,
             storyPoints: true,
             assignee: {
@@ -181,7 +180,6 @@ export async function POST(
           select: {
             id: true,
             title: true,
-            status: true,
             priority: true,
             storyPoints: true,
             assignee: {

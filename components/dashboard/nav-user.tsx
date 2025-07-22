@@ -27,7 +27,7 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
     useSidebar,
-} from "@/components/ui/sidebar"
+} from "@/components/animate-ui/radix/sidebar"
 import { supabase } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 export function NavUser({

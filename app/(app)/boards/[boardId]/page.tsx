@@ -1,9 +1,10 @@
 "use client"
 
 import { useParams, useSearchParams } from 'next/navigation'
+import { useState, useEffect, Suspense } from 'react'
 import useSWR from 'swr'
 import { Card, CardContent } from '@/components/ui/card'
-import { Loader2, ArrowLeft, MoreHorizontal } from 'lucide-react'
+import { Loader2, ArrowLeft, MoreHorizontal, Kanban, Calendar } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import ProjectBoard from '@/components/projects/project-board'
@@ -11,6 +12,7 @@ import StandaloneBoardView from '@/components/boards/standalone-board-view'
 import Scrum from '@/components/scrum/Scrum'
 import BoardEditForm from '@/components/boards/board-edit-form'
 import BoardDeleteDialog from '@/components/boards/board-delete-dialog'
+import { AppHeader } from '@/components/dashboard/app-header'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -75,11 +77,19 @@ type Board = {
   }
 }
 
-export default function StandaloneBoardPage() {
+function BoardContent() {
   const params = useParams()
   const searchParams = useSearchParams()
   const boardId = params?.boardId as string
-  const taskId = searchParams?.get('task')
+  const [initialTaskId, setInitialTaskId] = useState<string | null>(null)
+  
+  // Handle search params after hydration
+  useEffect(() => {
+    const taskId = searchParams?.get('task')
+    if (taskId) {
+      setInitialTaskId(taskId)
+    }
+  }, [searchParams])
   
   const { data: board, error, isLoading, mutate } = useSWR<Board>(
     boardId ? `/api/boards/${boardId}` : null,
@@ -160,62 +170,90 @@ export default function StandaloneBoardPage() {
     return null // Board is still loading or not found (error state handles not found case)
   }
 
-  return (
-    <div className="h-full flex flex-col p-6">
-      <div className="flex items-center gap-4 mb-6">
-        <Button asChild variant="ghost" size="sm">
-          <Link href="/">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
-          </Link>
-        </Button>
-        
-        <div className="flex-1">
-          <h1 className="text-2xl font-bold">{board.name}</h1>
-          <p className="text-muted-foreground">
-            {board.projectLinks && board.projectLinks.length > 0
-              ? `Linked to ${board.projectLinks.map(link => link.project.name).join(', ')}` 
-              : `Standalone board in ${board.organization?.name}`
-            }
-          </p>
-        </div>
+  const getBoardIcon = (boardType?: string | null) => {
+    return boardType === 'scrum' ? Calendar : Kanban
+  }
 
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm">
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <BoardEditForm board={board} onSuccess={mutate}>
-              <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                Edit Board
-              </DropdownMenuItem>
-            </BoardEditForm>
-            <DropdownMenuSeparator />
-            <BoardDeleteDialog board={board}>
-              <DropdownMenuItem 
-                onSelect={(e) => e.preventDefault()}
-                className="text-red-600"
-              >
-                Delete Board
-              </DropdownMenuItem>
-            </BoardDeleteDialog>
-          </DropdownMenuContent>
-        </DropdownMenu>
+  const getBoardTypeLabel = (boardType?: string | null) => {
+    return boardType === 'scrum' ? 'Scrum' : 'Kanban'
+  }
+
+  // Create breadcrumbs
+  const BoardIcon = getBoardIcon(board.boardType)
+  const breadcrumbs = [
+    { label: 'Home', href: '/' },
+    { label: 'Boards', href: '/boards' },
+    { 
+      label: board.name, 
+      icon: <BoardIcon className="w-4 h-4" />,
+      isCurrentPage: true 
+    }
+  ]
+
+  // Header actions
+  const headerActions = (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" size="sm">
+          <MoreHorizontal className="h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <BoardEditForm board={board} onSuccess={mutate}>
+          <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+            Edit Board
+          </DropdownMenuItem>
+        </BoardEditForm>
+        <DropdownMenuSeparator />
+        <BoardDeleteDialog board={board}>
+          <DropdownMenuItem 
+            onSelect={(e) => e.preventDefault()}
+            className="text-red-600"
+          >
+            Delete Board
+          </DropdownMenuItem>
+        </BoardDeleteDialog>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+
+  return (
+    <>
+      <AppHeader 
+        title={board.name}
+        breadcrumbs={breadcrumbs}
+        actions={headerActions}
+      />
+      <main className="flex-1 overflow-auto">
+        <div className="h-full flex flex-col">
+          <div className="flex-1 px-6">
+            {board.boardType === 'scrum' ? (
+              <Scrum 
+                boardId={board.id}
+                organizationId={board.organizationId}
+                initialTaskId={initialTaskId}
+              />
+            ) : (
+              <StandaloneBoardView board={board} onUpdate={mutate} />
+            )}
+          </div>
+        </div>
+      </main>
+    </>
+  )
+}
+
+export default function StandaloneBoardPage() {
+  return (
+    <Suspense fallback={
+      <div className="h-96 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
+          <p className="text-muted-foreground">Loading board...</p>
+        </div>
       </div>
-      
-      <div className="flex-1">
-        {board.boardType === 'scrum' ? (
-          <Scrum 
-            boardId={board.id}
-            organizationId={board.organizationId}
-            initialTaskId={taskId}
-          />
-        ) : (
-          <StandaloneBoardView board={board} onUpdate={mutate} />
-        )}
-      </div>
-    </div>
+    }>
+      <BoardContent />
+    </Suspense>
   )
 } 

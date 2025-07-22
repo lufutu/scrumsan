@@ -22,7 +22,6 @@ export async function GET(
                 storyPoints: true,
                 loggedHours: true,
                 estimatedHours: true,
-                status: true,
                 taskType: true,
                 priority: true,
                 assignee: {

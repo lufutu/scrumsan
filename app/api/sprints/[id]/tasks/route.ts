@@ -146,7 +146,6 @@ export async function POST(
                 id: true,
                 title: true,
                 description: true,
-                status: true,
                 priority: true,
                 storyPoints: true,
                 estimatedHours: true,

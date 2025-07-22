@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import useSWR, { mutate } from 'swr'
 import { useSupabase } from '@/providers/supabase-provider'
 import { useBoardRealtime } from '@/hooks/useSupabaseRealtime'
+import { getTaskStatusFromColumn } from '@/lib/constants'
 
 export interface ScrumTask {
   id: string
@@ -315,7 +316,10 @@ export function useScrumBoard(boardId: string, projectId?: string) {
 
   // Filter tasks by status
   const getTasksByStatus = useCallback((status: 'backlog' | 'sprint' | 'followup') => {
-    return tasks?.filter(task => task.status === status) || []
+    return tasks?.filter(task => {
+      const derivedStatus = task.column ? getTaskStatusFromColumn(task.column.name) : 'todo'
+      return derivedStatus === status
+    }) || []
   }, [tasks])
 
   // Clone a task

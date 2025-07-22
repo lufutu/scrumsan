@@ -1,14 +1,15 @@
 "use client"
 
 import { use } from 'react'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useSupabase } from '@/providers/supabase-provider'
 import { useToast } from '@/hooks/use-toast'
-import { Building2, ArrowLeft, Users, Settings, Plus } from 'lucide-react'
+import { Building2, Users, Settings, Plus } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { AppHeader } from '@/components/dashboard/app-header'
 import ProjectList from '@/components/projects/project-list'
 import ProjectForm from '@/components/projects/project-form'
 import { Tables } from '@/types/database'
@@ -29,48 +30,50 @@ export default function OrganizationDetailsPage({ params }: { params: Promise<{ 
   const [isLoading, setIsLoading] = useState(true)
   const [showProjectForm, setShowProjectForm] = useState(false)
 
-  useEffect(() => {
-    fetchOrganization()
-  }, [organizationId])
-
-  const fetchOrganization = async () => {
+  const fetchOrganization = useCallback(async () => {
     try {
       setIsLoading(true)
       
-      const { data, error } = await supabase
-        .from('organizations')
-        .select(`
-          *,
-          projects (*)
-        `)
-        .eq('id', organizationId)
-        .single()
-
-      if (error) throw error
-
-      // Get member count
-      const { count: memberCount } = await supabase
-        .from('organization_members')
-        .select('*', { count: 'exact', head: true })
-        .eq('organization_id', organizationId)
+      const response = await fetch(`/api/organizations/${organizationId}`)
+      
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || errorData.message || 'Failed to fetch organization')
+      }
+      
+      const data = await response.json()
+      
+      // Get projects for this organization
+      const projectsResponse = await fetch(`/api/organizations/${organizationId}/projects`)
+      let projects = []
+      
+      if (projectsResponse.ok) {
+        projects = await projectsResponse.json()
+      }
 
       setOrganization({
         ...data,
+        projects,
         _count: {
-          members: memberCount || 0,
-          projects: data.projects?.length || 0
+          members: data.members?.length || 0,
+          projects: projects.length || 0
         }
       })
     } catch (err: unknown) {
       console.error('Error fetching organization:', err)
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load organization'
       toast({
         title: "Error",
-        description: "Failed to load organization"
+        description: errorMessage
       })
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [organizationId, toast])
+
+  useEffect(() => {
+    fetchOrganization()
+  }, [fetchOrganization])
 
   if (isLoading) {
     return (
@@ -85,52 +88,66 @@ export default function OrganizationDetailsPage({ params }: { params: Promise<{ 
 
   if (!organization) {
     return (
-      <div className="p-8">
-        <Card>
-          <CardContent className="p-6 text-center">
-            <h1 className="text-2xl font-bold text-red-600 mb-4">Organization not found</h1>
-            <Button asChild variant="outline">
-              <Link href="/organizations">
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to Organizations
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+      <>
+        <AppHeader 
+          title="Organization Not Found"
+          breadcrumbs={[
+            { label: 'Home', href: '/' },
+            { label: 'Organizations', href: '/organizations' },
+            { label: 'Not Found', isCurrentPage: true }
+          ]}
+        />
+        <main className="flex-1 overflow-auto">
+          <div className="container mx-auto px-4 py-6">
+            <Card>
+              <CardContent className="p-6 text-center">
+                <h1 className="text-2xl font-bold text-red-600 mb-4">Organization not found</h1>
+                <Button asChild variant="outline">
+                  <Link href="/organizations">
+                    Back to Organizations
+                  </Link>
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </main>
+      </>
     )
   }
 
-  return (
-    <div className="h-full flex flex-col p-6">
-      <div className="flex items-center gap-4 mb-6">
-        <Button asChild variant="ghost" size="sm">
-          <Link href="/organizations">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
-          </Link>
-        </Button>
-        
-        <div className="flex-1">
-          <div className="flex items-center gap-3">
-            <Building2 className="h-8 w-8" />
-            <div>
-              <h1 className="text-2xl font-bold">{organization.name}</h1>
-              <p className="text-muted-foreground">{organization.description}</p>
-            </div>
-          </div>
-        </div>
-        
-        <Button asChild variant="outline">
-          <Link href={`/organizations/${organizationId}/settings`}>
-            <Settings className="h-4 w-4 mr-2" />
-            Settings
-          </Link>
-        </Button>
-      </div>
+  // Custom breadcrumbs for organization page
+  const breadcrumbs = [
+    { label: 'Home', href: '/' },
+    { label: 'Organizations', href: '/organizations' },
+    { 
+      label: organization.name, 
+      icon: <Building2 className="w-4 h-4" />,
+      isCurrentPage: true 
+    }
+  ];
 
-      {/* Organization Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+  // Header actions
+  const headerActions = (
+    <Button asChild variant="outline" size="sm">
+      <Link href={`/organizations/${organizationId}/settings`}>
+        <Settings className="h-4 w-4 mr-2" />
+        Settings
+      </Link>
+    </Button>
+  );
+
+  return (
+    <>
+      <AppHeader 
+        title={organization.name}
+        breadcrumbs={breadcrumbs}
+        actions={headerActions}
+      />
+      <main className="flex-1 overflow-auto">
+        <div className="container mx-auto px-4 py-6">
+          <div className="space-y-6">
+        {/* Organization Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-muted-foreground">Projects</CardTitle>
@@ -159,7 +176,7 @@ export default function OrganizationDetailsPage({ params }: { params: Promise<{ 
         </Card>
       </div>
 
-      <Tabs defaultValue="projects" className="flex-1">
+        <Tabs defaultValue="projects" className="flex-1">
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="projects">Projects</TabsTrigger>
           <TabsTrigger value="members">Members</TabsTrigger>
@@ -233,6 +250,9 @@ export default function OrganizationDetailsPage({ params }: { params: Promise<{ 
           </Card>
         </TabsContent>
       </Tabs>
-    </div>
+          </div>
+        </div>
+      </main>
+    </>
   )
 } 

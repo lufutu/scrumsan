@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect } from 'react'
-import { useSupabase } from '@/providers/supabase-provider'
 import { useOrganization } from '@/providers/organization-provider'
 import { ChevronRight, ChevronDown, Building2, FolderOpen, Kanban, Calendar, Plus, Zap } from 'lucide-react'
 import Link from 'next/link'
@@ -17,7 +16,7 @@ import {
   SidebarMenuSub,
   SidebarMenuSubButton,
   SidebarMenuSubItem,
-} from '@/components/ui/sidebar'
+} from '@/components/animate-ui/radix/sidebar'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import BoardCreationWizard from '@/components/projects/board-creation-wizard-simple'
 import { Tables } from '@/types/database'

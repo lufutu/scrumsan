@@ -10,6 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Kanban, Calendar, Plus, Users, MoreVertical } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { AppHeader } from '@/components/dashboard/app-header'
 import BoardCreationWizard from '@/components/projects/board-creation-wizard-simple'
 import BoardEditForm from '@/components/boards/board-edit-form'
 import BoardDeleteDialog from '@/components/boards/board-delete-dialog'
@@ -102,189 +103,212 @@ export default function BoardsPage() {
 
   if (!activeOrg) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <Card>
-          <CardContent className="p-6 text-center">
-            <h1 className="text-2xl font-bold text-muted-foreground">No Organization Selected</h1>
-            <p className="text-muted-foreground mt-2">Please select an organization to view boards.</p>
-          </CardContent>
-        </Card>
-      </div>
+      <>
+        <AppHeader 
+          title="Boards"
+          breadcrumbs={[
+            { label: 'Home', href: '/' },
+            { label: 'Boards', icon: <Kanban className="w-4 h-4" />, isCurrentPage: true }
+          ]}
+        />
+        <main className="flex-1 overflow-auto">
+          <div className="container mx-auto px-4 py-6">
+            <Card>
+              <CardContent className="p-6 text-center">
+                <h1 className="text-2xl font-bold text-muted-foreground">No Organization Selected</h1>
+                <p className="text-muted-foreground mt-2">Please select an organization to view boards.</p>
+              </CardContent>
+            </Card>
+          </div>
+        </main>
+      </>
     )
   }
 
   if (isLoading) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold">Boards</h1>
-            <p className="text-muted-foreground">All boards in {activeOrg.name}</p>
+      <>
+        <AppHeader 
+          title="Boards"
+          breadcrumbs={[
+            { label: 'Home', href: '/' },
+            { label: 'Boards', icon: <Kanban className="w-4 h-4" />, isCurrentPage: true }
+          ]}
+          actions={<Skeleton className="h-10 w-32" />}
+        />
+        <main className="flex-1 overflow-auto">
+          <div className="container mx-auto px-4 py-6">
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {[...Array(6)].map((_, i) => (
+                  <Card key={i} className="animate-pulse">
+                    <CardHeader>
+                      <Skeleton className="h-6 w-3/4" />
+                      <Skeleton className="h-4 w-1/2" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex gap-4">
+                        <Skeleton className="h-4 w-20" />
+                        <Skeleton className="h-4 w-20" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
           </div>
-          <Skeleton className="h-10 w-32" />
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[...Array(6)].map((_, i) => (
-            <Card key={i} className="animate-pulse">
-              <CardHeader>
-                <Skeleton className="h-6 w-3/4" />
-                <Skeleton className="h-4 w-1/2" />
-              </CardHeader>
-              <CardContent>
-                <div className="flex gap-4">
-                  <Skeleton className="h-4 w-20" />
-                  <Skeleton className="h-4 w-20" />
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
+        </main>
+      </>
     )
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-3xl font-bold">Boards</h1>
-          <p className="text-muted-foreground">
-            All boards in {activeOrg.name}
-          </p>
-        </div>
-        
-        <BoardCreationWizard organizationId={activeOrg.id} onSuccess={handleBoardCreated}>
-          <Button>
-            <Plus className="h-4 w-4 mr-2" />
-            Create Board
-          </Button>
-        </BoardCreationWizard>
-      </div>
+    <>
+      <AppHeader 
+        title="Boards"
+        breadcrumbs={[
+          { label: 'Home', href: '/' },
+          { label: 'Boards', icon: <Kanban className="w-4 h-4" />, isCurrentPage: true }
+        ]}
+        actions={
+          <BoardCreationWizard organizationId={activeOrg.id} onSuccess={handleBoardCreated}>
+            <Button>
+              <Plus className="h-4 w-4 mr-2" />
+              Create Board
+            </Button>
+          </BoardCreationWizard>
+        }
+      />
+      <main className="flex-1 overflow-auto">
+        <div className="container mx-auto px-4 py-6">
+          <div className="space-y-6">
 
-      {error && (
-        <Card className="mb-6 border-red-200 bg-red-50">
-          <CardContent className="p-4">
-            <p className="text-red-600">{error}</p>
-          </CardContent>
-        </Card>
-      )}
+        {error && (
+          <Card className="mb-6 border-red-200 bg-red-50">
+            <CardContent className="p-4">
+              <p className="text-red-600">{error}</p>
+            </CardContent>
+          </Card>
+        )}
 
-      {!isLoading && boards.length === 0 ? (
-        <Card>
-          <CardContent className="p-12 text-center">
-            <Kanban className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-            <h3 className="text-xl font-semibold mb-2">No boards yet</h3>
-            <p className="text-muted-foreground mb-6">
-              Create your first board to start organizing work.
-            </p>
-            <BoardCreationWizard organizationId={activeOrg.id} onSuccess={handleBoardCreated}>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Create Your First Board
-              </Button>
-            </BoardCreationWizard>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {boards.map((board) => {
-            const BoardIcon = getBoardIcon(board.board_type)
-            const taskCount = board.tasks?.[0]?.count || 0
-            const columnCount = board.board_columns?.[0]?.count || 0
+          {!isLoading && boards.length === 0 ? (
+          <Card>
+            <CardContent className="p-12 text-center">
+              <Kanban className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
+              <h3 className="text-xl font-semibold mb-2">No boards yet</h3>
+              <p className="text-muted-foreground mb-6">
+                Create your first board to start organizing work.
+              </p>
+              <BoardCreationWizard organizationId={activeOrg.id} onSuccess={handleBoardCreated}>
+                <Button>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Your First Board
+                </Button>
+              </BoardCreationWizard>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {boards.map((board) => {
+              const BoardIcon = getBoardIcon(board.board_type)
+              const taskCount = board.tasks?.[0]?.count || 0
+              const columnCount = board.board_columns?.[0]?.count || 0
 
-            return (
-              <Card key={board.id} className="hover:shadow-lg transition-all relative group">
-                <div 
-                  className="absolute top-4 right-4 z-10 opacity-0 group-hover:opacity-100 transition-opacity"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem asChild>
-                        <Link href={`/boards/${board.id}`}>
-                          Open Board
-                        </Link>
-                      </DropdownMenuItem>
-                      <BoardEditForm 
-                        board={{
-                          id: board.id,
-                          name: board.name,
-                          description: board.description,
-                          boardType: board.board_type,
-                          color: board.color
-                        }} 
-                        onSuccess={fetchBoards}
-                      >
-                        <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                          Edit Board
+              return (
+                <Card key={board.id} className="hover:shadow-lg transition-all relative group">
+                  <div 
+                    className="absolute top-4 right-4 z-10 opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem asChild>
+                          <Link href={`/boards/${board.id}`}>
+                            Open Board
+                          </Link>
                         </DropdownMenuItem>
-                      </BoardEditForm>
-                      <DropdownMenuSeparator />
-                      <BoardDeleteDialog 
-                        board={{
-                          id: board.id,
-                          name: board.name,
-                          _count: {
-                            tasks: taskCount,
-                            sprints: 0 // We don't have this data in the list view
-                          }
-                        }}
-                        onSuccess={fetchBoards}
-                        redirectTo={null}
-                      >
-                        <DropdownMenuItem 
-                          onSelect={(e) => e.preventDefault()}
-                          className="text-red-600"
+                        <BoardEditForm 
+                          board={{
+                            id: board.id,
+                            name: board.name,
+                            description: board.description,
+                            boardType: board.board_type,
+                            color: board.color
+                          }} 
+                          onSuccess={fetchBoards}
                         >
-                          Delete Board
-                        </DropdownMenuItem>
-                      </BoardDeleteDialog>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-                
-                <Link href={`/boards/${board.id}`} className="block">
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-2">
-                        <BoardIcon className="h-5 w-5 text-muted-foreground" />
-                        <CardTitle className="text-xl truncate">{board.name}</CardTitle>
-                      </div>
-                      <Badge className={`${getBoardTypeColor(board.board_type)} border`}>
-                        {getBoardTypeLabel(board.board_type)}
-                      </Badge>
-                    </div>
-                    {board.created_at && (
-                      <CardDescription>
-                        Created {new Date(board.created_at).toLocaleDateString()}
-                      </CardDescription>
-                    )}
-                  </CardHeader>
+                          <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                            Edit Board
+                          </DropdownMenuItem>
+                        </BoardEditForm>
+                        <DropdownMenuSeparator />
+                        <BoardDeleteDialog 
+                          board={{
+                            id: board.id,
+                            name: board.name,
+                            _count: {
+                              tasks: taskCount,
+                              sprints: 0 // We don't have this data in the list view
+                            }
+                          }}
+                          onSuccess={fetchBoards}
+                          redirectTo={null}
+                        >
+                          <DropdownMenuItem 
+                            onSelect={(e) => e.preventDefault()}
+                            className="text-red-600"
+                          >
+                            Delete Board
+                          </DropdownMenuItem>
+                        </BoardDeleteDialog>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                   
-                  <CardContent>
-                    <div className="flex items-center gap-6 text-sm text-muted-foreground">
-                      <div className="flex items-center gap-1">
-                        <Kanban className="h-4 w-4" />
-                        <span>{columnCount} columns</span>
+                  <Link href={`/boards/${board.id}`} className="block">
+                    <CardHeader>
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-2">
+                          <BoardIcon className="h-5 w-5 text-muted-foreground" />
+                          <CardTitle className="text-xl truncate">{board.name}</CardTitle>
+                        </div>
+                        <Badge className={`${getBoardTypeColor(board.board_type)} border`}>
+                          {getBoardTypeLabel(board.board_type)}
+                        </Badge>
                       </div>
-                      <div className="flex items-center gap-1">
-                        <Users className="h-4 w-4" />
-                        <span>{taskCount} tasks</span>
+                      {board.created_at && (
+                        <CardDescription>
+                          Created {new Date(board.created_at).toLocaleDateString()}
+                        </CardDescription>
+                      )}
+                    </CardHeader>
+                    
+                    <CardContent>
+                      <div className="flex items-center gap-6 text-sm text-muted-foreground">
+                        <div className="flex items-center gap-1">
+                          <Kanban className="h-4 w-4" />
+                          <span>{columnCount} columns</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Users className="h-4 w-4" />
+                          <span>{taskCount} tasks</span>
+                        </div>
                       </div>
-                    </div>
-                  </CardContent>
-                </Link>
-              </Card>
-            )
-          })}
+                    </CardContent>
+                  </Link>
+                </Card>
+              )
+            })}
+          </div>
+        )}
+          </div>
         </div>
-      )}
-    </div>
+      </main>
+    </>
   )
 } 

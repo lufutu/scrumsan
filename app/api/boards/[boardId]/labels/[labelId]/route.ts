@@ -20,7 +20,6 @@ export async function GET(
                 id: true,
                 title: true,
                 description: true,
-                status: true,
                 taskType: true,
                 priority: true,
                 storyPoints: true,
@@ -47,8 +46,7 @@ export async function GET(
                       select: {
                         id: true,
                         name: true,
-                        status: true,
-                        startDate: true,
+                                startDate: true,
                         endDate: true
                       }
                     }

@@ -98,7 +98,6 @@ export async function PATCH(
           select: {
             id: true,
             title: true,
-            status: true,
             priority: true,
             storyPoints: true,
             assignee: {

@@ -18,8 +18,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Upload, X, Image as ImageIcon } from 'lucide-react'
 import Image from 'next/image'
 import { toast } from 'sonner'
-import { FileUploadQueue, QueuedFile } from '@/components/ui/file-upload-queue'
-// Removed uploadOrganizationLogo import - now using API endpoint
+import { SingleImageUpload } from '@/components/ui/single-image-upload'
 
 interface CreateOrganizationDialogProps {
   open: boolean
@@ -38,32 +37,9 @@ export function CreateOrganizationDialog({
     description: '',
   })
   const [logoFile, setLogoFile] = useState<File | null>(null)
-  const [logoPreview, setLogoPreview] = useState<string | null>(null)
-  const [isUploadingLogo, setIsUploadingLogo] = useState(false)
-  const [uploadProgress, setUploadProgress] = useState(0)
 
-  const handleLogoUpload = async (file: File) => {
-    // Just return the file - we'll handle actual upload during form submission
-    return { file }
-  }
-
-  const handleLogoUploadComplete = (queuedFile: QueuedFile, result: any) => {
-    setLogoFile(queuedFile.file)
-    // Create preview URL
-    const previewUrl = URL.createObjectURL(queuedFile.file)
-    setLogoPreview(previewUrl)
-  }
-
-  const handleLogoUploadError = (queuedFile: QueuedFile, error: string) => {
-    toast.error(`Failed to process logo: ${error}`)
-  }
-
-  const handleRemoveLogo = () => {
-    setLogoFile(null)
-    if (logoPreview) {
-      URL.revokeObjectURL(logoPreview)
-      setLogoPreview(null)
-    }
+  const handleLogoChange = (file: File | null) => {
+    setLogoFile(file)
   }
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -109,7 +85,7 @@ export function CreateOrganizationDialog({
       // Reset form
       onOpenChange(false)
       setFormData({ name: '', description: '' })
-      handleRemoveLogo()
+      setLogoFile(null)
     } catch (error: any) {
       console.error('Error creating organization:', error)
       toast.error(`Error: ${error.message}`)
@@ -120,11 +96,6 @@ export function CreateOrganizationDialog({
 
   const handleDialogClose = (open: boolean) => {
     if (!open) {
-      // Clean up preview URL when dialog closes
-      if (logoPreview) {
-        URL.revokeObjectURL(logoPreview)
-        setLogoPreview(null)
-      }
       setLogoFile(null)
       setFormData({ name: '', description: '' })
     }
@@ -171,72 +142,15 @@ export function CreateOrganizationDialog({
 
             <div className="space-y-2">
               <Label htmlFor="logo">Logo</Label>
-              {logoPreview ? (
-                <div className="flex items-center gap-4">
-                  <div className="relative">
-                    <div className="w-16 h-16 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center overflow-hidden">
-                      <Image
-                        src={logoPreview}
-                        alt="Logo preview"
-                        width={64}
-                        height={64}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      size="sm"
-                      className="absolute -top-2 -right-2 w-6 h-6 rounded-full p-0"
-                      onClick={handleRemoveLogo}
-                    >
-                      <X className="w-3 h-3" />
-                    </Button>
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">{logoFile?.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {logoFile ? `${(logoFile.size / 1024 / 1024).toFixed(2)} MB` : ''}
-                    </p>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={handleRemoveLogo}
-                      className="mt-2"
-                    >
-                      Change Logo
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <FileUploadQueue
-                  onFileUpload={handleLogoUpload}
-                  onUploadComplete={handleLogoUploadComplete}
-                  onUploadError={handleLogoUploadError}
-                  multiple={false}
-                  accept="image/*"
-                  maxSize={5}
-                  maxFiles={1}
-                  disabled={isLoading}
-                  autoUpload={true}
-                  showQueue={false}
-                  className="h-32"
-                >
-                  <div className="flex flex-col items-center justify-center text-center">
-                    <ImageIcon className="h-8 w-8 mb-2 text-muted-foreground" />
-                    <p className="text-sm font-medium">
-                      Drag & drop your logo here
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      or click to browse
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      PNG, JPG, WebP or SVG • Max 5MB
-                    </p>
-                  </div>
-                </FileUploadQueue>
-              )}
+              <SingleImageUpload
+                onChange={handleLogoChange}
+                accept="image/*"
+                maxSize={5}
+                disabled={isLoading}
+                placeholder="Upload organization logo"
+                aspectRatio="square"
+                showFileName={true}
+              />
             </div>
           </div>
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { AppSidebar } from "@/components/dashboard/app-sidebar";
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { SidebarInset, SidebarProvider } from "@/components/animate-ui/radix/sidebar";
 import { useSupabase } from "@/providers/supabase-provider";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
@@ -33,9 +33,7 @@ export default function AppLayout({
     <SidebarProvider>
       <AppSidebar />
       <SidebarInset>
-        <div className="flex-1 flex flex-col min-h-screen">
-          {children}
-        </div>
+        {children}
       </SidebarInset>
     </SidebarProvider>
   );
