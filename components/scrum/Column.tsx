@@ -42,6 +42,7 @@ interface ColumnProps {
     color: string;
   }>;
   useEnhancedForm?: boolean;
+  boardColor?: string | null;
 }
 
 export function Column({ 
@@ -55,7 +56,8 @@ export function Column({
   onAddTaskEnhanced,
   users,
   labels,
-  useEnhancedForm = false
+  useEnhancedForm = false,
+  boardColor
 }: ColumnProps) {
   const [showEnhancedForm, setShowEnhancedForm] = useState(false);
 
@@ -66,6 +68,11 @@ export function Column({
     }
   };
   const getColumnStyles = () => {
+    // Use board color if provided, otherwise fall back to default colors
+    if (boardColor) {
+      return `bg-gradient-to-b`;
+    }
+    
     switch (columnType) {
       case 'backlog':
         return 'bg-gradient-to-b from-orange-500 to-orange-600';
@@ -76,6 +83,15 @@ export function Column({
       default:
         return 'bg-gradient-to-b from-orange-500 to-orange-600';
     }
+  };
+
+  const getColumnStyle = () => {
+    if (boardColor) {
+      return {
+        background: `linear-gradient(to bottom, ${boardColor}, ${boardColor}dd)`
+      };
+    }
+    return {};
   };
 
   const getDropdownItems = () => {
@@ -107,10 +123,13 @@ export function Column({
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 h-full flex flex-col">
       {/* Column Header */}
-      <div className={cn(
-        "rounded-t-lg px-4 py-3 flex items-center justify-between text-white",
-        getColumnStyles()
-      )}>
+      <div 
+        className={cn(
+          "rounded-t-lg px-4 py-3 flex items-center justify-between text-white",
+          getColumnStyles()
+        )}
+        style={getColumnStyle()}
+      >
         <div className="flex items-center space-x-2">
           <div className="flex items-center space-x-1">
             <span className="text-xs bg-white/20 px-2 py-1 rounded">📊</span>

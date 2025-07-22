@@ -50,6 +50,7 @@ interface ProductBacklogProps {
   onRefresh?: () => void
   onMoveTask?: (taskId: string, fromLocation: string, toLocation: string) => void
   initialTaskId?: string | null
+  boardColor?: string | null
 }
 
 // Draggable Task Component
@@ -130,7 +131,8 @@ function DroppableColumn({
   onAddTask,
   onAddTaskEnhanced,
   users,
-  labels
+  labels,
+  boardColor
 }: { 
   id: string
   title: string
@@ -158,6 +160,7 @@ function DroppableColumn({
     name: string;
     color: string;
   }>
+  boardColor?: string | null
 }) {
   const { setNodeRef } = useDroppable({ id })
   
@@ -176,6 +179,7 @@ function DroppableColumn({
         users={users}
         labels={labels}
         useEnhancedForm={true}
+        boardColor={boardColor}
       >
         <SortableContext items={tasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
           {children}
@@ -199,7 +203,8 @@ export default function ProductBacklog({
   onFinishSprint,
   onRefresh,
   onMoveTask,
-  initialTaskId
+  initialTaskId,
+  boardColor
 }: ProductBacklogProps) {
   const {
     tasks,
@@ -618,6 +623,7 @@ export default function ProductBacklog({
                   name: l.name,
                   color: l.color || '#6B7280'
                 }))}
+                boardColor={boardColor}
               >
                 {backlogTasks.map(task => (
                   <DraggableTask 
@@ -654,6 +660,7 @@ export default function ProductBacklog({
                   name: l.name,
                   color: l.color || '#6B7280'
                 }))}
+                boardColor={boardColor}
               >
                 {sprintTasks.map(task => (
                   <DraggableTask 
@@ -690,6 +697,7 @@ export default function ProductBacklog({
                   name: l.name,
                   color: l.color || '#6B7280'
                 }))}
+                boardColor={boardColor}
               >
                 {followupTasks.map(task => (
                   <DraggableTask 

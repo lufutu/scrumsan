@@ -317,7 +317,8 @@ export function useScrumBoard(boardId: string, projectId?: string) {
   // Filter tasks by status
   const getTasksByStatus = useCallback((status: 'backlog' | 'sprint' | 'followup') => {
     return tasks?.filter(task => {
-      const derivedStatus = task.column ? getTaskStatusFromColumn(task.column.name) : 'todo'
+      // For scrum boards, tasks without a column (columnId = NULL) should be treated as backlog items
+      const derivedStatus = task.column ? getTaskStatusFromColumn(task.column.name) : 'backlog'
       return derivedStatus === status
     }) || []
   }, [tasks])

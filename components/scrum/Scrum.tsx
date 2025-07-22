@@ -9,6 +9,7 @@ interface ScrumProps {
   projectId?: string
   organizationId?: string
   initialTaskId?: string | null
+  boardColor?: string | null
 }
 
 interface Sprint {
@@ -20,7 +21,7 @@ interface Sprint {
   endDate?: string
 }
 
-export default function Scrum({ boardId, projectId, organizationId, initialTaskId }: ScrumProps) {
+export default function Scrum({ boardId, projectId, organizationId, initialTaskId, boardColor }: ScrumProps) {
   const [currentView, setCurrentView] = useState<'product-backlog' | 'sprint-backlog'>('product-backlog')
   const [activeSprint, setActiveSprint] = useState<Sprint | null>({
     id: 'sprint-1',
@@ -48,6 +49,7 @@ export default function Scrum({ boardId, projectId, organizationId, initialTaskI
           organizationId={organizationId}
           projectId={projectId}
           initialTaskId={initialTaskId}
+          boardColor={boardColor}
         />
       ) : activeSprint ? (
         <SprintBacklog

@@ -232,6 +232,7 @@ function BoardContent() {
                 boardId={board.id}
                 organizationId={board.organizationId}
                 initialTaskId={initialTaskId}
+                boardColor={board.color}
               />
             ) : (
               <StandaloneBoardView board={board} onUpdate={mutate} />
