@@ -33,26 +33,7 @@ type Board = {
       name: string
     }
   }>
-  columns?: Array<{
-    id: string
-    name: string
-    position: number
-    tasks: Array<{
-      id: string
-      title: string
-      description: string | null
-      taskType: string | null
-      priority: string | null
-      storyPoints: number | null
-      assigneeId: string | null
-      createdAt: string
-      assignee?: {
-        id: string
-        fullName: string | null
-        avatarUrl: string | null
-      } | null
-    }>
-  }>
+  columns?: BoardColumn[]
   _count?: {
     tasks: number
     sprints: number
@@ -63,22 +44,7 @@ type BoardColumn = {
   id: string
   name: string
   position: number
-  tasks: Array<{
-    id: string
-    title: string
-    description: string | null
-    status: string | null
-    taskType: string | null
-    priority: string | null
-    storyPoints: number | null
-    assigneeId: string | null
-    createdAt: string
-    assignee?: {
-      id: string
-      fullName: string | null
-      avatarUrl: string | null
-    } | null
-  }>
+  tasks: Array<Task>
 }
 
 interface StandaloneBoardViewProps {
@@ -134,7 +100,7 @@ export default function StandaloneBoardView({ board, onUpdate }: StandaloneBoard
         const foundTask = column.tasks.find((t: Task) => t.id === draggedTask)
         if (foundTask) {
           sourceColumn = column
-          task = foundTask
+          task = foundTask as Task
           break
         }
       }
@@ -284,8 +250,8 @@ export default function StandaloneBoardView({ board, onUpdate }: StandaloneBoard
                                     boardId: board.id,
                                     columnId: column.id,
                                     taskType: data.taskType,
-                                    assigneeId: data.assigneeId,
-                                    labels: data.labels || [],
+                                    labels: data.taskLabels || [],
+                                    taskAssignees: data.assignees || [],
                                     priority: data.priority,
                                     storyPoints: data.storyPoints,
                                   })

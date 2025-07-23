@@ -276,6 +276,45 @@ This is a **VivifyScrum clone** - a comprehensive project management application
 
 This rule has **ZERO TOLERANCE** - any status field usage for tasks will cause Prisma validation errors and application failures.
 
+## 🚨 CRITICAL: NO LEGACY COMPATIBILITY RULE (ZERO TOLERANCE)
+
+### ⚠️ ABSOLUTELY FORBIDDEN: Adding Legacy Fields for Backward Compatibility ⚠️
+- **NEVER add deprecated fields** like `assigneeId`, `reviewerId`, `labels` array to interfaces
+- **NEVER create backward compatibility** by making old fields optional
+- **ALWAYS fix the data source** instead of compromising type definitions
+- **PRINCIPLE**: Update components to use new schema, don't make schema support old components
+
+### 🔴 BANNED PRACTICES (Zero Tolerance)
+- ❌ Adding `assigneeId?: string` to Task interface
+- ❌ Adding `reviewerId?: string` to Task interface  
+- ❌ Adding `labels?: string[]` to Task interface
+- ❌ Any "// Legacy field for compatibility" comments
+- ❌ Making required fields optional to support old data
+- ❌ Adding backward compatibility type unions
+- ❌ Temporary compatibility solutions
+
+### ✅ CORRECT APPROACH WHEN TYPE ERRORS OCCUR
+1. **Identify the data source** returning old schema data
+2. **Update the data source** to return new schema (use Prisma, not Supabase)
+3. **Transform data at source** to match new interfaces
+4. **Replace Supabase queries** with proper Prisma API calls
+5. **Update components** to use new junction table patterns
+
+### 🛡️ ENFORCEMENT
+- **Immediate revert** if legacy fields are added to interfaces
+- **No exceptions** - fix root cause, not symptoms
+- **Clean schema only** - maintain new junction table approach
+- **Component responsibility** - adapt to new schema, don't adapt schema to old components
+
+### ⚠️ WHEN YOU GET TYPE ERRORS:
+1. **DO NOT** add legacy fields to interfaces
+2. **DO NOT** make fields optional for compatibility
+3. **FIND** the component/query returning old data
+4. **FIX** that component to use new schema
+5. **VERIFY** all data sources use Prisma with proper includes
+
+This rule has **ZERO TOLERANCE** - maintaining clean schema is critical for application integrity.
+
 ### IMPORTANT: UI Component Consistency Rule
 - **ALWAYS use standardized UI components** for consistent user experience
 - **Loading States**: Use components from `/components/ui/loading-state.tsx`
