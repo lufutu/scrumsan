@@ -287,6 +287,39 @@ function DroppableSprintColumn({
         )}
       </div>
 
+      {/* Add Task Button */}
+      {!showAddForm && (
+        <div className="px-4 py-3 border-b border-gray-200">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full"
+            onClick={() => setShowAddForm(true)}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add item
+          </Button>
+        </div>
+      )}
+
+      {/* Inline Form */}
+      {showAddForm && (
+        <div className="px-4 py-3 border-b border-gray-200">
+          <ComprehensiveInlineForm
+            onAdd={async (data) => {
+              if (onAddTask) {
+                await onAddTask(sprint.id, data)
+                setShowAddForm(false)
+              }
+            }}
+            onCancel={() => setShowAddForm(false)}
+            placeholder="What needs to be done?"
+            users={users}
+            labels={labels}
+          />
+        </div>
+      )}
+
       {/* Sprint Tasks */}
       <div 
         className="p-4 space-y-3 max-h-[600px] overflow-y-auto"
@@ -318,40 +351,8 @@ function DroppableSprintColumn({
             )}
           </AnimatePresence>
         </SortableContext>
-        
-        {/* Inline Form */}
-        {showAddForm && (
-          <div className="mt-3">
-            <ComprehensiveInlineForm
-              onAdd={async (data) => {
-                if (onAddTask) {
-                  await onAddTask(sprint.id, data)
-                  setShowAddForm(false)
-                }
-              }}
-              onCancel={() => setShowAddForm(false)}
-              placeholder="What needs to be done?"
-              users={users}
-              labels={labels}
-            />
-          </div>
-        )}
       </div>
 
-      {/* Add Task Button */}
-      {!showAddForm && (
-        <div className="p-4 border-t border-gray-200">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full"
-            onClick={() => setShowAddForm(true)}
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Add item
-          </Button>
-        </div>
-      )}
     </motion.div>
   )
 }

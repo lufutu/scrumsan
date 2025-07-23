@@ -147,14 +147,9 @@ export function ComprehensiveInlineForm({
       if (spaceIndex === -1) {
         // No space after #, show dropdown
         setFilterQuery(afterHash.toLowerCase())
-        // Add small delay to ensure proper positioning after render
-        setTimeout(() => {
-          const position = calculateDropdownPosition()
-          if (position) {
-            setDropdownPosition(position)
-            setShowDropdown(true)
-          }
-        }, 0)
+        const position = calculateDropdownPosition()
+        setDropdownPosition(position)
+        setShowDropdown(true)
       } else {
         setShowDropdown(false)
         setDropdownPosition(null)
