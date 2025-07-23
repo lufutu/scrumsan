@@ -504,6 +504,40 @@ import { motion } from 'framer-motion' // DON'T USE
 3. **Update CLAUDE.md**: When new library versions or syntax changes are discovered
 4. **Verify compatibility**: Always test build and runtime after updating library usage
 
+## 🚨 CRITICAL: Auto-Commit Rule
+
+### ALWAYS Auto-Commit After Completing Tasks
+- **MANDATORY**: After completing each user request or chat prompt, create a git commit
+- **Purpose**: Create restore checkpoints for rollback if needed
+- **Commit Message Format**: 
+  ```
+  🤖 Auto-commit: [Brief description of changes]
+  
+  - [Key change 1]
+  - [Key change 2]
+  - [Key change 3]
+  
+  🤖 Generated with Claude Code
+  Co-Authored-By: Claude <noreply@anthropic.com>
+  ```
+
+### Auto-Commit Protocol
+1. **After task completion**: Always run `git add .` followed by `git commit`
+2. **Include all changes**: Stage all modified files in the working directory
+3. **Descriptive messages**: Clearly describe what was accomplished
+4. **Build verification**: Only commit if build/tests pass
+5. **Restore capability**: Each commit serves as a checkpoint for potential rollback
+
+### When to Auto-Commit
+- ✅ After fixing bugs or performance issues
+- ✅ After implementing new features
+- ✅ After major refactoring or optimization
+- ✅ After updating dependencies or configurations
+- ✅ After documentation updates
+- ✅ When user explicitly requests changes be saved
+- ❌ Do NOT commit broken/non-building code
+- ❌ Do NOT commit incomplete implementations (unless user requests it)
+
 ## Environment Setup
 
 ### Required Environment Variables
