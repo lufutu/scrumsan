@@ -868,9 +868,9 @@ export default function ProductBacklogRedesigned({
                 <TaskCardModern
                   id={activeTask.id}
                   title={activeTask.title}
-                  description={activeTask.description}
+                  description={activeTask.description || ''}
                   taskType={activeTask.taskType as any}
-                  storyPoints={activeTask.storyPoints}
+                  storyPoints={activeTask.storyPoints || 0}
                   priority={activeTask.priority as any}
                   assignee={activeTask.assignee ? {
                     name: activeTask.assignee.fullName || activeTask.assignee.email,
