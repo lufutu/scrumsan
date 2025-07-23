@@ -51,9 +51,13 @@ export async function GET(req: NextRequest) {
       whereClause.boardId = boardId
     }
     
-    // Filter by assignee if provided
+    // Filter by assignee if provided (using junction table)
     if (assigneeId) {
-      whereClause.assigneeId = assigneeId
+      whereClause.taskAssignees = {
+        some: {
+          userId: assigneeId
+        }
+      }
     }
     
     // Add user access check - user must be member of organization

@@ -8,7 +8,7 @@ const subtaskSchema = z.object({
   title: z.string().min(1).max(500),
   taskType: z.enum(['story', 'improvement', 'bug', 'task', 'note', 'idea']).default('task'),
   description: z.string().optional(),
-  assigneeId: z.string().uuid().optional(),
+  assignees: z.array(z.object({ id: z.string().uuid() })).optional(),
   priority: z.string().optional(),
   storyPoints: z.number().optional()
 })
@@ -142,13 +142,14 @@ export async function POST(
       }
     })
 
-    // Create assignee relationship if provided
-    if (validatedData.assigneeId) {
-      await prisma.taskAssignee.create({
-        data: {
+    // Create assignee relationships if provided
+    if (validatedData.assignees && validatedData.assignees.length > 0) {
+      await prisma.taskAssignee.createMany({
+        data: validatedData.assignees.map(assignee => ({
           taskId: subtask.id,
-          userId: validatedData.assigneeId
-        }
+          userId: assignee.id
+        })),
+        skipDuplicates: true
       })
       
       // Refetch the subtask with assignee data

@@ -1,15 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/prisma'
-import { getCurrentUser } from '@/lib/auth-utils'
-import { z } from 'zod'
-
-const boardUpdateSchema = z.object({
-  name: z.string().min(1).optional(),
-  description: z.string().optional(),
-  color: z.string().optional(),
-  boardType: z.enum(['kanban', 'scrum']).optional(),
-})
+import { withAuth, validateRequestBody, handleApiError } from '@/lib/api-auth-utils'
+import { boardUpdateSchema } from '@/lib/validation-schemas'
+import { boardFullInclude } from '@/lib/prisma-includes'
 
 export async function GET(
   req: NextRequest,
