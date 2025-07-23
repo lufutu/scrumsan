@@ -30,7 +30,6 @@ const taskSchema = z.object({
   columnId: z.string().uuid().optional().nullable(), // Allow null
   sprintId: z.string().uuid().optional(), // Add sprint ID support
   sprintColumnId: z.string().uuid().optional(), // Add sprint column ID support
-  assigneeId: z.string().uuid().optional(),
   epicId: z.string().uuid().optional(),
   dueDate: z.string().optional(),
   position: z.number().optional(),
@@ -270,13 +269,10 @@ export async function POST(req: NextRequest) {
         estimationType: validatedData.estimationType || 'story_points',
         itemValue: validatedData.itemValue,
         estimatedHours: validatedData.estimatedHours || 0,
-        // labels removed - handled via junction table below
         boardId: validatedData.boardId,
         columnId: validatedData.columnId,
         sprintColumnId: sprintColumnId, // Use calculated sprint column ID
         sprintId: validatedData.sprintId, // Add sprint ID
-        // Use first assignee as primary assignee for backward compatibility
-        assigneeId: validatedData.assignees?.[0]?.id || validatedData.assigneeId,
         epicId: validatedData.epicId,
         dueDate: validatedData.dueDate ? new Date(validatedData.dueDate) : null,
         position: validatedData.position,

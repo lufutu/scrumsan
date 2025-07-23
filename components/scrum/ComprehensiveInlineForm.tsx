@@ -40,7 +40,7 @@ interface ComprehensiveInlineFormProps {
   onAdd: (data: {
     title: string
     taskType: string
-    assigneeId?: string
+    assignees?: Array<{ id: string }>
     labels?: string[]
     storyPoints?: number
     priority?: string
@@ -278,7 +278,7 @@ export function ComprehensiveInlineForm({
       await onAdd({
         title: cleanTitle,
         taskType: selectedTaskType.id,
-        assigneeId: selectedAssignee?.id,
+        assignees: selectedAssignee ? [{ id: selectedAssignee.id }] : [],
         labels: selectedLabels.map(l => l.id),
         storyPoints: storyPoints > 0 ? storyPoints : undefined,
         priority: selectedPriority !== 'medium' ? selectedPriority : undefined

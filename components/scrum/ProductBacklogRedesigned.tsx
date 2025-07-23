@@ -173,7 +173,7 @@ function DroppableSprintColumn({
   onAddTask?: (sprintId: string, data: {
     title: string;
     taskType: string;
-    assigneeId?: string;
+    assignees?: Array<{ id: string }>;
     labels?: string[];
     storyPoints?: number;
     priority?: string;
@@ -690,7 +690,7 @@ export default function ProductBacklogRedesigned({
   const handleAddTask = async (sprintId: string, data: {
     title: string;
     taskType: string;
-    assigneeId?: string;
+    assignees?: Array<{ id: string }>;
     labels?: string[];
     storyPoints?: number;
     priority?: string;
@@ -708,7 +708,7 @@ export default function ProductBacklogRedesigned({
         boardId,
         taskType: data.taskType as 'story' | 'bug' | 'task' | 'epic' | 'improvement',
         storyPoints: data.storyPoints || 0,
-        assigneeId: data.assigneeId,
+        assignees: data.assignees || [],
         labels: data.labels || [],
         priority: data.priority,
         // Product Backlog context: ALWAYS assign task to the sprint (including backlog sprint)
