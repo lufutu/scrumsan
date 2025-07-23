@@ -667,7 +667,7 @@ export default function ProjectScrumBoard({ projectId, board, onUpdate }: Projec
                               <TaskCardModern
                                 id={task.id}
                                 title={task.title}
-                                description={task.description}
+                                description={task.description }
                                 taskType={task.taskType as 'story' | 'bug' | 'task' | 'epic' | 'improvement' | 'idea' | 'note' || 'task'}
                                 storyPoints={task.storyPoints || 0}
                                 assignees={task.taskAssignees?.map((ta: any) => ({

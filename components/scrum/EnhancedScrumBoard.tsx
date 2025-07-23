@@ -547,7 +547,11 @@ export default function EnhancedScrumBoard({
                           })) || []}
                           organizationId={board?.organizationId}
                           boardId={boardId}
-                          labels={[]}
+                          labels={task.taskLabels?.map((tl: any) => ({
+                            id: tl.label.id,
+                            name: tl.label.name,
+                            color: tl.label.color
+                          })) || []}
                           onClick={() => setSelectedTask(task)}
                           onAssigneesChange={() => {
                             // Trigger refetch if needed

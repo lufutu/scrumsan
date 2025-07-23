@@ -107,8 +107,14 @@ export async function GET(req: NextRequest) {
           }
         },
         taskLabels: {
-          include: {
-            label: true
+          select: {
+            label: {
+              select: {
+                id: true,
+                color: true,
+                name: true
+              }
+            }
           }
         },
         creator: {
@@ -196,7 +202,7 @@ export async function GET(req: NextRequest) {
         { createdAt: 'desc' }
       ]
     })
-    console.log('tasks', tasks)
+    console.log('tasks', JSON.stringify(tasks))
     return NextResponse.json(tasks)
   } catch (error: any) {
     console.error('Error fetching tasks:', error)
@@ -295,8 +301,14 @@ export async function POST(req: NextRequest) {
           }
         },
         taskLabels: {
-          include: {
-            label: true
+          select: {
+            label: {
+              select: {
+                id: true,
+                name: true,
+                color: true
+              }
+            }
           }
         },
         creator: {

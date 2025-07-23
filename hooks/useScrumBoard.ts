@@ -4,17 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import useSWR, { mutate } from 'swr'
 import { useSupabase } from '@/providers/supabase-provider'
 import { useBoardRealtime } from '@/hooks/useSupabaseRealtime'
-import { Task } from '@/types/shared'
-
-export interface ScrumSprint {
-  id: string
-  name: string
-  goal?: string
-  status: 'planning' | 'active' | 'completed'
-  startDate?: string
-  endDate?: string
-  tasks?: Task[]
-}
+import { Task, Sprint } from '@/types/shared'
 
 const fetcher = async (url: string) => {
   const response = await fetch(url)
@@ -56,7 +46,7 @@ export function useScrumBoard(boardId: string, projectId?: string) {
   )
 
   // Fetch sprints for the board/project
-  const { data: sprints, error: sprintsError, mutate: mutateSprints } = useSWR<ScrumSprint[]>(
+  const { data: sprints, error: sprintsError, mutate: mutateSprints } = useSWR<Sprint[]>(
     boardId ? `/api/sprints?boardId=${boardId}` : null,
     fetcher
   )

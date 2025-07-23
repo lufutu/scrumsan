@@ -224,6 +224,8 @@ model Task {
   taskLabels        TaskLabel[]
   taskAssignees     TaskAssignee[]
   taskReviewers     TaskReviewer[]
+  taskLabels        TaskLabel[]
+  task
   customFieldValues TaskCustomFieldValue[]
   checklists        TaskChecklist[]
   worklogEntries    TaskWorklog[]

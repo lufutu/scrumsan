@@ -35,7 +35,6 @@ export interface Task {
   taskAssignees?: TaskAssignee[]
   taskReviewers?: TaskReviewer[]
   taskLabels?: TaskLabel[]
-  labels?: string[]
   dueDate?: string | null
   createdAt?: string
   updatedAt?: string
@@ -129,7 +128,6 @@ export interface Label {
   id: string
   name: string
   color: string | null
-  boardId: string
 }
 
 // Component Props Interfaces

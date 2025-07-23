@@ -52,7 +52,7 @@ export function EnhancedInlineForm({
   const [selectedAssignee, setSelectedAssignee] = useState<User | null>(null)
   const [selectedLabels, setSelectedLabels] = useState<Label[]>([])
   const [selectedPriority, setSelectedPriority] = useState<string>('medium')
-  const [dueDate, setDueDate] = useState('')
+  const [dueDate] = useState('')
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [suggestionType, setSuggestionType] = useState<'type' | 'assign' | 'label' | 'priority'>('type')
   const [suggestionQuery, setSuggestionQuery] = useState('')
@@ -109,7 +109,7 @@ export function EnhancedInlineForm({
     parseInputForMentions(value)
   }
 
-  const handleSuggestionSelect = (item: any) => {
+  const handleSuggestionSelect = (item: ItemType | User | Label | { id: string; name: string; }) => {
     const symbols = { type: '#', assign: '@', label: '+', priority: '!' }
     const symbol = symbols[suggestionType]
     

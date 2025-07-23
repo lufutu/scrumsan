@@ -19,7 +19,7 @@ export async function PATCH(
   try {
     const supabase = await createClient()
     const user = await getCurrentUser(supabase)
-    const { id: taskId, checklistId, itemId } = await params
+    const { checklistId, itemId } = await params
     const body = await req.json()
     
     const validatedData = checklistItemUpdateSchema.parse(body)
@@ -51,9 +51,6 @@ export async function PATCH(
       )
     }
 
-    // Use the actual task ID from the item's checklist, not the URL parameter
-    // This handles cases where the frontend passes incorrect task ID in URL
-    const actualTaskId = item.checklist.taskId
 
     // Check access to organization
     if (item.checklist.task.board?.organizationId) {
@@ -78,7 +75,7 @@ export async function PATCH(
     }
 
     // Prepare update data
-    const updateData: any = {}
+    const updateData: Record<string, unknown> = {}
     if (validatedData.content !== undefined) {
       updateData.content = validatedData.content
     }

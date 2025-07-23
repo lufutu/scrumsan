@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth-utils'
 import { z } from 'zod'
+import { Prisma } from '@prisma/client'
 
 const sprintSchema = z.object({
   name: z.string().min(1),
@@ -24,7 +25,7 @@ export async function GET(req: NextRequest) {
     const status = url.searchParams.get('status')
     const includeDetails = url.searchParams.get('includeDetails') === 'true'
     
-    const whereClause: Record<string, unknown> = {
+    let whereClause: Record<string, unknown> = {
       isDeleted: false // Always exclude deleted sprints
     }
     
@@ -147,7 +148,7 @@ export async function GET(req: NextRequest) {
     
     const sprints = await prisma.sprint.findMany({
       where: whereClause,
-      include: includeClause,
+      include: includeClause as Prisma.SprintInclude,
       orderBy: {
         position: 'asc'
       }

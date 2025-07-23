@@ -70,10 +70,6 @@ export async function GET(
       )
     }
 
-    // Extract S3 key from the attachment URL
-    const bucket = process.env.AWS_S3_BUCKET!
-    const region = process.env.AWS_REGION!
-    
     // Parse the S3 URL to get the key
     let s3Key: string
     try {

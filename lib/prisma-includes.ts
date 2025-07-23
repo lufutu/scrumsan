@@ -17,6 +17,12 @@ export const userSelectMinimal = {
   avatarUrl: true
 } as const
 
+export const labelSelectMinimal = {
+  id: true,
+  name: true,
+  color: true
+}
+
 // Organization member with user details
 export const organizationMemberInclude = {
   user: {
@@ -49,14 +55,9 @@ export const taskReviewersInclude = {
 // Task labels include
 export const taskLabelsInclude = {
   taskLabels: {
-    include: {
+    select: {
       label: {
-        select: {
-          id: true,
-          name: true,
-          color: true,
-          description: true
-        }
+        select: labelSelectMinimal
       }
     }
   }
