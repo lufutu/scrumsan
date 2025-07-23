@@ -13,13 +13,13 @@ export const commonFields = {
   email: z.string().email('Invalid email format'),
   url: z.string().url('Invalid URL format').optional(),
   status: z.enum(['active', 'completed', 'on_hold', 'cancelled', 'planning']),
-  priority: z.enum(['low', 'medium', 'high', 'critical']),
   color: z.string().regex(/^#[0-9A-F]{6}$/i, 'Invalid color format').optional(),
 } as const
 
 // Task-specific validations
 export const taskFields = {
   taskType: z.enum(['story', 'bug', 'task', 'epic', 'improvement', 'note', 'idea']),
+  priority: z.enum(['low', 'medium', 'high', 'critical']),
   storyPoints: z.number().int().min(0).max(100).optional(),
   effortUnits: z.number().int().min(0).max(1000).optional(),
   estimationType: z.enum(['story_points', 'effort_units']),
@@ -77,10 +77,17 @@ export function createUpdateSchema<T extends z.ZodRawShape>(fields: T) {
  * Common task creation schema
  */
 export const taskCreateSchema = z.object({
-  ...taskFields,
   title: commonFields.title,
   description: commonFields.description,
+  taskType: taskFields.taskType.optional().default('story'),
   priority: taskFields.priority.optional(),
+  storyPoints: taskFields.storyPoints,
+  effortUnits: taskFields.effortUnits,
+  estimationType: taskFields.estimationType.optional().default('story_points'),
+  itemValue: taskFields.itemValue,
+  estimatedHours: taskFields.estimatedHours,
+  loggedHours: taskFields.loggedHours,
+  position: taskFields.position,
   boardId: commonFields.uuid,
   columnId: commonFields.uuid.optional().nullable(),
   sprintId: commonFields.uuid.optional(),
