@@ -63,10 +63,10 @@ export async function GET(
                 }
               }
             }
-        },
-        orderBy: {
-          createdAt: 'desc'
         }
+      },
+      orderBy: {
+        createdAt: 'desc'
       }
     })
     
