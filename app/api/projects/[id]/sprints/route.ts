@@ -63,18 +63,15 @@ export async function GET(
                 }
               }
             }
+        },
+        orderBy: {
+          createdAt: 'desc'
         }
-      },
-      orderBy: {
-        createdAt: 'desc'
       }
     })
     
-    // Transform the data to include tasks directly
-    const transformedSprints = sprints.map(sprint => ({
-      ...sprint,
-      tasks: sprint.sprintTasks.map(st => st.task)
-    }))
+    // Tasks are already directly included, no transformation needed
+    const transformedSprints = sprints
     
     return NextResponse.json(transformedSprints)
   } catch (error: any) {
