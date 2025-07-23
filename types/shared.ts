@@ -27,7 +27,8 @@ export interface Task {
   taskType?: string | null
   priority?: string | null
   storyPoints?: number | null
-  boardId: string
+  boardId?: string
+  assigneeId?: string | null // Legacy field for backward compatibility
   columnId?: string | null
   sprintColumnId?: string | null
   sprintId?: string | null
