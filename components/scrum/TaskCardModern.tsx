@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { 
-  Paperclip, 
-  MessageCircle, 
+import {
+  Paperclip,
+  MessageCircle,
   Tag,
   ListTodo,
   Calendar,
@@ -27,6 +27,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { getItemTypeColor, getPriorityColor, getItemTypeById } from '@/lib/constants';
 import { useUsers } from '@/hooks/useUsers';
+import { useLabels } from '@/hooks/useLabels';
 import { useSupabase } from '@/providers/supabase-provider';
 import { useComments } from '@/hooks/useComments';
 import { toast } from 'sonner';
@@ -55,8 +56,8 @@ export function TaskCardModern({
   onAssigneesChange
 }: TaskCardModernProps) {
   // Get boardId from task data or props
-  const taskBoardId = (boardId || (typeof window !== 'undefined' && window.location.pathname.includes('/boards/') 
-    ? window.location.pathname.split('/boards/')[1]?.split('/')[0] 
+  const taskBoardId = (boardId || (typeof window !== 'undefined' && window.location.pathname.includes('/boards/')
+    ? window.location.pathname.split('/boards/')[1]?.split('/')[0]
     : null));
   const { user } = useSupabase();
   const [assigneeSelectorOpen, setAssigneeSelectorOpen] = useState(false);
@@ -68,17 +69,17 @@ export function TaskCardModern({
     const r = parseInt(hex.substr(0, 2), 16);
     const g = parseInt(hex.substr(2, 2), 16);
     const b = parseInt(hex.substr(4, 2), 16);
-    
+
     // Calculate luminance
     const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-    
+
     // Return white text for dark backgrounds, dark text for light backgrounds
     return luminance > 0.5 ? '#374151' : '#ffffff';
   };
   const [searchTerm, setSearchTerm] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
   const [currentAssignees, setCurrentAssignees] = useState(assignees);
-  
+
   // Inline editing states
   const [storyPointsOpen, setStoryPointsOpen] = useState(false);
   const [labelsOpen, setLabelsOpen] = useState(false);
@@ -87,7 +88,7 @@ export function TaskCardModern({
   const [checklistsOpen, setChecklistsOpen] = useState(false);
   const [dueDateOpen, setDueDateOpen] = useState(false);
   const [priorityOpen, setPriorityOpen] = useState(false);
-  
+
   // Quick edit states
   const [quickComment, setQuickComment] = useState('');
   const [newLabelName, setNewLabelName] = useState('');
@@ -97,12 +98,12 @@ export function TaskCardModern({
 
   // Ref to track previous assignees to prevent infinite re-renders
   const prevAssigneesRef = useRef<string>('');
-  
+
   // Sync local state with prop changes (e.g., after refresh)
   useEffect(() => {
     // Create a stable string representation of assignees for comparison
     const assigneesKey = assignees.map(a => a.id).sort().join(',');
-    
+
     // Only update if the assignees actually changed
     if (prevAssigneesRef.current !== assigneesKey) {
       setCurrentAssignees(assignees);
@@ -115,10 +116,13 @@ export function TaskCardModern({
     organizationId
   });
 
+  // Fetch board labels
+  const { labels: boardLabels } = useLabels(boardId);
+
   // Fetch comments
   const { comments, loading: loadingComments, mutate: mutateComments } = useComments(id);
 
-  const checklistProgress = checklistsCount ? 
+  const checklistProgress = checklistsCount ?
     Math.round((completedChecklists || 0) / checklistsCount * 100) : 0;
 
   const filteredMembers = organizationMembers?.filter(member =>
@@ -159,9 +163,9 @@ export function TaskCardModern({
       }
 
       const updatedTask = await response.json();
-      
+
       // Convert to the expected format and update local state
-      const newAssignees = updatedTask.taskAssignees?.map((ta: any) => ({
+      const newAssignees = updatedTask.taskAssignees?.map((ta: unknown) => ({
         id: ta.user.id,
         name: ta.user.fullName || ta.user.email || 'Unknown User',
         avatar: ta.user.avatarUrl,
@@ -220,16 +224,16 @@ export function TaskCardModern({
   // Quick edit handlers
   const handleStoryPointsChange = async (points: number) => {
     if (!id) return;
-    
+
     try {
       const response = await fetch(`/api/tasks/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ storyPoints: points })
       });
-      
+
       if (!response.ok) throw new Error('Failed to update story points');
-      
+
       onAssigneesChange?.();
       toast.success('Story points updated');
       setStoryPointsOpen(false);
@@ -240,16 +244,16 @@ export function TaskCardModern({
 
   const handleQuickComment = async () => {
     if (!id || !quickComment.trim()) return;
-    
+
     try {
       const response = await fetch(`/api/tasks/${id}/comments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: quickComment.trim() })
       });
-      
+
       if (!response.ok) throw new Error('Failed to add comment');
-      
+
       // Refresh comments and task data
       mutateComments();
       onAssigneesChange?.();
@@ -262,37 +266,84 @@ export function TaskCardModern({
   };
 
 
+  const handleAddExistingLabel = async (label: { id: string; name: string; color: string | null }) => {
+    try {
+      // Get current label IDs and add the selected one
+      const currentLabelIds = labels?.map(l => l.id) || [];
+      const response = await fetch(`/api/tasks/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          labels: [...currentLabelIds, label.id]
+        })
+      });
+
+      if (!response.ok) throw new Error('Failed to assign label');
+
+      onAssigneesChange?.();
+      toast.success(`Label "${label.name}" assigned`);
+      setLabelsOpen(false);
+    } catch (error) {
+      console.error('Label assignment error:', error);
+      toast.error('Failed to assign label');
+    }
+  };
+
+  const handleRemoveLabel = async (labelToRemove: { id: string; name: string; color: string }) => {
+    try {
+      // Get current label IDs and remove the selected one
+      const currentLabelIds = labels?.map(l => l.id) || [];
+      const updatedLabelIds = currentLabelIds.filter(id => id !== labelToRemove.id);
+
+      const response = await fetch(`/api/tasks/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          labels: updatedLabelIds
+        })
+      });
+
+      if (!response.ok) throw new Error('Failed to remove label');
+
+      onAssigneesChange?.();
+      toast.success(`Label "${labelToRemove.name}" removed`);
+    } catch (error) {
+      console.error('Label removal error:', error);
+      toast.error('Failed to remove label');
+    }
+  };
+
   const handleCreateLabel = async (boardIdParam?: string) => {
     if (!newLabelName.trim() || !boardIdParam) return;
-    
+
     try {
       // First create the label using the correct board-specific API
       const labelResponse = await fetch(`/api/boards/${boardIdParam}/labels`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           name: newLabelName.trim(),
           color: newLabelColor
         })
       });
-      
+
       if (!labelResponse.ok) throw new Error('Failed to create label');
-      
+
       const newLabel = await labelResponse.json();
-      
+
       // Then assign it to the task
       // Get current label IDs and add the new one
       const currentLabelIds = labels?.map(l => l.id) || [];
       const taskResponse = await fetch(`/api/tasks/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           labels: [...currentLabelIds, newLabel.id]
         })
       });
-      
+
       if (!taskResponse.ok) throw new Error('Failed to assign label');
-      
+
       onAssigneesChange?.();
       toast.success('Label created and assigned');
       setNewLabelName('');
@@ -305,35 +356,35 @@ export function TaskCardModern({
 
   // Image upload handlers
   const handleImageUpload = async (files: File[]) => {
-    const imageFiles = files.filter(file => file.type.startsWith('image/')) ;
+    const imageFiles = files.filter(file => file.type.startsWith('image/'));
     if (imageFiles.length === 0) return;
 
     setUploadingImages(imageFiles);
-    
+
     try {
       // Upload each image and get URLs
       const uploadPromises = imageFiles.map(async (file) => {
         const formData = new FormData();
         formData.append('file', file);
-        
+
         const response = await fetch(`/api/tasks/${id}/attachments`, {
           method: 'POST',
           body: formData
         });
-        
+
         if (!response.ok) throw new Error('Failed to upload image');
-        
+
         const attachment = await response.json();
         return attachment.url;
       });
-      
+
       const imageUrls = await Promise.all(uploadPromises);
-      
+
       // Insert image markdown into comment
       const imageMarkdown = imageUrls.map(url => `![Image](${url})`).join('\n');
       const newComment = quickComment + (quickComment ? '\n\n' : '') + imageMarkdown;
       setQuickComment(newComment);
-      
+
       toast.success(`${imageFiles.length} image(s) uploaded`);
     } catch (error) {
       toast.error('Failed to upload images');
@@ -358,7 +409,7 @@ export function TaskCardModern({
     e.preventDefault();
     e.stopPropagation();
     setIsDragOver(false);
-    
+
     const files = Array.from(e.dataTransfer.files);
     handleImageUpload(files);
   };
@@ -377,16 +428,16 @@ export function TaskCardModern({
 
   const handlePriorityChange = async (newPriority: string) => {
     if (!id) return;
-    
+
     try {
       const response = await fetch(`/api/tasks/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ priority: newPriority })
       });
-      
+
       if (!response.ok) throw new Error('Failed to update priority');
-      
+
       onAssigneesChange?.();
       toast.success('Priority updated');
       setPriorityOpen(false);
@@ -396,7 +447,7 @@ export function TaskCardModern({
   };
 
   return (
-    <div 
+    <div
       className={cn(
         "group bg-white rounded-lg border border-gray-200 hover:shadow-md transition-all cursor-pointer",
         "shadow-sm hover:shadow-lg hover:-translate-y-0.5 transform duration-200 ease-out",
@@ -414,13 +465,13 @@ export function TaskCardModern({
             {getItemTypeById(taskType)?.icon || '●'}
           </div>
           <h3 className={cn(
-              "text-sm font-medium text-gray-900 line-clamp-2 flex-1",
-              status === 'done' && "line-through"
-            )}>
-              {title}
+            "text-sm font-medium text-gray-900 line-clamp-2 flex-1",
+            status === 'done' && "line-through"
+          )}>
+            {title}
           </h3>
         </div>
-        
+
         {/* Assignees in top right - always show something with built-in selector */}
         <div className="flex-shrink-0 ml-2" onClick={(e) => e.stopPropagation()}>
           <Popover modal={true} open={assigneeSelectorOpen} onOpenChange={setAssigneeSelectorOpen}>
@@ -455,14 +506,14 @@ export function TaskCardModern({
               <Command className="rounded-lg border shadow-md">
                 <div className="flex items-center border-b px-3">
                   <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                  <CommandInput 
-                    placeholder="Search members..." 
+                  <CommandInput
+                    placeholder="Search members..."
                     value={searchTerm}
                     onValueChange={setSearchTerm}
                     className="flex h-10 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
                   />
                 </div>
-                
+
                 <CommandList className="max-h-60">
                   {loadingMembers ? (
                     <div className="p-4 text-center text-sm text-slate-500">
@@ -582,7 +633,7 @@ export function TaskCardModern({
             <div
               key={index}
               className="px-2 py-1 rounded-full cursor-pointer hover:opacity-80 transition-opacity text-xs font-medium"
-              style={{ 
+              style={{
                 backgroundColor: label.color,
                 color: getTextColor(label.color),
                 minWidth: 'auto'
@@ -596,23 +647,23 @@ export function TaskCardModern({
               {label.name}
             </div>
           ))}
-          
+
           {/* Add Label Button */}
           <Popover modal={true} open={labelsOpen} onOpenChange={setLabelsOpen}>
             <PopoverTrigger asChild>
-              <button 
+              <button
                 className="px-2 py-1 flex items-center justify-center border border-dashed border-gray-300 rounded-full hover:border-gray-400 transition-colors text-xs"
                 onClick={(e) => e.stopPropagation()}
                 title="Add labels"
               >
-                <Tag className="w-3 h-3 text-gray-500 mr-1"/>
+                <Tag className="w-3 h-3 text-gray-500 mr-1" />
                 <span className="text-gray-500">Add</span>
               </button>
             </PopoverTrigger>
             <PopoverContent className="w-80 p-4" align="start">
               <div className="space-y-4">
                 <Label className="text-sm font-medium">Edit Labels</Label>
-                
+
                 {/* Current Labels */}
                 {labels.length > 0 && (
                   <div className="space-y-2">
@@ -624,16 +675,16 @@ export function TaskCardModern({
                           className="flex items-center gap-2 px-3 py-1 rounded-full text-xs"
                           style={{ backgroundColor: label.color + '20', color: label.color }}
                         >
-                          <div 
+                          <div
                             className="w-3 h-3 rounded-full"
                             style={{ backgroundColor: label.color }}
                           />
                           {label.name}
-                          <button 
+                          <button
                             className="hover:bg-black hover:bg-opacity-10 rounded-full p-0.5"
                             onClick={(e) => {
                               e.stopPropagation();
-                              // Remove label logic here
+                              handleRemoveLabel(label);
                             }}
                           >
                             <X className="h-3 w-3" />
@@ -643,7 +694,38 @@ export function TaskCardModern({
                     </div>
                   </div>
                 )}
-                
+
+                {/* Available Labels */}
+                {boardLabels && boardLabels.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="text-xs text-gray-500">Available Labels</div>
+                    <div className="max-h-32 overflow-y-auto space-y-1">
+                      {boardLabels
+                        .filter(boardLabel => !labels.some(currentLabel => currentLabel.id === boardLabel.id))
+                        .map((boardLabel) => (
+                          <button
+                            key={boardLabel.id}
+                            className="w-full flex items-center gap-2 p-2 rounded-md text-left hover:bg-gray-50 transition-colors"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleAddExistingLabel(boardLabel);
+                            }}
+                          >
+                            <div
+                              className="w-3 h-3 rounded-full"
+                              style={{ backgroundColor: boardLabel.color || '#6B7280' }}
+                            />
+                            <span className="flex-1 text-sm">{boardLabel.name}</span>
+                            <Plus className="w-3 h-3 text-gray-400" />
+                          </button>
+                        ))}
+                      {boardLabels.filter(boardLabel => !labels.some(currentLabel => currentLabel.id === boardLabel.id)).length === 0 && (
+                        <p className="text-xs text-gray-400 text-center py-2">All labels are already assigned</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 {/* Create New Label */}
                 <div className="space-y-3 border-t pt-3">
                   <div className="text-xs text-gray-500">Add New Label</div>
@@ -697,7 +779,7 @@ export function TaskCardModern({
             {/* Story Points - Interactive */}
             <Popover modal={true} open={storyPointsOpen} onOpenChange={setStoryPointsOpen}>
               <PopoverTrigger asChild>
-                <button 
+                <button
                   className="flex items-center gap-1 hover:bg-blue-100 p-1 rounded transition-colors"
                   onClick={(e) => e.stopPropagation()}
                 >
@@ -753,7 +835,7 @@ export function TaskCardModern({
             {/* Comments - Interactive */}
             <Popover modal={true} open={commentsOpen} onOpenChange={setCommentsOpen}>
               <PopoverTrigger asChild>
-                <button 
+                <button
                   className="flex items-center gap-1 hover:bg-amber-100 p-1 rounded transition-colors"
                   onClick={(e) => e.stopPropagation()}
                 >
@@ -767,7 +849,7 @@ export function TaskCardModern({
                   <div className="px-4 py-3 border-b">
                     <Label className="text-sm font-medium">Comments</Label>
                   </div>
-                  
+
                   {/* Comments List */}
                   <div className="flex-1 overflow-y-auto max-h-48 px-4 py-3">
                     {loadingComments ? (
@@ -802,10 +884,10 @@ export function TaskCardModern({
                       <div className="text-sm text-gray-500 text-center py-4">No comments yet</div>
                     )}
                   </div>
-                  
+
                   {/* Add Comment Form */}
                   <div className="border-t px-4 py-3 space-y-3">
-                    <div 
+                    <div
                       className={cn(
                         "relative",
                         isDragOver && "bg-blue-50 border-2 border-dashed border-blue-300 rounded-lg"
@@ -834,17 +916,17 @@ export function TaskCardModern({
                         </div>
                       )}
                     </div>
-                    
+
                     {/* Upload Status */}
                     {uploadingImages.length > 0 && (
                       <div className="text-xs text-blue-600">
                         Uploading {uploadingImages.length} image(s)...
                       </div>
                     )}
-                    
+
                     {/* Image Upload Area */}
                     <div className="text-xs text-gray-500">
-                      Drag&Drop or <button 
+                      Drag&Drop or <button
                         className="text-blue-500 hover:text-blue-600 underline"
                         onClick={(e) => {
                           e.stopPropagation();
@@ -854,7 +936,7 @@ export function TaskCardModern({
                         select images
                       </button> Formatting rules
                     </div>
-                    
+
                     <div className="flex justify-end">
                       <Button
                         size="sm"
@@ -876,7 +958,7 @@ export function TaskCardModern({
             {/* Files - Interactive */}
             <Popover modal={true} open={filesOpen} onOpenChange={setFilesOpen}>
               <PopoverTrigger asChild>
-                <button 
+                <button
                   className="flex items-center gap-1 hover:bg-yellow-100 p-1 rounded transition-colors"
                   onClick={(e) => e.stopPropagation()}
                 >
@@ -906,7 +988,7 @@ export function TaskCardModern({
             {/* Checklists - Interactive */}
             <Popover modal={true} open={checklistsOpen} onOpenChange={setChecklistsOpen}>
               <PopoverTrigger asChild>
-                <button 
+                <button
                   className="flex items-center gap-1 hover:bg-purple-100 p-1 rounded transition-colors"
                   onClick={(e) => e.stopPropagation()}
                 >
@@ -933,13 +1015,13 @@ export function TaskCardModern({
             {/* Due Date - Interactive */}
             <Popover modal={true} open={dueDateOpen} onOpenChange={setDueDateOpen}>
               <PopoverTrigger asChild>
-                <button 
+                <button
                   className="flex items-center gap-1 hover:bg-orange-100 p-1 rounded transition-colors"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <Calendar className="h-5 w-5" />
                   <span className="text-xs">
-                    {dueDate 
+                    {dueDate
                       ? new Date(dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
                       : 'Due'
                     }
@@ -981,10 +1063,10 @@ export function TaskCardModern({
           {/* Priority Badge - Interactive */}
           <Popover modal={true} open={priorityOpen} onOpenChange={setPriorityOpen}>
             <PopoverTrigger asChild>
-              <button 
+              <button
                 className={cn(
                   "text-xs px-2 py-0 rounded-md transition-colors hover:opacity-80",
-                  priority && priority !== 'medium' 
+                  priority && priority !== 'medium'
                     ? cn(getPriorityColor(priority).color, getPriorityColor(priority).bgColor)
                     : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                 )}
@@ -1026,7 +1108,7 @@ export function TaskCardModern({
       {checklistsCount > 0 && (
         <div className="px-3 pb-3">
           <div className="w-full bg-gray-200 rounded-full h-1">
-            <div 
+            <div
               className="bg-green-500 h-1 rounded-full transition-all"
               style={{ width: `${checklistProgress}%` }}
             />

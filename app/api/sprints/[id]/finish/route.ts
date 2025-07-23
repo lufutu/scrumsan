@@ -169,10 +169,10 @@ export async function POST(
         ? `Sprint finished successfully. ${result.unfinishedTasksCount} unfinished tasks moved to "${result.newSprint.name}".`
         : `Sprint finished successfully. All tasks completed!`
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error finishing sprint:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to finish sprint' },
+      { error: error instanceof Error ? error.message : 'Failed to finish sprint' },
       { status: 500 }
     )
   }

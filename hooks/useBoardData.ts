@@ -149,6 +149,7 @@ export const useBoardData = (boardId: string | null) => {
     mutate: mutateAll,
     mutateBoard,
     mutateSprints,
+    mutateSprintDetails,
     mutateTasks,
     mutateLabels,
     mutateUsers

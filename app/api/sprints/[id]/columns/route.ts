@@ -73,10 +73,10 @@ export async function GET(
     })
     
     return NextResponse.json(columns)
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error fetching sprint columns:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch sprint columns' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch sprint columns' },
       { status: 500 }
     )
   }
@@ -155,7 +155,7 @@ export async function POST(
     })
     
     return NextResponse.json(column)
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error creating sprint column:', error)
     if (error instanceof z.ZodError) {
       return NextResponse.json(
@@ -164,7 +164,7 @@ export async function POST(
       )
     }
     return NextResponse.json(
-      { error: error.message || 'Failed to create sprint column' },
+      { error: error instanceof Error ? error.message : 'Failed to create sprint column' },
       { status: 500 }
     )
   }

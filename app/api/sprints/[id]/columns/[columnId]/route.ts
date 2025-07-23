@@ -68,7 +68,7 @@ export async function PATCH(
     }
     
     // Prepare update data
-    const updateData: any = {}
+    const updateData: Record<string, unknown> = {}
     if (validatedData.name !== undefined) updateData.name = validatedData.name
     if (validatedData.position !== undefined) updateData.position = validatedData.position
     if (validatedData.isDone !== undefined) updateData.isDone = validatedData.isDone
@@ -98,7 +98,7 @@ export async function PATCH(
     })
     
     return NextResponse.json(column)
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error updating sprint column:', error)
     if (error instanceof z.ZodError) {
       return NextResponse.json(
@@ -107,7 +107,7 @@ export async function PATCH(
       )
     }
     return NextResponse.json(
-      { error: error.message || 'Failed to update sprint column' },
+      { error: error instanceof Error ? error.message : 'Failed to update sprint column' },
       { status: 500 }
     )
   }
@@ -184,10 +184,10 @@ export async function DELETE(
     })
     
     return NextResponse.json({ success: true })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error deleting sprint column:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to delete sprint column' },
+      { error: error instanceof Error ? error.message : 'Failed to delete sprint column' },
       { status: 500 }
     )
   }

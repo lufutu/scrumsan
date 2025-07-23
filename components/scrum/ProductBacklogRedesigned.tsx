@@ -146,7 +146,7 @@ function DraggableTask({
         boardId={boardId}
         onClick={!isDragging ? () => onTaskClick?.(task) : undefined}
         onAssigneesChange={() => {
-          // This could trigger a refetch if needed
+          mutateTasks() // Invalidate cache when labels or assignees are changed
         }}
       />
     </motion.div>
@@ -395,7 +395,7 @@ export default function ProductBacklogRedesigned({
   const mutateSprints = onDataChange || (() => {})
   const mutateTasks = () => {
     setOptimisticTasks([]) // Clear optimistic state
-    if (onDataChange) onDataChange()
+    if (onDataChange) onDataChange() // This invalidates all caches including sprintDetails
   }
 
   // Filter sprints
@@ -906,8 +906,7 @@ export default function ProductBacklogRedesigned({
           onClose={() => setSelectedTask(null)}
           taskId={selectedTask.id}
           onUpdate={() => {
-            mutateTasks()
-            mutateSprints() // Also invalidate sprints cache since sprint.tasks contains the updated task data
+            mutateTasks() // This calls onDataChange() which invalidates all caches including sprintDetails
           }}
         />
       )}
