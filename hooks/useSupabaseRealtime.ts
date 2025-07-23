@@ -8,6 +8,7 @@ export interface RealtimeCallbacks {
   onTaskCreated?: (task: any) => void
   onTaskUpdated?: (task: any) => void
   onTaskDeleted?: (taskId: string) => void
+  onTaskMoved?: (data: { taskId: string; fromStatus: string; toStatus: string }) => void
   onBoardUpdated?: (board: any) => void
   onSprintUpdated?: (sprint: any) => void
 }

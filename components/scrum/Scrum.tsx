@@ -70,11 +70,11 @@ export default function Scrum({ boardId, projectId, organizationId, initialTaskI
         <SprintBacklog
           sprint={{ 
             id: selectedSprintId,
-            name: activeSprint.name,
-            goal: activeSprint.goal,
-            status: activeSprint.status,
-            startDate: activeSprint.startDate,
-            endDate: activeSprint.endDate
+            name: activeSprint.name || '',
+            goal: activeSprint.goal || '',
+            status: activeSprint.status as 'completed' | 'active' | 'planning',
+            startDate: activeSprint.startDate || '',
+            endDate: activeSprint.endDate || ''
           }}
           onBackToBacklog={handleBackToProductBacklog}
         />

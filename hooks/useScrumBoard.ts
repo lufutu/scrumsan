@@ -4,35 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import useSWR, { mutate } from 'swr'
 import { useSupabase } from '@/providers/supabase-provider'
 import { useBoardRealtime } from '@/hooks/useSupabaseRealtime'
-// REMOVED: getTaskStatusFromColumn import - no longer needed
-
-export interface ScrumTask {
-  id: string
-  title: string
-  description?: string
-  taskType: 'story' | 'bug' | 'task' | 'epic' | 'improvement'
-  priority?: 'critical' | 'high' | 'medium' | 'low'
-  storyPoints?: number
-  assignee?: {
-    id: string
-    fullName: string
-    email: string
-  }
-  columnId?: string | null
-  sprintColumnId?: string | null
-  column?: {
-    id: string
-    name: string
-  } | null
-  labels?: string[] // Add labels field
-  position?: number
-  dueDate?: string
-  url?: string
-  createdAt: string
-  boardId?: string
-  projectId?: string
-  sprintId?: string
-}
+import { Task } from '@/types/shared'
 
 export interface ScrumSprint {
   id: string
@@ -41,7 +13,7 @@ export interface ScrumSprint {
   status: 'planning' | 'active' | 'completed'
   startDate?: string
   endDate?: string
-  tasks?: ScrumTask[]
+  tasks?: Task[]
 }
 
 const fetcher = async (url: string) => {
@@ -67,7 +39,7 @@ export function useScrumBoard(boardId: string, projectId?: string) {
       onTaskUpdated: (updatedTask) => {
         mutateTasks()
       },
-      onTaskDeleted: (data: { taskId: string }) => {
+      onTaskDeleted: (taskId: string) => {
         mutateTasks()
       },
       onTaskMoved: (data: { taskId: string; fromStatus: string; toStatus: string }) => {
@@ -78,7 +50,7 @@ export function useScrumBoard(boardId: string, projectId?: string) {
   )
 
   // Fetch tasks for the board
-  const { data: tasks, error: tasksError, mutate: mutateTasks } = useSWR<ScrumTask[]>(
+  const { data: tasks, error: tasksError, mutate: mutateTasks } = useSWR<Task[]>(
     boardId ? `/api/tasks?boardId=${boardId}` : null,
     fetcher
   )
@@ -91,7 +63,7 @@ export function useScrumBoard(boardId: string, projectId?: string) {
 
 
   // Create a new task
-  const createTask = useCallback(async (taskData: Partial<ScrumTask> & {
+  const createTask = useCallback(async (taskData: Partial<Task> & {
     effortUnits?: number
     estimationType?: 'story_points' | 'effort_units'
     itemValue?: string
@@ -140,7 +112,7 @@ export function useScrumBoard(boardId: string, projectId?: string) {
   }, [user, boardId, projectId, mutateTasks, tasks])
 
   // Update a task
-  const updateTask = useCallback(async (taskId: string, updates: Partial<ScrumTask>) => {
+  const updateTask = useCallback(async (taskId: string, updates: Partial<Task>) => {
     if (!user) return
 
     setLoading(true)
@@ -242,7 +214,7 @@ export function useScrumBoard(boardId: string, projectId?: string) {
       }
 
       // Optimistic update for smooth UI
-      mutateTasks((currentTasks: ScrumTask[] = []) => {
+      mutateTasks((currentTasks: Task[] = []) => {
         return currentTasks.map(task => 
           task.id === taskId ? optimisticTask : task
         )
@@ -365,13 +337,13 @@ export function useScrumBoard(boardId: string, projectId?: string) {
     return tasks?.filter(task => {
       if (status === 'backlog') {
         // Backlog items have no column assignment and no followup/sprint labels
-        return !task.columnId && !task.sprintColumnId && !task.taskLabels?.some(tl => tl.labelId === '__followup__') && !task.taskLabels?.some(tl => tl.labelId === '__sprint__')
+        return !task.columnId && !task.sprintColumnId && !task.taskLabels?.some(tl => tl.label.name === '__followup__') && !task.taskLabels?.some(tl => tl.label.name === '__sprint__')
       } else if (status === 'sprint') {
         // Sprint items have sprintColumnId assigned, are in sprint tasks, or have sprint marker
-        return task.sprintColumnId || task.sprintId || task.taskLabels?.some(tl => tl.labelId === '__sprint__')
+        return task.sprintColumnId || task.sprintId || task.taskLabels?.some(tl => tl.label.name === '__sprint__')
       } else if (status === 'followup') {
         // Followup items have no column assignment but have followup label
-        return !task.columnId && !task.sprintColumnId && task.taskLabels?.some(tl => tl.labelId === '__followup__')
+        return !task.columnId && !task.sprintColumnId && task.taskLabels?.some(tl => tl.label.name === '__followup__')
       }
       return false
     }) || []
