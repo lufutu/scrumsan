@@ -4,12 +4,11 @@ import { useEffect, useState } from 'react'
 import { useSupabase } from '@/providers/supabase-provider'
 import { useToast } from '@/hooks/use-toast'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Search, Filter, Calendar, User, AlertCircle, CheckCircle2, Clock, Play } from 'lucide-react'
+import { Search, Filter, Calendar, User, AlertCircle } from 'lucide-react'
 import TaskCreationDialog from '@/components/common/TaskCreationDialog'
 import { Tables } from '@/types/database'
 
@@ -38,11 +37,7 @@ export default function TaskList({ projectId }: TaskListProps) {
   const [typeFilter, setTypeFilter] = useState('all')
   const [assigneeFilter, setAssigneeFilter] = useState('all')
 
-  useEffect(() => {
-    fetchTasks()
-  }, [projectId])
-
-  const fetchTasks = async () => {
+  const fetchTasksCallback = async () => {
     try {
       setIsLoading(true)
       
@@ -50,12 +45,12 @@ export default function TaskList({ projectId }: TaskListProps) {
         .from('tasks')
         .select(`
           *,
-          assignee:users!assignee_id (
+          assignee:assigned_to (
             id,
             full_name,
             avatar_url
           ),
-          created_by_user:users!created_by (
+          created_by_user:created_by (
             id,
             full_name
           )
@@ -63,11 +58,13 @@ export default function TaskList({ projectId }: TaskListProps) {
         .eq('project_id', projectId)
         .order('created_at', { ascending: false })
 
-      if (error) throw error
+      if (error) {
+        throw error
+      }
 
       setTasks(data || [])
-    } catch (err: any) {
-      console.error('Error fetching tasks:', err)
+    } catch (error) {
+      console.error('Error fetching tasks:', error)
       toast({
         title: "Error",
         description: "Failed to load tasks"
@@ -77,16 +74,13 @@ export default function TaskList({ projectId }: TaskListProps) {
     }
   }
 
+  useEffect(() => {
+    fetchTasksCallback()
+  }, [projectId, fetchTasksCallback])
 
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'high': return 'destructive'
-      case 'medium': return 'default'
-      case 'low': return 'secondary'
-      default: return 'outline'
-    }
-  }
+
+
 
   // Filter tasks based on search and filters
   const filteredTasks = tasks.filter(task => {

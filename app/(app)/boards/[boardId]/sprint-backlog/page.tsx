@@ -3,7 +3,7 @@
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
-import { Loader2, ArrowLeft, Calendar, Play, CheckCircle } from 'lucide-react'
+import { Loader2, ArrowLeft, Play } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import SprintBacklogView from '@/components/scrum/SprintBacklogView'
@@ -53,8 +53,8 @@ export default function SprintBacklogPage() {
           const boardData = await boardResponse.json()
           setBoard(boardData)
         }
-      } catch (err: any) {
-        setError(err.message || 'Failed to load sprint')
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : 'Failed to load sprint')
       } finally {
         setLoading(false)
       }

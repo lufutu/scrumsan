@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useActiveOrg } from '@/hooks/useActiveOrg'
 import { useToast } from '@/hooks/use-toast'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -37,13 +37,7 @@ export default function BoardsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (activeOrg?.id) {
-      fetchBoards()
-    }
-  }, [activeOrg?.id])
-
-  const fetchBoards = async () => {
+  const fetchBoardsCallback = useCallback(async () => {
     if (!activeOrg?.id) return
 
     try {
@@ -78,11 +72,18 @@ export default function BoardsPage() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [activeOrg?.id, toast])
+
+  useEffect(() => {
+    if (activeOrg?.id) {
+      fetchBoardsCallback()
+    }
+  }, [activeOrg?.id, fetchBoardsCallback])
+
 
   const handleBoardCreated = async (newBoard?: { id?: string }) => {
     // Refresh the boards list
-    await fetchBoards()
+    await fetchBoardsCallback()
     
     // Redirect to the new board
     if (newBoard?.id) {
@@ -234,7 +235,7 @@ export default function BoardsPage() {
                             boardType: board.board_type,
                             color: board.color
                           }} 
-                          onSuccess={fetchBoards}
+                          onSuccess={fetchBoardsCallback}
                         >
                           <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
                             Edit Board
@@ -250,7 +251,7 @@ export default function BoardsPage() {
                               sprints: 0 // We don't have this data in the list view
                             }
                           }}
-                          onSuccess={fetchBoards}
+                          onSuccess={fetchBoardsCallback}
                           redirectTo={null}
                         >
                           <DropdownMenuItem 

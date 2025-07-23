@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
     const url = new URL(req.url)
     const organizationId = url.searchParams.get('organizationId')
     
-    let whereClause: any = {}
+    const whereClause: Record<string, unknown> = {}
     
     // Filter by organization
     if (organizationId) {
@@ -81,10 +81,10 @@ export async function GET(req: NextRequest) {
     })
     
     return NextResponse.json(boards)
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error fetching boards:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch boards' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch boards' },
       { status: 500 }
     )
   }
@@ -133,7 +133,7 @@ export async function POST(req: NextRequest) {
       // Create default structure based on board type
       if (validatedData.boardType === 'scrum') {
         // Create Backlog sprint
-        const backlogSprint = await tx.sprint.create({
+        await tx.sprint.create({
           data: {
             boardId: board.id,
             name: 'Backlog',
@@ -204,7 +204,7 @@ export async function POST(req: NextRequest) {
     })
 
     return NextResponse.json(result)
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error creating board:', error)
     if (error instanceof z.ZodError) {
       return NextResponse.json(

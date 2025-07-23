@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { MoreHorizontal, Edit, Trash, AlertCircle, ArrowUp, Ban, AlertTriangle } from 'lucide-react'
+import { MoreHorizontal, Edit, Trash, ArrowUp, Ban, AlertTriangle } from 'lucide-react'
 import { useTaskRelations } from '@/hooks/useTaskRelations'
 import { Tables } from '@/types/database'
 import { ItemModal } from '@/components/scrum/ItemModal'
@@ -45,15 +45,15 @@ interface TaskCardProps {
 export default function TaskCard({ task, onUpdate, onDelete, className = "" }: TaskCardProps) {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   // Only load detailed relations when modal is opened to avoid excessive API calls
-  const { relations } = useTaskRelations(isEditModalOpen ? task.id : null)
+  useTaskRelations(isEditModalOpen ? task.id : null)
   
   // Use embedded relation data from main task query for card indicators
-  const hasParent = !!(task as any).parent
-  const hasSubitems = (task as any).subtasks?.length > 0 || false
-  const isBlocked = (task as any)._count?.relationsAsTarget > 0 || false
-  const isBlocking = (task as any)._count?.relationsAsSource > 0 || false
-  const subitemsCount = (task as any).subtasks?.length || 0
-  const blockingCount = (task as any)._count?.relationsAsSource || 0
+  const hasParent = !!(task as Task & { parent?: unknown }).parent
+  const hasSubitems = (task as Task & { subtasks?: unknown[] }).subtasks?.length > 0 || false
+  const isBlocked = (task as Task & { _count?: { relationsAsTarget?: number } })._count?.relationsAsTarget && (task as Task & { _count?: { relationsAsTarget?: number } })._count.relationsAsTarget > 0 || false
+  const isBlocking = (task as Task & { _count?: { relationsAsSource?: number } })._count?.relationsAsSource && (task as Task & { _count?: { relationsAsSource?: number } })._count.relationsAsSource > 0 || false
+  const subitemsCount = (task as Task & { subtasks?: unknown[] }).subtasks?.length || 0
+  const blockingCount = (task as Task & { _count?: { relationsAsSource?: number } })._count?.relationsAsSource || 0
 
   const handleDelete = () => {
     if (confirm('Are you sure you want to delete this task?')) {

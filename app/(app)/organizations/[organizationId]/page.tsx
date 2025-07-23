@@ -10,7 +10,6 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { AppHeader } from '@/components/dashboard/app-header'
-import ProjectList from '@/components/projects/project-list'
 import ProjectForm from '@/components/projects/project-form'
 import { Tables } from '@/types/database'
 
@@ -24,7 +23,7 @@ type Organization = Tables<'organizations'> & {
 
 export default function OrganizationDetailsPage({ params }: { params: Promise<{ organizationId: string }> }) {
   const { organizationId } = use(params)
-  const { supabase } = useSupabase()
+  const { } = useSupabase()
   const { toast } = useToast()
   const [organization, setOrganization] = useState<Organization | null>(null)
   const [isLoading, setIsLoading] = useState(true)

@@ -6,7 +6,6 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Loader2, ArrowLeft, MoreHorizontal, Kanban, Calendar } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
-import ProjectBoard from '@/components/projects/project-board'
 import StandaloneBoardView from '@/components/boards/standalone-board-view'
 import Scrum from '@/components/scrum/Scrum'
 import BoardEditForm from '@/components/boards/board-edit-form'
@@ -21,61 +20,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 
-const fetcher = (url: string) => fetch(url).then(res => {
-  if (!res.ok) {
-    if (res.status === 404) {
-      throw new Error('Board not found')
-    }
-    throw new Error('Failed to fetch board')
-  }
-  return res.json()
-})
 
-type Board = {
-  id: string
-  name: string
-  boardType: string | null
-  organizationId: string
-  description: string | null
-  color: string | null
-  createdAt: string
-  organization?: {
-    id: string
-    name: string
-  } | null
-  projectLinks?: Array<{
-    id: string
-    project: {
-      id: string
-      name: string
-    }
-  }>
-  columns?: Array<{
-    id: string
-    name: string
-    position: number
-    tasks: Array<{
-      id: string
-      title: string
-      description: string | null
-      status: string | null
-      taskType: string | null
-      priority: string | null
-      storyPoints: number | null
-      assigneeId: string | null
-      createdAt: string
-      assignee?: {
-        id: string
-        fullName: string | null
-        avatarUrl: string | null
-      } | null
-    }>
-  }>
-  _count?: {
-    tasks: number
-    sprints: number
-  }
-}
 
 function BoardContent() {
   const params = useParams()
@@ -172,9 +117,6 @@ function BoardContent() {
     return boardType === 'scrum' ? Calendar : Kanban
   }
 
-  const getBoardTypeLabel = (boardType?: string | null) => {
-    return boardType === 'scrum' ? 'Scrum' : 'Kanban'
-  }
 
   // Create breadcrumbs
   const BoardIcon = getBoardIcon(board.boardType)

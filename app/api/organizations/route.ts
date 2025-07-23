@@ -10,7 +10,7 @@ const organizationSchema = z.object({
   logo: z.string().optional(),
 })
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
     // Get current user and ensure they exist in our database
     const supabase = await createClient()
@@ -36,9 +36,9 @@ export async function GET(req: NextRequest) {
     })
     
     return NextResponse.json(organizations)
-  } catch (error: any) {
+  } catch (error: unknown) {
     return NextResponse.json(
-      { error: error.message },
+      { error: error instanceof Error ? error.message : 'An error occurred' },
       { status: 500 }
     )
   }
@@ -80,7 +80,7 @@ export async function POST(req: NextRequest) {
 
     // Return the organization data with ID so frontend can upload logo
     return NextResponse.json(organization)
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error creating organization:', error);
     if (error instanceof z.ZodError) {
       return NextResponse.json(

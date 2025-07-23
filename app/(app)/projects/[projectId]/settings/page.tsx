@@ -2,11 +2,10 @@
 
 import { use } from 'react'
 import ProjectMembers from '@/components/projects/project-members'
-import ProjectForm from '@/components/projects/project-form'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
-import { Settings, Users, Archive, Trash2 } from 'lucide-react'
+import { Settings, Archive, Trash2 } from 'lucide-react'
 
 export default function ProjectSettingsPage({ params }: { params: Promise<{ projectId: string }> }) {
   const { projectId } = use(params)

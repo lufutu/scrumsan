@@ -39,30 +39,29 @@ export async function GET(
       include: {
         tasks: {
           include: {
-                taskAssignees: {
+            taskAssignees: {
+              select: {
+                user: {
                   select: {
-                    user: {
-                      select: {
-                        id: true,
-                        fullName: true,
-                        avatarUrl: true
-                      }
-                    }
+                    id: true,
+                    fullName: true,
+                    avatarUrl: true
                   }
-                },
-                taskLabels: {
+                }
+              }
+            },
+            taskLabels: {
+              select: {
+                label: {
                   select: {
-                    label: {
-                      select: {
-                        id: true,
-                        name: true,
-                        color: true
-                      }
-                    }
+                    id: true,
+                    name: true,
+                    color: true
                   }
                 }
               }
             }
+          }
         }
       },
       orderBy: {
