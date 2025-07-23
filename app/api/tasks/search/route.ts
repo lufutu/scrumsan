@@ -47,11 +47,15 @@ export async function GET(req: NextRequest) {
             organizationId: true
           }
         },
-        assignee: {
+        taskAssignees: {
           select: {
-            id: true,
-            fullName: true,
-            avatarUrl: true
+            user: {
+              select: {
+                id: true,
+                fullName: true,
+                avatarUrl: true
+              }
+            }
           }
         }
       },
@@ -80,7 +84,7 @@ export async function GET(req: NextRequest) {
             itemCode: task.itemCode,
             taskType: task.taskType,
             boardName: task.board.name,
-            assignee: task.assignee
+            assignees: task.taskAssignees?.map(ta => ta.user) || []
           })
         }
       }

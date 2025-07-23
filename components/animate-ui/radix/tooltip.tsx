@@ -1,8 +1,8 @@
 'use client';
 
 import * as React from 'react';
-import * as TooltipPrimitive from '@radix-ui/react-tooltip';
-import { AnimatePresence, motion, type Transition } from 'framer-motion';
+import { Tooltip as TooltipPrimitive } from 'radix-ui';
+import { AnimatePresence, motion, type Transition } from 'motion/react';
 
 import { cn } from '@/lib/utils';
 

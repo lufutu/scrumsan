@@ -53,6 +53,21 @@ type RecentActivity = {
   }
 }
 
+// Helper function to get relative time
+const getRelativeTime = (date: Date): string => {
+  const now = new Date()
+  const diff = now.getTime() - date.getTime()
+  const seconds = Math.floor(diff / 1000)
+  const minutes = Math.floor(seconds / 60)
+  const hours = Math.floor(minutes / 60)
+  const days = Math.floor(hours / 24)
+  
+  if (days > 0) return `${days} day${days > 1 ? 's' : ''} ago`
+  if (hours > 0) return `${hours} hour${hours > 1 ? 's' : ''} ago`
+  if (minutes > 0) return `${minutes} minute${minutes > 1 ? 's' : ''} ago`
+  return 'Just now'
+}
+
 export default function Dashboard() {
   const { supabase, user } = useSupabase()
   const activeOrg = useActiveOrg()
@@ -81,18 +96,13 @@ export default function Dashboard() {
     try {
       setIsLoading(true)
 
-      // Fetch projects
-      const { data: projectsData, error: projectsError } = await supabase
-        .from('projects')
-        .select('*')
-        .eq('organization_id', activeOrg.id)
-        .order('created_at', { ascending: false })
-        .limit(6)
-
-      if (projectsError) {
-        console.error('Projects error:', projectsError)
-        throw projectsError
+      // Fetch projects using our Prisma API
+      const projectsResponse = await fetch(`/api/organizations/${activeOrg.id}/projects?limit=6`)
+      if (!projectsResponse.ok) {
+        throw new Error('Failed to fetch projects')
       }
+      
+      const projectsData = await projectsResponse.json()
 
       if (!projectsData || projectsData.length === 0) {
         setProjects([])
@@ -119,38 +129,32 @@ export default function Dashboard() {
         return
       }
 
-      // Get basic project stats
-      const { data: allProjects } = await supabase
-        .from('projects')
-        .select('id')
-        .eq('organization_id', activeOrg.id)
+      // Get all projects for stats
+      const allProjectsResponse = await fetch(`/api/organizations/${activeOrg.id}/projects`)
+      const allProjects = allProjectsResponse.ok ? await allProjectsResponse.json() : []
+      const projectIds = allProjects.map((p: any) => p.id)
 
-      const projectIds = allProjects?.map(p => p.id) || []
-
-      // Enhance projects with counts
+      // Enhance projects with counts by calling individual project APIs
       const enhancedProjects = await Promise.all(
-        projectsData.map(async (project) => {
+        projectsData.map(async (project: any) => {
           try {
-            const { count: memberCount } = await supabase
-              .from('project_members')
-              .select('*', { count: 'exact', head: true })
-              .eq('project_id', project.id)
+            // Get project members count
+            const membersResponse = await fetch(`/api/projects/${project.id}/members`)
+            const members = membersResponse.ok ? await membersResponse.json() : []
 
-            const { count: taskCount } = await supabase
-              .from('tasks')
-              .select('*', { count: 'exact', head: true })
-              .eq('project_id', project.id)
+            // Get project tasks count  
+            const tasksResponse = await fetch(`/api/projects/${project.id}/tasks`)
+            const tasks = tasksResponse.ok ? await tasksResponse.json() : []
 
-            const { count: sprintCount } = await supabase
-              .from('sprints')
-              .select('*', { count: 'exact', head: true })
-              .eq('project_id', project.id)
+            // Get project sprints count
+            const sprintsResponse = await fetch(`/api/projects/${project.id}/sprints`)
+            const sprints = sprintsResponse.ok ? await sprintsResponse.json() : []
 
             return {
               ...project,
-              memberCount: memberCount || 0,
-              taskCount: taskCount || 0,
-              sprintCount: sprintCount || 0
+              memberCount: members.length || 0,
+              taskCount: tasks.length || 0,
+              sprintCount: sprints.length || 0
             }
           } catch (err) {
             console.error('Error enhancing project:', project.id, err)
@@ -168,26 +172,50 @@ export default function Dashboard() {
 
       // Calculate overall stats
       if (projectIds.length > 0) {
-        const { data: allTasks } = await supabase
-          .from('tasks')
-          .select('id, column(name)')
-          .in('project_id', projectIds)
+        let totalTasks = 0
+        let completedTasks = 0
+        let activeSprints = 0
 
-        const currentDate = new Date().toISOString().split('T')[0]
-        const { data: activeSprints } = await supabase
-          .from('sprints')
-          .select('id')
-          .in('project_id', projectIds)
-          .gte('end_date', currentDate)
+        // Aggregate stats from all projects
+        await Promise.all(
+          projectIds.map(async (projectId: string) => {
+            try {
+              // Get tasks for this project
+              const tasksResponse = await fetch(`/api/projects/${projectId}/tasks`)
+              if (tasksResponse.ok) {
+                const tasks = await tasksResponse.json()
+                totalTasks += tasks.length
+                // Count completed tasks - check both board columns and sprint columns
+                completedTasks += tasks.filter((task: any) => {
+                  // Check if task is in a "done" board column
+                  if (task.column?.name?.toLowerCase().includes('done')) return true;
+                  // Check if task is in a "done" sprint column
+                  if (task.sprintColumn?.isDone === true) return true;
+                  // Check if task is in a sprint column named "done"
+                  if (task.sprintColumn?.name?.toLowerCase().includes('done')) return true;
+                  return false;
+                }).length
+              }
 
-        const completedTasks = allTasks?.filter(task => 
-          task.column?.name?.toLowerCase().includes('done')
-        ).length || 0
+              // Get active sprints for this project
+              const sprintsResponse = await fetch(`/api/projects/${projectId}/sprints`)
+              if (sprintsResponse.ok) {
+                const sprints = await sprintsResponse.json()
+                // Count sprints that are active
+                activeSprints += sprints.filter((sprint: any) => 
+                  sprint.status === 'active' && !sprint.isDeleted && !sprint.isFinished
+                ).length
+              }
+            } catch (err) {
+              console.error('Error getting stats for project:', projectId, err)
+            }
+          })
+        )
 
         setStats({
-          totalProjects: allProjects?.length || 0,
-          activeSprints: activeSprints?.length || 0,
-          totalTasks: allTasks?.length || 0,
+          totalProjects: allProjects.length || 0,
+          activeSprints,
+          totalTasks,
           completedTasks
         })
       } else {
@@ -199,31 +227,56 @@ export default function Dashboard() {
         })
       }
 
-      // Set recent activity
-      setRecentActivity([
+      // Get recent activity - for now, we'll show basic project activity
+      const recentActivityItems: RecentActivity[] = []
+      
+      // Add recently created projects to activity
+      projectsData.slice(0, 3).forEach((project: any, index: number) => {
+        if (project.createdAt) {
+          recentActivityItems.push({
+            id: `project-${project.id}`,
+            type: 'project',
+            title: 'Project created',
+            description: project.name,
+            time: getRelativeTime(new Date(project.createdAt)),
+            user: project.creator ? { 
+              name: project.creator.fullName || project.creator.email || 'Unknown' 
+            } : undefined
+          })
+        }
+      })
+
+      // Add active sprints to activity
+      if (projectIds.length > 0) {
+        for (const projectId of projectIds.slice(0, 2)) {
+          const sprintsResponse = await fetch(`/api/projects/${projectId}/sprints`)
+          if (sprintsResponse.ok) {
+            const sprints = await sprintsResponse.json()
+            const activeSprint = sprints.find((s: any) => s.status === 'active')
+            if (activeSprint) {
+              recentActivityItems.push({
+                id: `sprint-${activeSprint.id}`,
+                type: 'sprint',
+                title: 'Sprint active',
+                description: activeSprint.name,
+                time: activeSprint.startDate ? getRelativeTime(new Date(activeSprint.startDate)) : 'Recently',
+                user: { name: 'Team' }
+              })
+              break; // Only show one active sprint
+            }
+          }
+        }
+      }
+
+      // Sort by most recent first
+      setRecentActivity(recentActivityItems.length > 0 ? recentActivityItems : [
         {
-          id: '1',
-          type: 'task',
-          title: 'Task completed',
-          description: 'Implement user authentication system',
-          time: '2 hours ago',
-          user: { name: 'John Doe' }
-        },
-        {
-          id: '2', 
-          type: 'sprint',
-          title: 'Sprint started',
-          description: 'Q1 Development Sprint',
-          time: '1 day ago',
-          user: { name: 'Jane Smith' }
-        },
-        {
-          id: '3',
+          id: 'welcome',
           type: 'project',
-          title: 'Project created',
-          description: projectsData[0]?.name || 'New Project',
-          time: '3 days ago',
-          user: { name: 'Team Lead' }
+          title: 'Welcome to ScrumSan!',
+          description: 'Your activity will appear here',
+          time: 'Just now',
+          user: { name: 'System' }
         }
       ])
 

@@ -26,11 +26,15 @@ export async function GET(
                 loggedHours: true,
                 estimatedHours: true,
                 createdAt: true,
-                assignee: {
+                taskAssignees: {
                   select: {
-                    id: true,
-                    fullName: true,
-                    avatarUrl: true
+                    user: {
+                      select: {
+                        id: true,
+                        fullName: true,
+                        avatarUrl: true
+                      }
+                    }
                   }
                 },
                 reviewer: {

@@ -96,11 +96,15 @@ export async function GET(
           title: true,
           taskType: true,
           itemCode: true,
-          assignee: {
+          taskAssignees: {
             select: {
-              id: true,
-              fullName: true,
-              avatarUrl: true
+              user: {
+                select: {
+                  id: true,
+                  fullName: true,
+                  avatarUrl: true
+                }
+              }
             }
           }
         },

@@ -44,7 +44,16 @@ interface TaskCardProps {
 
 export default function TaskCard({ task, onUpdate, onDelete, className = "" }: TaskCardProps) {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
-  const { relations, hasParent, hasSubitems, isBlocked, isBlocking } = useTaskRelations(task.id)
+  // Only load detailed relations when modal is opened to avoid excessive API calls
+  const { relations } = useTaskRelations(isEditModalOpen ? task.id : null)
+  
+  // Use embedded relation data from main task query for card indicators
+  const hasParent = !!(task as any).parent
+  const hasSubitems = (task as any).subtasks?.length > 0 || false
+  const isBlocked = (task as any)._count?.relationsAsTarget > 0 || false
+  const isBlocking = (task as any)._count?.relationsAsSource > 0 || false
+  const subitemsCount = (task as any).subtasks?.length || 0
+  const blockingCount = (task as any)._count?.relationsAsSource || 0
 
   const handleDelete = () => {
     if (confirm('Are you sure you want to delete this task?')) {
@@ -185,8 +194,8 @@ export default function TaskCard({ task, onUpdate, onDelete, className = "" }: T
                   </div>
                 )}
                 {hasSubitems && (
-                  <div className="w-4 h-4 bg-green-100 rounded flex items-center justify-center" title={`${relations.subitems.length} subitems`}>
-                    <span className="text-xs font-medium text-green-600">{relations.subitems.length}</span>
+                  <div className="w-4 h-4 bg-green-100 rounded flex items-center justify-center" title={`${subitemsCount} subitems`}>
+                    <span className="text-xs font-medium text-green-600">{subitemsCount}</span>
                   </div>
                 )}
                 {isBlocked && (
@@ -195,7 +204,7 @@ export default function TaskCard({ task, onUpdate, onDelete, className = "" }: T
                   </div>
                 )}
                 {isBlocking && (
-                  <div className="w-4 h-4 bg-orange-100 rounded flex items-center justify-center" title={`Blocking ${relations.blocking.length} items`}>
+                  <div className="w-4 h-4 bg-orange-100 rounded flex items-center justify-center" title={`Blocking ${blockingCount} items`}>
                     <Ban className="w-2 h-2 text-orange-600" />
                   </div>
                 )}

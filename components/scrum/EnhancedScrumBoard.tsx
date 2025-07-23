@@ -43,44 +43,7 @@ import {
 } from '@dnd-kit/core'
 import { cn } from '@/lib/utils'
 
-interface Task {
-  id: string
-  title: string
-  description?: string
-  taskType: string
-  priority?: string
-  storyPoints?: number
-  estimatedHours?: number
-  columnId?: string
-  sprintColumnId?: string
-  assignee?: {
-    id: string
-    fullName: string
-    avatarUrl?: string
-  }
-  labels?: string[]
-  dueDate?: string
-  createdAt: string
-}
-
-interface Sprint {
-  id: string
-  name: string
-  goal?: string
-  status: 'planning' | 'active' | 'completed'
-  startDate?: string
-  endDate?: string
-  plannedPoints?: number
-  completedPoints?: number
-  tasks: Task[]
-}
-
-interface BoardColumn {
-  id: string
-  name: string
-  position: number
-  tasks: Task[]
-}
+import { Task, Sprint, BoardColumn } from '@/types/shared';
 
 interface EnhancedScrumBoardProps {
   projectId: string
@@ -576,13 +539,19 @@ export default function EnhancedScrumBoard({
                           description={task.description}
                           taskType={task.taskType as any}
                           storyPoints={task.storyPoints || 0}
-                          assignee={task.assignee ? {
-                            name: task.assignee.fullName,
-                            initials: task.assignee.fullName.split(' ').map(n => n[0]).join(''),
-                            avatar: task.assignee.avatarUrl
-                          } : undefined}
+                          assignees={task.taskAssignees?.map((ta: any) => ({
+                            id: ta.user.id,
+                            name: ta.user.fullName || ta.user.email || 'Unknown User',
+                            avatar: ta.user.avatarUrl || undefined,
+                            initials: ta.user.fullName?.split(' ').map((n: string) => n[0]).join('') || 'U'
+                          })) || []}
+                          organizationId={board?.organizationId}
+                          boardId={boardId}
                           labels={[]}
                           onClick={() => setSelectedTask(task)}
+                          onAssigneesChange={() => {
+                            // Trigger refetch if needed
+                          }}
                         />
                       </div>
                     ))}
@@ -628,13 +597,19 @@ export default function EnhancedScrumBoard({
                                 description={task.description}
                                 taskType={task.taskType as any}
                                 storyPoints={task.storyPoints || 0}
-                                assignee={task.assignee ? {
-                                  name: task.assignee.fullName,
-                                  initials: task.assignee.fullName.split(' ').map(n => n[0]).join(''),
-                                  avatar: task.assignee.avatarUrl
-                                } : undefined}
+                                assignees={task.taskAssignees?.map((ta: any) => ({
+                                  id: ta.user.id,
+                                  name: ta.user.fullName || ta.user.email || 'Unknown User',
+                                  avatar: ta.user.avatarUrl || undefined,
+                                  initials: ta.user.fullName?.split(' ').map((n: string) => n[0]).join('') || 'U'
+                                })) || []}
+                                organizationId={board?.organizationId}
+                                boardId={boardId}
                                 labels={[]}
                                 onClick={() => setSelectedTask(task)}
+                                onAssigneesChange={() => {
+                                  // Trigger refetch if needed
+                                }}
                               />
                             </div>
                           ))}
@@ -706,7 +681,7 @@ export default function EnhancedScrumBoard({
           onClose={() => setSelectedTask(null)}
           taskId={selectedTask.id}
           onUpdate={() => {
-            setSelectedTask(null);
+            fetchData();
           }}
         />
       )}

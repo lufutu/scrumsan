@@ -670,17 +670,24 @@ export default function ProjectScrumBoard({ projectId, board, onUpdate }: Projec
                                 description={task.description}
                                 taskType={task.taskType as 'story' | 'bug' | 'task' | 'epic' | 'improvement' | 'idea' | 'note' || 'task'}
                                 storyPoints={task.storyPoints || 0}
-                                assignee={task.assignee ? {
-                                  name: task.assignee.full_name || '',
-                                  initials: task.assignee.full_name?.split(' ').map(n => n[0]).join('') || '',
-                                  avatar: task.assignee.avatar_url
-                                } : undefined}
-                                labels={task.labels ? labels.filter(l => task.labels?.includes(l.id)).map(l => ({
-                                  name: l.name,
-                                  color: l.color || '#6B7280'
+                                assignees={task.taskAssignees?.map((ta: any) => ({
+                                  id: ta.user.id,
+                                  name: ta.user.fullName || ta.user.email || 'Unknown User',
+                                  avatar: ta.user.avatarUrl || undefined,
+                                  initials: ta.user.fullName?.split(' ').map((n: string) => n[0]).join('') || 'U'
+                                })) || []}
+                                organizationId={board?.organizationId}
+                                boardId={board?.id}
+                                labels={task.taskLabels ? task.taskLabels.map(tl => ({
+                                  id: tl.label.id,
+                                  name: tl.label.name,
+                                  color: tl.label.color || '#6B7280'
                                 })) : []}
                                 status={'todo'}
-                              onClick={() => setSelectedTask(task)}
+                                onClick={() => setSelectedTask(task)}
+                                onAssigneesChange={() => {
+                                  // Trigger refetch if needed
+                                }}
                               />
                               {'active' === 'planning' && (
                                 <Button
@@ -812,7 +819,7 @@ export default function ProjectScrumBoard({ projectId, board, onUpdate }: Projec
           onClose={() => setSelectedTask(null)}
           taskId={selectedTask.id}
           onUpdate={() => {
-            setSelectedTask(null);
+            fetchData();
           }}
         />
       )}

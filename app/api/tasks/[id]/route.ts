@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth-utils'
-// Real-time updates are handled automatically by Supabase
 import { z } from 'zod'
 
 const taskUpdateSchema = z.object({
@@ -12,11 +11,12 @@ const taskUpdateSchema = z.object({
   priority: z.string().optional(),
   storyPoints: z.number().optional(),
   estimatedHours: z.number().optional(),
-  labels: z.array(z.string()).optional(), // Allow array of strings (labels are stored as string[])
+  labels: z.array(z.string()).optional(),
   boardId: z.string().uuid().optional(),
-  columnId: z.string().uuid().optional().nullable(), // Allow null for backlog items
-  sprintColumnId: z.string().uuid().optional().nullable(), // Add sprintColumnId field
-  assigneeId: z.string().uuid().optional(),
+  columnId: z.string().uuid().optional().nullable(),
+  sprintColumnId: z.string().uuid().optional().nullable(),
+  assigneeIds: z.array(z.string().uuid()).optional(), // Multiple assignees
+  reviewerIds: z.array(z.string().uuid()).optional(), // Multiple reviewers
   epicId: z.string().uuid().optional(),
   dueDate: z.string().optional(),
   position: z.number().optional(),
@@ -34,11 +34,26 @@ export async function GET(
     const task = await prisma.task.findUnique({
       where: { id },
       include: {
-        assignee: {
+        taskAssignees: {
           select: {
-            id: true,
-            fullName: true,
-            avatarUrl: true
+            user: {
+              select: {
+                id: true,
+                fullName: true,
+                avatarUrl: true
+              }
+            }
+          }
+        },
+        taskReviewers: {
+          select: {
+            user: {
+              select: {
+                id: true,
+                fullName: true,
+                avatarUrl: true
+              }
+            }
           }
         },
         creator: {
@@ -137,9 +152,7 @@ export async function GET(
       }
     })
     
-    const hasAccess = !!orgMember
-    
-    if (!hasAccess) {
+    if (!orgMember) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 403 }
@@ -198,9 +211,7 @@ export async function PATCH(
       }
     })
     
-    const hasAccess = !!orgMember
-    
-    if (!hasAccess) {
+    if (!orgMember) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 403 }
@@ -218,23 +229,95 @@ export async function PATCH(
     if (validatedData.boardId !== undefined) updateData.boardId = validatedData.boardId
     if (validatedData.columnId !== undefined) updateData.columnId = validatedData.columnId
     if (validatedData.sprintColumnId !== undefined) updateData.sprintColumnId = validatedData.sprintColumnId
-    if (validatedData.assigneeId !== undefined) updateData.assigneeId = validatedData.assigneeId
     if (validatedData.epicId !== undefined) updateData.epicId = validatedData.epicId
     if (validatedData.dueDate !== undefined) updateData.dueDate = validatedData.dueDate ? new Date(validatedData.dueDate) : null
     if (validatedData.position !== undefined) updateData.position = validatedData.position
-    // Handle labels directly (stored as string array in Prisma)
-    if (validatedData.labels !== undefined) updateData.labels = validatedData.labels
+    // Note: labels are handled separately via taskLabels junction table
     
-    // Update task
-    const task = await prisma.task.update({
+    // Update basic task data
+    let task = await prisma.task.update({
       where: { id },
       data: updateData,
+    })
+
+    // Handle assignees if provided
+    if (validatedData.assigneeIds !== undefined) {
+      // Remove existing assignees
+      await prisma.taskAssignee.deleteMany({
+        where: { taskId: id }
+      })
+      
+      // Add new assignees
+      if (validatedData.assigneeIds.length > 0) {
+        await prisma.taskAssignee.createMany({
+          data: validatedData.assigneeIds.map(userId => ({
+            taskId: id,
+            userId: userId
+          }))
+        })
+      }
+    }
+
+    // Handle reviewers if provided
+    if (validatedData.reviewerIds !== undefined) {
+      // Remove existing reviewers
+      await prisma.taskReviewer.deleteMany({
+        where: { taskId: id }
+      })
+      
+      // Add new reviewers
+      if (validatedData.reviewerIds.length > 0) {
+        await prisma.taskReviewer.createMany({
+          data: validatedData.reviewerIds.map(userId => ({
+            taskId: id,
+            userId: userId
+          }))
+        })
+      }
+    }
+
+    // Handle labels if provided
+    if (validatedData.labels !== undefined) {
+      // Remove existing task labels
+      await prisma.taskLabel.deleteMany({
+        where: { taskId: id }
+      })
+      
+      // Add new task labels
+      if (validatedData.labels.length > 0) {
+        await prisma.taskLabel.createMany({
+          data: validatedData.labels.map(labelId => ({
+            taskId: id,
+            labelId: labelId
+          }))
+        })
+      }
+    }
+
+    // Fetch updated task with all relations
+    task = await prisma.task.findUnique({
+      where: { id },
       include: {
-        assignee: {
+        taskAssignees: {
           select: {
-            id: true,
-            fullName: true,
-            avatarUrl: true
+            user: {
+              select: {
+                id: true,
+                fullName: true,
+                avatarUrl: true
+              }
+            }
+          }
+        },
+        taskReviewers: {
+          select: {
+            user: {
+              select: {
+                id: true,
+                fullName: true,
+                avatarUrl: true
+              }
+            }
           }
         },
         creator: {
@@ -274,9 +357,7 @@ export async function PATCH(
           }
         }
       }
-    })
-    
-    // Real-time updates are automatically handled by Supabase when data changes
+    }) as any
     
     return NextResponse.json(task)
   } catch (error: any) {
@@ -330,9 +411,7 @@ export async function DELETE(
       }
     })
     
-    const hasAccess = !!orgMember
-    
-    if (!hasAccess) {
+    if (!orgMember) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 403 }
@@ -343,8 +422,6 @@ export async function DELETE(
     await prisma.task.delete({
       where: { id }
     })
-    
-    // Real-time updates are automatically handled by Supabase when data changes
     
     return NextResponse.json({ success: true })
   } catch (error: any) {

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -407,7 +407,7 @@ export default function SprintBacklogView({
     }
   }
 
-  const SprintBoard = () => (
+  const SprintBoard = useMemo(() => (
     <div className="space-y-6">
       {/* Search and Filter */}
       <div className="bg-white rounded-lg border shadow-sm p-4">
@@ -580,7 +580,7 @@ export default function SprintBacklogView({
         </DragOverlay>
       </DndContext>
     </div>
-  )
+  ), [columns, searchTerm, activeId, handleDragStart, handleDragEnd, getTasksByColumn, onRefresh, organizationId])
 
   return (
     <div className="h-full">
@@ -600,53 +600,61 @@ export default function SprintBacklogView({
 
         {/* Sprint Progress */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <Card>
-            <CardContent className="pt-4">
-              <div className="flex items-center gap-2">
-                <CheckCircle className="h-5 w-5 text-green-600" />
+          <Card className='p-2'>
+            <CardContent className="py-0 px-2">
+              <div className="flex items-center gap-2">                
                 <div>
-                  <p className="text-sm text-muted-foreground">Tasks Completed</p>
-                  <p className="text-2xl font-bold">{completedTasks}/{totalTasks}</p>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="h-5 w-5 text-green-600" />
+                    <p className="text-sm text-muted-foreground">Tasks Completed</p>
+                    <p className="text-lg font-bold">{completedTasks}/{totalTasks}</p>
+                  </div>                  
                   <Progress value={completionPercentage} className="mt-2" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardContent className="pt-4">
+          <Card className='p-2'>
+            <CardContent className="py-0 px-2">
               <div className="flex items-center gap-2">
-                <Target className="h-5 w-5 text-blue-600" />
                 <div>
-                  <p className="text-sm text-muted-foreground">Story Points</p>
-                  <p className="text-2xl font-bold">{completedStoryPoints}/{totalStoryPoints}</p>
+                  <div className="flex items-center gap-2">
+                    <Target className="h-5 w-5 text-blue-600" />
+                    <p className="text-sm text-muted-foreground">Story Points</p>
+                    <p className="text-lg font-bold">{completedStoryPoints}/{totalStoryPoints}</p>
+                  </div>
                   <Progress value={storyPointsPercentage} className="mt-2" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardContent className="pt-4">
+          <Card className='p-2'>
+            <CardContent className="py-0 px-2">
               <div className="flex items-center gap-2">
-                <AlertCircle className="h-5 w-5 text-yellow-600" />
                 <div>
-                  <p className="text-sm text-muted-foreground">In Progress</p>
-                  <p className="text-2xl font-bold">{inProgressTasks}</p>
+                  <div className="flex items-center gap-2">
+                    <AlertCircle className="h-5 w-5 text-yellow-600" />
+                    <p className="text-sm text-muted-foreground">WIP</p>
+                    <p className="text-lg font-bold">{inProgressTasks}</p>
+                  </div>
                   <p className="text-sm text-muted-foreground mt-2">tasks active</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardContent className="pt-4">
+          <Card className='p-2'>
+            <CardContent className="py-0 px-2">
               <div className="flex items-center gap-2">
-                <Clock className="h-5 w-5 text-orange-600" />
                 <div>
-                  <p className="text-sm text-muted-foreground">Time Remaining</p>
-                  <p className="text-2xl font-bold">{daysRemaining}</p>
-                  <p className="text-sm text-muted-foreground mt-2">days left</p>
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-5 w-5 text-orange-600" />
+                    <p className="text-sm text-muted-foreground">Sprint Ends In</p>
+                    <p className="text-lg font-bold">{daysRemaining} days</p>
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-2">Time left to complete sprint goals</p>
                 </div>
               </div>
             </CardContent>
@@ -663,7 +671,7 @@ export default function SprintBacklogView({
         </TabsList>
 
         <TabsContent value="board" className="mt-6">
-          <SprintBoard />
+          {SprintBoard}
         </TabsContent>
 
         <TabsContent value="burndown" className="mt-6">

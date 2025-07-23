@@ -34,11 +34,15 @@ export async function POST(
           include: {
             task: {
               include: {
-                assignee: {
+                taskAssignees: {
                   select: {
-                    id: true,
-                    fullName: true,
-                    avatarUrl: true
+                    user: {
+                      select: {
+                        id: true,
+                        fullName: true,
+                        avatarUrl: true
+                      }
+                    }
                   }
                 }
               }
@@ -108,11 +112,15 @@ export async function POST(
           createdBy: user.id
         },
         include: {
-          assignee: {
+          taskAssignees: {
             select: {
-              id: true,
-              fullName: true,
-              avatarUrl: true
+              user: {
+                select: {
+                  id: true,
+                  fullName: true,
+                  avatarUrl: true
+                }
+              }
             }
           }
         }

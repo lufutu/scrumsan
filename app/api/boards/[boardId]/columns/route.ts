@@ -74,11 +74,15 @@ export async function GET(
             title: true,
             priority: true,
             storyPoints: true,
-            assignee: {
+            taskAssignees: {
               select: {
-                id: true,
-                fullName: true,
-                avatarUrl: true
+                user: {
+                  select: {
+                    id: true,
+                    fullName: true,
+                    avatarUrl: true
+                  }
+                }
               }
             }
           },
@@ -182,11 +186,15 @@ export async function POST(
             title: true,
             priority: true,
             storyPoints: true,
-            assignee: {
+            taskAssignees: {
               select: {
-                id: true,
-                fullName: true,
-                avatarUrl: true
+                user: {
+                  select: {
+                    id: true,
+                    fullName: true,
+                    avatarUrl: true
+                  }
+                }
               }
             }
           },

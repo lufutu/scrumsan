@@ -773,7 +773,6 @@ export type Database = {
           epic_id: string | null
           estimated_hours: number | null
           id: string
-          labels: string[] | null
           logged_hours: number | null
           position: number | null
           priority: string | null
@@ -795,7 +794,6 @@ export type Database = {
           epic_id?: string | null
           estimated_hours?: number | null
           id?: string
-          labels?: string[] | null
           logged_hours?: number | null
           position?: number | null
           priority?: string | null
@@ -817,7 +815,6 @@ export type Database = {
           epic_id?: string | null
           estimated_hours?: number | null
           id?: string
-          labels?: string[] | null
           logged_hours?: number | null
           position?: number | null
           priority?: string | null

@@ -1,6 +1,6 @@
 "use client"
 
-import { ReactNode } from 'react'
+import React, { ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { 
@@ -149,14 +149,9 @@ export function ErrorState({
             "mx-auto rounded-full bg-gradient-to-br from-red-50 to-red-100 p-4",
             "border-2 border-red-200 shadow-sm"
           )}>
-            {typeof IconComponent === 'function' ? (
-              <IconComponent className={cn(
-                sizeConfig.iconSize,
-                getErrorColor()
-              )} />
-            ) : (
-              IconComponent
-            )}
+            {React.createElement(IconComponent, {
+              className: cn(sizeConfig.iconSize, getErrorColor())
+            })}
           </div>
         </div>
 

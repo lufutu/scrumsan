@@ -1233,7 +1233,6 @@ export default function SprintBacklog({ sprint, onBackToBacklog }: SprintBacklog
           taskId={selectedTask.id}
           onUpdate={() => {
             fetchColumns()
-            setSelectedTask(null)
           }}
         />
       )}

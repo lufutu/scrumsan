@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useSupabase } from "@/providers/supabase-provider"
 import { useToast } from "@/hooks/use-toast"
 
 interface TeamMember {
@@ -15,72 +14,57 @@ export function useTeamMembers(projectId: string) {
   const [isLoading, setIsLoading] = useState(true)
   const [totalCapacity, setTotalCapacity] = useState(0)
   const [averageVelocity, setAverageVelocity] = useState<number | null>(null)
-  const { supabase } = useSupabase()
   const { toast } = useToast()
 
   useEffect(() => {
     const fetchTeamMembers = async () => {
       setIsLoading(true)
       try {
-        // Fetch team members for this project
-        const { data: members, error: membersError } = await supabase
-          .from("project_members")
-          .select(
-            `
-            id,
-            profiles (
-              id,
-              full_name
-            )
-          `,
-          )
-          .eq("project_id", projectId)
-
-        if (membersError) throw membersError
+        // Fetch team members for this project using Prisma API
+        const membersResponse = await fetch(`/api/projects/${projectId}/members`)
+        if (!membersResponse.ok) {
+          throw new Error('Failed to fetch team members')
+        }
+        
+        const members = await membersResponse.json()
 
         // Format team members with default capacity
-        const formattedMembers = members.map((member) => ({
-          id: member.profiles.id,
-          name: member.profiles.full_name || "Unnamed User",
+        const formattedMembers = members.map((member: any) => ({
+          id: member.user.id,
+          name: member.user.fullName || member.user.email || "Unnamed User",
           capacity: 8, // Default capacity in story points
         }))
 
         setTeamMembers(formattedMembers)
         calculateTotalCapacity(formattedMembers)
 
-        // Fetch average velocity from completed sprints
-        const { data: sprints, error: sprintsError } = await supabase
-          .from("sprints")
-          .select(
-            `
-            id,
-            boards (
-              project_id
-            )
-          `,
-          )
-          .eq("status", "completed")
-          .eq("boards.project_id", projectId)
-          .limit(5)
+        // Fetch completed sprints for velocity calculation
+        const sprintsResponse = await fetch(`/api/projects/${projectId}/sprints`)
+        if (!sprintsResponse.ok) {
+          throw new Error('Failed to fetch sprints')
+        }
 
-        if (sprintsError) throw sprintsError
+        const allSprints = await sprintsResponse.json()
+        const completedSprints = allSprints.filter((sprint: any) => 
+          sprint.status === 'completed'
+        ).slice(0, 5) // Get last 5 completed sprints
 
-        // Filter out sprints that don't belong to this project
-        const projectSprints = sprints.filter((sprint) => sprint.boards?.project_id === projectId)
-
-        if (projectSprints.length > 0) {
+        if (completedSprints.length > 0) {
           // For each sprint, get the completed story points
           const sprintData = await Promise.all(
-            projectSprints.map(async (sprint) => {
-              const { data: items, error: itemsError } = await supabase
-                .from("items")
-                .select("estimate")
-                .eq("sprint_id", sprint.id)
-                .eq("status", "done")
+            completedSprints.map(async (sprint: any) => {
+              const tasksResponse = await fetch(`/api/sprints/${sprint.id}/tasks`)
+              if (!tasksResponse.ok) return 0
 
-              if (itemsError) throw itemsError
-
-              const completedPoints = items.reduce((sum, item) => sum + (item.estimate || 0), 0)
+              const tasks = await tasksResponse.json()
+              
+              // Calculate completed story points (tasks in "done" columns)
+              const completedPoints = tasks
+                .filter((task: any) => 
+                  task.column?.name?.toLowerCase().includes('done') || 
+                  task.status === 'done'
+                )
+                .reduce((sum: number, task: any) => sum + (task.storyPoints || 0), 0)
 
               return completedPoints
             }),
@@ -88,7 +72,7 @@ export function useTeamMembers(projectId: string) {
 
           // Calculate average velocity
           const totalPoints = sprintData.reduce((sum, points) => sum + points, 0)
-          const avgVelocity = projectSprints.length > 0 ? Math.round(totalPoints / projectSprints.length) : null
+          const avgVelocity = completedSprints.length > 0 ? Math.round(totalPoints / completedSprints.length) : null
           setAverageVelocity(avgVelocity)
         }
       } catch (error: any) {
@@ -106,7 +90,7 @@ export function useTeamMembers(projectId: string) {
     if (projectId) {
       fetchTeamMembers()
     }
-  }, [projectId, supabase, toast])
+  }, [projectId, toast])
 
   const calculateTotalCapacity = (members: TeamMember[]) => {
     const total = members.reduce((sum, member) => sum + member.capacity, 0)

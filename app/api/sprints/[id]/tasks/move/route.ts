@@ -94,11 +94,15 @@ export async function POST(
       where: { id: taskId },
       data: updateData,
       include: {
-        assignee: {
+        taskAssignees: {
           select: {
-            id: true,
-            fullName: true,
-            avatarUrl: true
+            user: {
+              select: {
+                id: true,
+                fullName: true,
+                avatarUrl: true
+              }
+            }
           }
         }
       }

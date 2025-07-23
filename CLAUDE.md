@@ -26,6 +26,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Drag and drop with **@dnd-kit**
 - Forms with **react-hook-form** and **zod**
 - Data fetching with **SWR**
+- **Motion for React** (modern animation library) - `motion` package only
 
 ## Architecture Overview
 
@@ -315,6 +316,34 @@ This rule has **ZERO TOLERANCE** - any status field usage for tasks will cause P
   ```
 - **Only close when user explicitly clicks close button**
 - **This ensures users can perform multiple actions** without reopening
+- **NEVER call setSelectedTask(null) in onUpdate callbacks** - this auto-closes the modal:
+  ```typescript
+  // ❌ BAD - Auto-closes modal
+  onUpdate={() => {
+    fetchData()
+    setSelectedTask(null) // Don't do this!
+  }}
+  
+  // ✅ GOOD - Keeps modal open
+  onUpdate={() => {
+    fetchData()
+  }}
+  ```
+
+### IMPORTANT: Popover in Dialog Rule
+- **ALWAYS set modal={true} on Popover components inside Dialog components**
+- **This prevents focus trap conflicts and interaction issues**:
+  ```typescript
+  <Dialog open={isOpen}>
+    <DialogContent>
+      <Popover modal={true}>
+        <PopoverTrigger>...</PopoverTrigger>
+        <PopoverContent>...</PopoverContent>
+      </Popover>
+    </DialogContent>
+  </Dialog>
+  ```
+- **Without modal={true}, Popovers inside Dialogs may not work correctly**
 
 ### IMPORTANT: Subtask Inheritance Rule
 - **Subtasks inherit parent properties**:
@@ -429,6 +458,51 @@ GOOD (Complete functionality):
 - **Browser dev tools** for debugging
 - **Prisma Studio** for database inspection (`bun run db:studio`)
 - **Next.js built-in debugging** features
+
+## 🚨 CRITICAL: Documentation Policy & Library Standards
+
+### ALWAYS Use Context7 MCP for Latest Documentation
+- **NEVER use outdated documentation** or assume library syntax
+- **ALWAYS use Context7 MCP** to fetch the latest documentation before implementing any library features
+- **VERIFY current syntax** for all dependencies, especially rapidly evolving ones
+- **CHECK official documentation** at the source (e.g., motion.dev, nextjs.org) using Context7 MCP
+
+### Motion for React (Animation Library) - CURRENT STANDARDS
+- **Package**: Use `motion` package ONLY (v12.23.6+)
+- **NEVER use**: `framer-motion` (legacy package)
+- **Import Syntax**: `import { motion, AnimatePresence } from 'motion/react'`
+- **For React Server Components**: `import * as motion from 'motion/react-client'`
+- **Documentation**: Always check https://motion.dev/docs/react using Context7 MCP for latest syntax
+
+### Modern Motion Components Usage
+```typescript
+// ✅ CORRECT - Latest motion/react syntax
+import { motion, AnimatePresence } from 'motion/react'
+
+// Basic motion component
+<motion.div
+  layout
+  initial={{ opacity: 0, y: 20 }}
+  animate={{ opacity: 1, y: 0 }}
+  exit={{ opacity: 0, y: -20 }}
+  transition={{ 
+    type: "spring", 
+    damping: 20, 
+    stiffness: 300 
+  }}
+>
+  Content
+</motion.div>
+
+// ❌ FORBIDDEN - Legacy framer-motion syntax
+import { motion } from 'framer-motion' // DON'T USE
+```
+
+### Documentation Update Protocol
+1. **Before implementing any library feature**: Use Context7 MCP to fetch latest docs
+2. **When encountering build errors**: Check if library syntax has changed using Context7 MCP
+3. **Update CLAUDE.md**: When new library versions or syntax changes are discovered
+4. **Verify compatibility**: Always test build and runtime after updating library usage
 
 ## Environment Setup
 

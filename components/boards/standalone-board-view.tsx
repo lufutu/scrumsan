@@ -239,13 +239,19 @@ export default function StandaloneBoardView({ board, onUpdate }: StandaloneBoard
                             description={task.description}
                             taskType={task.taskType as 'story' | 'bug' | 'task' | 'epic' | 'improvement' | 'idea' | 'note' || 'task'}
                             storyPoints={task.storyPoints || 0}
-                            assignee={task.assignee ? {
-                              name: task.assignee.fullName || '',
-                              initials: task.assignee.fullName?.split(' ').map(n => n[0]).join('') || '',
-                              avatar: task.assignee.avatarUrl
-                            } : undefined}
+                            assignees={task.taskAssignees?.map((ta: any) => ({
+                              id: ta.user.id,
+                              name: ta.user.fullName || ta.user.email || 'Unknown User',
+                              avatar: ta.user.avatarUrl || undefined,
+                              initials: ta.user.fullName?.split(' ').map((n: string) => n[0]).join('') || 'U'
+                            })) || []}
+                            organizationId={board.organizationId}
+                            boardId={board.id}
                             status={'todo'}
                             onClick={() => setSelectedTask(task)}
+                            onAssigneesChange={() => {
+                              // Trigger refetch if needed
+                            }}
                           />
                         </div>
                       ))}
@@ -385,13 +391,19 @@ export default function StandaloneBoardView({ board, onUpdate }: StandaloneBoard
                       description={task.description}
                       taskType={task.taskType as 'story' | 'bug' | 'task' | 'epic' | 'improvement' | 'idea' | 'note' || 'task'}
                       storyPoints={task.storyPoints || 0}
-                      assignee={task.assignee ? {
-                        name: task.assignee.fullName || '',
-                        initials: task.assignee.fullName?.split(' ').map(n => n[0]).join('') || '',
-                        avatar: task.assignee.avatarUrl
-                      } : undefined}
+                      assignees={task.taskAssignees?.map((ta: any) => ({
+                        id: ta.user.id,
+                        name: ta.user.fullName || ta.user.email || 'Unknown User',
+                        avatar: ta.user.avatarUrl || undefined,
+                        initials: ta.user.fullName?.split(' ').map((n: string) => n[0]).join('') || 'U'
+                      })) || []}
+                      organizationId={board.organizationId}
+                      boardId={board.id}
                       status={task.status === 'todo' ? 'todo' : task.status === 'done' ? 'done' : 'in_progress'}
                       onClick={() => setSelectedTask(task)}
+                      onAssigneesChange={() => {
+                        // Trigger refetch if needed
+                      }}
                     />
                   </div>
                 ))}
@@ -482,7 +494,6 @@ export default function StandaloneBoardView({ board, onUpdate }: StandaloneBoard
           taskId={selectedTask.id}
           onUpdate={() => {
             onUpdate();
-            setSelectedTask(null);
           }}
         />
       )}

@@ -7,9 +7,8 @@ import {
   MessageSquare,
   Paperclip,
   Clock,
-  Calendar,
+  Calendar as CalendarIcon,
   Flag,
-  Tag,
   Users,
   Link2,
   Plus,
@@ -39,6 +38,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
@@ -54,18 +54,35 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useSupabase } from '@/providers/supabase-provider';
-import { useToast } from '@/hooks/use-toast';
 import { Tables } from '@/types/database';
 import { FileUploadQueue } from '@/components/ui/file-upload-queue';
 import { RelationsTab } from '@/components/scrum/RelationsTab';
+import LabelSelector from '@/components/scrum/LabelSelector';
 import { toast } from 'sonner';
+import { useUsers } from '@/hooks/useUsers';
+import { useLabels } from '@/hooks/useLabels';
+import { ItemModalProps } from '@/types/shared';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Calendar } from '@/components/ui/calendar';
+import { Search } from 'lucide-react';
+import { format } from 'date-fns';
 
 type Task = Tables<'tasks'> & {
-  assignee?: {
-    id: string
-    full_name: string | null
-    avatar_url: string | null
-  } | null
+  taskAssignees?: {
+    user: {
+      id: string
+      fullName: string | null
+      avatarUrl: string | null
+    }
+  }[]
+  taskLabels?: {
+    label: {
+      id: string
+      name: string
+      color: string | null
+    }
+  }[]
   created_by_user?: {
     id: string
     full_name: string | null
@@ -73,6 +90,7 @@ type Task = Tables<'tasks'> & {
   board?: {
     id: string
     name: string
+    organizationId: string
   } | null
   project?: {
     id: string
@@ -90,13 +108,6 @@ type Task = Tables<'tasks'> & {
   checklists?: Checklist[]
   comments?: Comment[]
   worklog_entries?: WorklogEntry[]
-}
-
-interface ItemModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  taskId?: string;
-  onUpdate?: () => void;
 }
 
 interface ChecklistItem {
@@ -160,9 +171,26 @@ export function ItemModal({
   onUpdate
 }: ItemModalProps) {
   const { supabase, user } = useSupabase();
-  const { toast: showToast } = useToast();
-  const [activeTab, setActiveTab] = useState('details');
+  // Tab state for right sidebar
+  const [activeTab, setActiveTab] = useState('properties');
+  // Collapsible sections state for content tab - expanded by default
+  const [detailsOpen, setDetailsOpen] = useState(true);
+  const [checklistsOpen, setChecklistsOpen] = useState(true);
+  const [filesOpen, setFilesOpen] = useState(true);
+  // Assignee selector state
+  const [assigneePopoverOpen, setAssigneePopoverOpen] = useState(false);
+  // Due date picker state
+  const [dueDatePopoverOpen, setDueDatePopoverOpen] = useState(false);
+  // Label selector state
   const [task, setTask] = useState<Task | null>(null);
+  
+  // Fetch organization members for assignee selector
+  const { users: organizationMembers, isLoading: loadingMembers } = useUsers({
+    organizationId: task?.board?.organizationId
+  });
+  
+  // Fetch board labels
+  const { labels: boardLabels, loading: loadingLabels, createLabel } = useLabels(task?.board?.id || '');
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   
@@ -205,17 +233,14 @@ export function ItemModal({
       }
 
       const data = await response.json();
+      console.log('Fetched task data:', data);
       setTask(data);
       setTitle(data.title);
       setDescription(data.description || '');
       
     } catch (error) {
       console.error('Error fetching task:', error);
-      showToast({
-        title: "Error",
-        description: "Failed to load task details",
-        variant: "destructive"
-      });
+      toast.error("Failed to load task details");
     } finally {
       setIsLoading(false);
     }
@@ -280,6 +305,7 @@ export function ItemModal({
   const updateTask = async (updates: Partial<Task>) => {
     if (!taskId) return;
     
+    console.log('Updating task with:', updates);
     setIsSaving(true);
     try {
       const response = await fetch(`/api/tasks/${taskId}`, {
@@ -289,10 +315,13 @@ export function ItemModal({
       });
 
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Update failed:', response.status, errorText);
         throw new Error('Failed to update task');
       }
 
       const updatedTask = await response.json();
+      console.log('Task updated successfully:', updatedTask);
       setTask(updatedTask);
       
       toast.success('Task updated successfully');
@@ -529,6 +558,62 @@ export function ItemModal({
     }
   };
 
+  const handleAssignUser = async (userId: string | null) => {
+    if (!taskId || !task) return;
+    
+    try {
+      setIsSaving(true);
+      
+      // Get current assignee IDs
+      const currentAssignees = task.taskAssignees?.map(ta => ta.user.id) || [];
+      let newAssigneeIds: string[] = [];
+      
+      if (userId === null) {
+        // Clear all assignees
+        newAssigneeIds = [];
+      } else if (currentAssignees.includes(userId)) {
+        // Remove user from assignees
+        newAssigneeIds = currentAssignees.filter(id => id !== userId);
+      } else {
+        // Add user to assignees
+        newAssigneeIds = [...currentAssignees, userId];
+      }
+
+      const response = await fetch(`/api/tasks/${taskId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          assigneeIds: newAssigneeIds
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update assignees');
+      }
+
+      const updatedTask = await response.json();
+      setTask(updatedTask);
+      setAssigneePopoverOpen(false);
+      
+      const message = userId === null 
+        ? 'All assignees removed' 
+        : currentAssignees.includes(userId)
+        ? 'Assignee removed'
+        : 'Assignee added';
+      toast.success(message);
+      onUpdate?.();
+    } catch (error) {
+      console.error('Error updating assignees:', error);
+      toast.error('Failed to update assignees');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+
+
   const handleDelete = async () => {
     if (!taskId) return;
     
@@ -557,12 +642,13 @@ export function ItemModal({
   // Handle dialog close only when user explicitly wants to close
   const handleDialogOpenChange = (open: boolean) => {
     // Only close when dialog is being closed (open = false) AND not during other state changes
-    if (!open) {
+    if (!open && !isSaving) {
       onClose();
     }
   };
 
   return (
+    <>
     <Dialog open={isOpen} onOpenChange={handleDialogOpenChange}>
       <DialogContent 
         className="[&>button:last-child]:hidden h-[95vh] p-0 gap-0 w-[95vw] max-w-[95vw] sm:max-w-[65vw]"
@@ -662,7 +748,7 @@ export function ItemModal({
               <SelectTrigger className="w-36 h-8 bg-emerald-500 text-white border-0 hover:bg-emerald-600">
                 <SelectValue placeholder="Backlog" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent onCloseAutoFocus={(e) => e.preventDefault()}>
                 <SelectItem value="backlog">Product Backlog</SelectItem>
                 <SelectItem value="sprint1">Sprint 1</SelectItem>
                 <SelectItem value="sprint2">Sprint 2</SelectItem>
@@ -694,11 +780,11 @@ export function ItemModal({
                     autoFocus
                   />
                   <div className="flex gap-2">
-                    <Button size="sm" onClick={handleSaveTitle} disabled={isSaving}>
+                    <Button type="button" size="sm" onClick={handleSaveTitle} disabled={isSaving}>
                       {isSaving && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
                       Save
                     </Button>
-                    <Button size="sm" variant="outline" onClick={() => {
+                    <Button type="button" size="sm" variant="outline" onClick={() => {
                       setTitle(task?.title || '');
                       setEditingTitle(false);
                     }}>
@@ -724,42 +810,19 @@ export function ItemModal({
               )}
             </div>
 
-            {/* Tabs */}
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="px-8">
-              <TabsList className="w-full justify-start h-12 p-1 bg-slate-100 rounded-lg mb-6">
-                <TabsTrigger 
-                  value="details"
-                  className="px-6 py-2 data-[state=active]:bg-white data-[state=active]:shadow-sm rounded-md font-medium"
-                >
-                  Details
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="checklists"
-                  className="px-6 py-2 data-[state=active]:bg-white data-[state=active]:shadow-sm rounded-md font-medium"
-                >
-                  Checklists ({checklists.length})
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="worklog"
-                  className="px-6 py-2 data-[state=active]:bg-white data-[state=active]:shadow-sm rounded-md font-medium"
-                >
-                  Worklog ({worklogEntries.length})
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="relations"
-                  className="px-6 py-2 data-[state=active]:bg-white data-[state=active]:shadow-sm rounded-md font-medium"
-                >
-                  Relations
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="files"
-                  className="px-6 py-2 data-[state=active]:bg-white data-[state=active]:shadow-sm rounded-md font-medium"
-                >
-                  Files ({attachments.length})
-                </TabsTrigger>
-              </TabsList>
+            {/* Collapsible Sections */}
+            <div className="px-8 space-y-6 pb-8">
 
-              <TabsContent value="details" className="space-y-8">
+              {/* Details Section */}
+              <Collapsible open={detailsOpen} onOpenChange={setDetailsOpen}>
+                <CollapsibleTrigger className="flex items-center justify-between w-full p-4 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors">
+                  <div className="flex items-center gap-2">
+                    <CheckSquare className="h-5 w-5 text-slate-600" />
+                    <span className="font-semibold text-slate-900">Details</span>
+                  </div>
+                  <ChevronDown className={`h-4 w-4 text-slate-600 transition-transform ${detailsOpen ? 'rotate-180' : ''}`} />
+                </CollapsibleTrigger>
+                <CollapsibleContent className="space-y-8 pt-4">
                 {/* Description */}
                 <div>
                   <Label className="text-sm font-semibold text-slate-700 mb-3 block">DESCRIPTION</Label>
@@ -772,11 +835,11 @@ export function ItemModal({
                         placeholder="Add a detailed description..."
                       />
                       <div className="flex gap-2">
-                        <Button size="sm" onClick={handleSaveDescription} disabled={isSaving}>
+                        <Button type="button" size="sm" onClick={handleSaveDescription} disabled={isSaving}>
                           {isSaving && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
                           Save
                         </Button>
-                        <Button size="sm" variant="outline" onClick={() => {
+                        <Button type="button" size="sm" variant="outline" onClick={() => {
                           setDescription(task?.description || '');
                           setEditingDescription(false);
                         }}>
@@ -868,9 +931,19 @@ export function ItemModal({
                     ))}
                   </div>
                 </div>
-              </TabsContent>
+                </CollapsibleContent>
+              </Collapsible>
 
-              <TabsContent value="checklists" className="space-y-6">
+              {/* Checklists Section */}
+              <Collapsible open={checklistsOpen} onOpenChange={setChecklistsOpen}>
+                <CollapsibleTrigger className="flex items-center justify-between w-full p-4 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors">
+                  <div className="flex items-center gap-2">
+                    <Square className="h-5 w-5 text-slate-600" />
+                    <span className="font-semibold text-slate-900">Checklists ({checklists.length})</span>
+                  </div>
+                  <ChevronDown className={`h-4 w-4 text-slate-600 transition-transform ${checklistsOpen ? 'rotate-180' : ''}`} />
+                </CollapsibleTrigger>
+                <CollapsibleContent className="space-y-6 pt-4">
                 {/* Add Checklist */}
                 <Card className="border-slate-200">
                   <CardContent className="p-4">
@@ -909,84 +982,20 @@ export function ItemModal({
                     />
                   ))}
                 </div>
-              </TabsContent>
+                </CollapsibleContent>
+              </Collapsible>
 
-              <TabsContent value="worklog" className="space-y-6">
-                {/* Add Worklog Entry */}
-                <Card className="border-slate-200">
-                  <CardContent className="p-4">
-                    <div className="space-y-4">
-                      <div className="flex gap-3">
-                        <Input
-                          value={newWorklogHours}
-                          onChange={(e) => setNewWorklogHours(e.target.value)}
-                          placeholder="Hours (e.g., 2.5)"
-                          type="number"
-                          step="0.5"
-                          min="0"
-                          className="w-32 border-slate-200 focus:border-emerald-500 focus:ring-emerald-500"
-                        />
-                        <Input
-                          value={newWorklogDescription}
-                          onChange={(e) => setNewWorklogDescription(e.target.value)}
-                          placeholder="Work description..."
-                          className="flex-1 border-slate-200 focus:border-emerald-500 focus:ring-emerald-500"
-                        />
-                        <Button 
-                          onClick={addWorklogEntry}
-                          disabled={!newWorklogDescription.trim() || !newWorklogHours}
-                          className="bg-emerald-500 hover:bg-emerald-600"
-                        >
-                          <Timer className="h-4 w-4 mr-2" />
-                          Log Work
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
 
-                {/* Worklog Entries */}
-                <div className="space-y-3">
-                  {worklogEntries.map((entry) => (
-                    <Card key={entry.id} className="border-slate-200">
-                      <CardContent className="p-4">
-                        <div className="flex items-start gap-3">
-                          <Avatar className="h-8 w-8">
-                            <AvatarImage src={entry.user.avatarUrl || ''} />
-                            <AvatarFallback className="text-xs bg-blue-500 text-white">
-                              {entry.user.fullName?.charAt(0) || 'U'}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="font-medium text-slate-900">
-                                {entry.user.fullName || 'Unknown User'}
-                              </span>
-                              <Badge variant="outline" className="text-xs">
-                                {entry.hoursLogged}h
-                              </Badge>
-                              <span className="text-xs text-slate-500">
-                                {new Date(entry.dateLogged).toLocaleDateString()}
-                              </span>
-                            </div>
-                            <p className="text-slate-700">{entry.description}</p>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </TabsContent>
-
-              <TabsContent value="relations" className="space-y-6">
-                <RelationsTab 
-                  taskId={taskId!} 
-                  task={task}
-                  onUpdate={onUpdate}
-                />
-              </TabsContent>
-
-              <TabsContent value="files" className="space-y-6">
+              {/* Files Section */}
+              <Collapsible open={filesOpen} onOpenChange={setFilesOpen}>
+                <CollapsibleTrigger className="flex items-center justify-between w-full p-4 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors">
+                  <div className="flex items-center gap-2">
+                    <Paperclip className="h-5 w-5 text-slate-600" />
+                    <span className="font-semibold text-slate-900">Files ({attachments.length})</span>
+                  </div>
+                  <ChevronDown className={`h-4 w-4 text-slate-600 transition-transform ${filesOpen ? 'rotate-180' : ''}`} />
+                </CollapsibleTrigger>
+                <CollapsibleContent className="space-y-6 pt-4">
                 {/* File Upload */}
                 <FileUploadQueue
                   onFileUpload={handleFileUpload}
@@ -1073,41 +1082,167 @@ export function ItemModal({
                     </div>
                   </div>
                 )}
-              </TabsContent>
-            </Tabs>
+                </CollapsibleContent>
+              </Collapsible>
+            </div>
           </div>
 
           {/* Right Sidebar */}
-          <div className="w-80 border-l bg-slate-50 overflow-y-auto">
-            <div className="p-6 space-y-6">
-              {/* Assignee */}
-              <div>
-                <Label className="text-sm font-semibold text-slate-700 mb-3 block">ASSIGNEE</Label>
-                {task?.assignee ? (
-                  <div className="flex items-center gap-3 p-3 bg-white rounded-lg border border-slate-200">
-                    <Avatar className="h-9 w-9">
-                      <AvatarImage src={task.assignee.avatar_url || ''} />
-                      <AvatarFallback className="bg-emerald-500 text-white text-sm">
-                        {task.assignee.full_name?.charAt(0) || 'U'}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1">
-                      <div className="font-medium text-sm text-slate-900">
-                        {task.assignee.full_name || 'Unassigned'}
-                      </div>
-                      <div className="text-xs text-slate-500">Assignee</div>
-                    </div>
-                  </div>
-                ) : (
-                  <Button 
-                    variant="outline" 
-                    className="w-full justify-start text-slate-600 border-slate-200 hover:bg-white"
-                  >
-                    <UserPlus className="h-4 w-4 mr-2" />
-                    Assign someone
-                  </Button>
-                )}
-              </div>
+          <div className="w-120 border-l bg-slate-50 overflow-y-auto">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full">
+              <TabsList className="w-full justify-start h-10 p-1 bg-slate-100 rounded-none border-b">
+                <TabsTrigger value="properties" className="flex-1 text-sm">Properties</TabsTrigger>
+                <TabsTrigger value="activity" className="flex-1 text-sm">Worklog</TabsTrigger>
+                <TabsTrigger value="relations" className="flex-1 text-sm">Relations</TabsTrigger>
+              </TabsList>
+
+              {/* Properties Tab */}
+              <TabsContent value="properties" className="p-6 space-y-6">
+                {/* Assignee */}
+                <div>
+                  <Label className="text-sm font-semibold text-slate-700 mb-3 block">ASSIGNEE</Label>
+                  <Popover modal={true} open={assigneePopoverOpen} onOpenChange={setAssigneePopoverOpen}>
+                    <PopoverTrigger asChild>
+                      {task?.taskAssignees && task.taskAssignees.length > 0 ? (
+                        <Button 
+                          variant="outline" 
+                          className="w-full justify-start p-3 h-auto bg-white border border-slate-200 hover:bg-slate-50"
+                        >
+                          <div className="flex items-center gap-2 mr-3">
+                            {task.taskAssignees.slice(0, 3).map((assignee, index) => (
+                              <Avatar key={assignee.user.id} className={cn("h-6 w-6", index > 0 && "-ml-2")}>
+                                <AvatarImage src={assignee.user.avatarUrl || ''} />
+                                <AvatarFallback className="bg-emerald-500 text-white text-xs">
+                                  {assignee.user.fullName?.charAt(0) || 'U'}
+                                </AvatarFallback>
+                              </Avatar>
+                            ))}
+                            {task.taskAssignees.length > 3 && (
+                              <div className="h-6 w-6 rounded-full bg-slate-200 flex items-center justify-center text-xs text-slate-600 -ml-2">
+                                +{task.taskAssignees.length - 3}
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex-1 text-left">
+                            <div className="font-medium text-sm text-slate-900">
+                              {task.taskAssignees.length === 1 
+                                ? task.taskAssignees[0].user.fullName || 'Assignee'
+                                : `${task.taskAssignees.length} Assignees`
+                              }
+                            </div>
+                            <div className="text-xs text-slate-500">Click to manage assignees</div>
+                          </div>
+                        </Button>
+                      ) : (
+                        <Button 
+                          variant="outline" 
+                          className="w-full justify-start text-slate-600 border-slate-200 hover:bg-white h-auto p-3"
+                        >
+                          <UserPlus className="h-4 w-4 mr-2" />
+                          <div className="text-left">
+                            <div className="font-medium">Assign someone</div>
+                            <div className="text-xs text-slate-500">Click to select assignees</div>
+                          </div>
+                        </Button>
+                      )}
+                    </PopoverTrigger>
+                    <PopoverContent className="w-80 p-0 z-50" align="start">
+                      <Command>
+                        <div className="flex items-center border-b px-3">
+                          <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                          <CommandInput placeholder="Search members..." className="flex h-10 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50" />
+                        </div>
+                        <CommandList>
+                          {loadingMembers ? (
+                            <div className="p-4 text-center text-sm text-slate-500">
+                              Loading members...
+                            </div>
+                          ) : (
+                            <>
+                              <CommandEmpty>No members found.</CommandEmpty>
+                              <CommandGroup>
+                                {task?.taskAssignees && task.taskAssignees.length > 0 && (
+                                  <CommandItem
+                                    onSelect={() => handleAssignUser(null)}
+                                    className="flex items-center gap-3 p-3 cursor-pointer"
+                                  >
+                                    <div className="h-8 w-8 rounded-full bg-slate-200 flex items-center justify-center">
+                                      <X className="h-4 w-4 text-slate-600" />
+                                    </div>
+                                    <div>
+                                      <div className="font-medium text-sm">Unassign all</div>
+                                      <div className="text-xs text-slate-500">Remove all assignees</div>
+                                    </div>
+                                  </CommandItem>
+                                )}
+                                {user && (
+                                  <CommandItem
+                                    onSelect={() => handleAssignUser(user.id)}
+                                    className="flex items-center gap-3 p-3 cursor-pointer"
+                                  >
+                                    <div className="relative">
+                                      <Avatar className="h-8 w-8">
+                                        <AvatarImage src={user.user_metadata?.avatar_url} />
+                                        <AvatarFallback className="bg-emerald-500 text-white text-sm">
+                                          {user.user_metadata?.full_name?.charAt(0) || user.email?.charAt(0) || 'U'}
+                                        </AvatarFallback>
+                                      </Avatar>
+                                      {task?.taskAssignees?.some(ta => ta.user.id === user.id) && (
+                                        <div className="absolute -bottom-1 -right-1 h-4 w-4 bg-emerald-500 rounded-full flex items-center justify-center">
+                                          <CheckSquare className="h-2.5 w-2.5 text-white" />
+                                        </div>
+                                      )}
+                                    </div>
+                                    <div className="flex-1">
+                                      <div className="font-medium text-sm">
+                                        {user.user_metadata?.full_name || user.email} 
+                                        <span className="text-xs text-slate-500 ml-1">(me)</span>
+                                        {task?.taskAssignees?.some(ta => ta.user.id === user.id) && (
+                                          <span className="text-xs text-emerald-600 ml-1">✓ Assigned</span>
+                                        )}
+                                      </div>
+                                      <div className="text-xs text-slate-500">{user.email}</div>
+                                    </div>
+                                  </CommandItem>
+                                )}
+                                {organizationMembers?.filter(member => member.id !== user?.id).map((member) => (
+                                  <CommandItem
+                                    key={member.id}
+                                    onSelect={() => handleAssignUser(member.id)}
+                                    className="flex items-center gap-3 p-3 cursor-pointer"
+                                  >
+                                    <div className="relative">
+                                      <Avatar className="h-8 w-8">
+                                        <AvatarImage src={member.avatarUrl || ''} />
+                                        <AvatarFallback className="bg-emerald-500 text-white text-sm">
+                                          {member.fullName?.charAt(0) || 'U'}
+                                        </AvatarFallback>
+                                      </Avatar>
+                                      {task?.taskAssignees?.some(ta => ta.user.id === member.id) && (
+                                        <div className="absolute -bottom-1 -right-1 h-4 w-4 bg-emerald-500 rounded-full flex items-center justify-center">
+                                          <CheckSquare className="h-2.5 w-2.5 text-white" />
+                                        </div>
+                                      )}
+                                    </div>
+                                    <div className="flex-1">
+                                      <div className="font-medium text-sm">
+                                        {member.fullName}
+                                        {task?.taskAssignees?.some(ta => ta.user.id === member.id) && (
+                                          <span className="text-xs text-emerald-600 ml-1">✓ Assigned</span>
+                                        )}
+                                      </div>
+                                      <div className="text-xs text-slate-500">{member.email}</div>
+                                    </div>
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </>
+                          )}
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                </div>
 
               {/* Priority */}
               <div>
@@ -1117,13 +1252,30 @@ export function ItemModal({
                   onValueChange={(value) => updateTask({ priority: value })}
                 >
                   <SelectTrigger className="w-full bg-white border-slate-200">
-                    <SelectValue />
+                    <SelectValue>
+                      {task?.priority && (
+                        <div className="flex items-center gap-2">
+                          <div className={cn("w-2 h-2 rounded-full", 
+                            task.priority === 'critical' ? 'bg-red-500' :
+                            task.priority === 'high' ? 'bg-orange-500' :
+                            task.priority === 'medium' ? 'bg-yellow-500' :
+                            'bg-green-500'
+                          )} />
+                          {PRIORITIES.find(p => p.id === task.priority)?.name || 'Medium'}
+                        </div>
+                      )}
+                    </SelectValue>
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent onCloseAutoFocus={(e) => e.preventDefault()}>
                     {PRIORITIES.map((priority) => (
                       <SelectItem key={priority.id} value={priority.id}>
                         <div className="flex items-center gap-2">
-                          <div className={cn("w-2 h-2 rounded-full", priority.color)} />
+                          <div className={cn("w-2 h-2 rounded-full", 
+                            priority.id === 'critical' ? 'bg-red-500' :
+                            priority.id === 'high' ? 'bg-orange-500' :
+                            priority.id === 'medium' ? 'bg-yellow-500' :
+                            'bg-green-500'
+                          )} />
                           {priority.name}
                         </div>
                       </SelectItem>
@@ -1135,45 +1287,91 @@ export function ItemModal({
               {/* Story Points */}
               <div>
                 <Label className="text-sm font-semibold text-slate-700 mb-3 block">STORY POINTS</Label>
-                <Select 
-                  value={task?.story_points?.toString() || '0'}
-                  onValueChange={(value) => updateTask({ story_points: parseInt(value) })}
-                >
-                  <SelectTrigger className="w-full bg-white border-slate-200">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {STORY_POINTS.map((point) => (
-                      <SelectItem key={point} value={point.toString()}>
-                        {point}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Popover modal={true}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="w-full justify-between bg-white border-slate-200"
+                    >
+                      <span>{task?.storyPoints || 0}</span>
+                      <ChevronDown className="h-4 w-4 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-full p-2" align="start">
+                    <div className="grid grid-cols-4 gap-1">
+                      {STORY_POINTS.map((point) => (
+                        <Button
+                          key={point}
+                          variant={task?.storyPoints === point ? "default" : "outline"}
+                          size="sm"
+                          className="w-full"
+                          onClick={async () => {
+                            await updateTask({ storyPoints: point });
+                          }}
+                        >
+                          {point}
+                        </Button>
+                      ))}
+                    </div>
+                  </PopoverContent>
+                </Popover>
               </div>
 
               {/* Due Date */}
               <div>
                 <Label className="text-sm font-semibold text-slate-700 mb-3 block">DUE DATE</Label>
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start text-slate-600 bg-white border-slate-200 hover:bg-slate-50"
-                >
-                  <CalendarDays className="h-4 w-4 mr-2" />
-                  {task?.due_date ? new Date(task.due_date).toLocaleDateString() : 'Set due date'}
-                </Button>
+                <Popover modal={true} open={dueDatePopoverOpen} onOpenChange={setDueDatePopoverOpen}>
+                  <PopoverTrigger asChild>
+                    <Button 
+                      variant="outline" 
+                      className="w-full justify-start text-slate-600 bg-white border-slate-200 hover:bg-slate-50"
+                    >
+                      <CalendarDays className="h-4 w-4 mr-2" />
+                      {task?.dueDate ? format(new Date(task.dueDate), 'PPP') : 'Set due date'}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0 z-50" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={task?.dueDate ? new Date(task.dueDate) : undefined}
+                      onSelect={async (date) => {
+                        if (date) {
+                          await updateTask({ dueDate: date.toISOString() });
+                          setDueDatePopoverOpen(false);
+                        }
+                      }}
+                      initialFocus
+                    />
+                    <div className="p-3 border-t">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full"
+                        onClick={async () => {
+                          await updateTask({ dueDate: null });
+                          setDueDatePopoverOpen(false);
+                        }}
+                      >
+                        Clear due date
+                      </Button>
+                    </div>
+                  </PopoverContent>
+                </Popover>
               </div>
 
               {/* Labels */}
               <div>
                 <Label className="text-sm font-semibold text-slate-700 mb-3 block">LABELS</Label>
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start text-slate-600 bg-white border-slate-200 hover:bg-slate-50"
-                >
-                  <Tag className="h-4 w-4 mr-2" />
-                  Add labels
-                </Button>
+                <LabelSelector
+                  boardId={task?.board?.id || ''}
+                  taskId={taskId}
+                  selectedLabels={task?.taskLabels?.map(tl => ({
+                    id: tl.label.id,
+                    name: tl.label.name,
+                    color: tl.label.color || '#3B82F6'
+                  })) || []}
+                  onTaskUpdate={fetchTask}
+                />
               </div>
 
               {/* Progress */}
@@ -1191,12 +1389,94 @@ export function ItemModal({
                     Based on completed checklist items and subtasks
                   </div>
                 </div>
-              </div>
-            </div>
+                </div>
+              </TabsContent>
+
+              {/* Activity Tab */}
+              <TabsContent value="activity" className="p-6 space-y-6">
+                {/* Worklog Section */}
+                <div>                  
+                  {/* Add Worklog Entry */}
+                  <Card className="border-slate-200 mb-4">
+                    <CardContent className="p-4">
+                      <div className="space-y-4">
+                        <div className="flex gap-3">
+                          <Input
+                            value={newWorklogHours}
+                            onChange={(e) => setNewWorklogHours(e.target.value)}
+                            placeholder="Hours (e.g., 2.5)"
+                            type="number"
+                            step="0.5"
+                            min="0"
+                            className="w-32 border-slate-200 focus:border-emerald-500 focus:ring-emerald-500"
+                          />
+                          <Input
+                            value={newWorklogDescription}
+                            onChange={(e) => setNewWorklogDescription(e.target.value)}
+                            placeholder="Work description..."
+                            className="flex-1 border-slate-200 focus:border-emerald-500 focus:ring-emerald-500"
+                          />
+                          <Button 
+                            onClick={addWorklogEntry}
+                            disabled={!newWorklogDescription.trim() || !newWorklogHours}
+                            className="bg-emerald-500 hover:bg-emerald-600"
+                          >
+                            <Timer className="h-4 w-4 mr-2" />
+                            Log Work
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Worklog Entries */}
+                  <div className="space-y-3">
+                    {worklogEntries.map((entry) => (
+                      <Card key={entry.id} className="border-slate-200">
+                        <CardContent className="p-4">
+                          <div className="flex items-start gap-3">
+                            <Avatar className="h-8 w-8">
+                              <AvatarImage src={entry.user.avatarUrl || ''} />
+                              <AvatarFallback className="text-xs bg-blue-500 text-white">
+                                {entry.user.fullName?.charAt(0) || 'U'}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="font-medium text-slate-900">
+                                  {entry.user.fullName || 'Unknown User'}
+                                </span>
+                                <Badge variant="outline" className="text-xs">
+                                  {entry.hoursLogged}h
+                                </Badge>
+                                <span className="text-xs text-slate-500">
+                                  {new Date(entry.dateLogged).toLocaleDateString()}
+                                </span>
+                              </div>
+                              <p className="text-slate-700">{entry.description}</p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+              </TabsContent>
+
+              {/* Relations Tab */}
+              <TabsContent value="relations" className="p-6">
+                <RelationsTab 
+                  taskId={taskId!} 
+                  task={task}
+                  onUpdate={onUpdate}
+                />
+              </TabsContent>
+            </Tabs>
           </div>
         </div>
       </DialogContent>
     </Dialog>
+    </>
   );
 }
 

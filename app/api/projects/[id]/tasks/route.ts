@@ -41,16 +41,33 @@ export async function GET(
     const tasks = await prisma.task.findMany({
       where: whereClause,
       include: {
-        assignee: {
+        taskAssignees: {
           select: {
-            id: true,
-            fullName: true,
-            avatarUrl: true
+            user: {
+              select: {
+                id: true,
+                fullName: true,
+                avatarUrl: true
+              }
+            }
           }
         },
         taskLabels: {
           include: {
             label: true
+          }
+        },
+        column: {
+          select: {
+            id: true,
+            name: true
+          }
+        },
+        sprintColumn: {
+          select: {
+            id: true,
+            name: true,
+            isDone: true
           }
         }
       },

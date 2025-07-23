@@ -365,13 +365,13 @@ export function useScrumBoard(boardId: string, projectId?: string) {
     return tasks?.filter(task => {
       if (status === 'backlog') {
         // Backlog items have no column assignment and no followup/sprint labels
-        return !task.columnId && !task.sprintColumnId && !task.labels?.includes('__followup__') && !task.labels?.includes('__sprint__')
+        return !task.columnId && !task.sprintColumnId && !task.taskLabels?.some(tl => tl.labelId === '__followup__') && !task.taskLabels?.some(tl => tl.labelId === '__sprint__')
       } else if (status === 'sprint') {
         // Sprint items have sprintColumnId assigned, are in sprint tasks, or have sprint marker
-        return task.sprintColumnId || task.sprintId || task.labels?.includes('__sprint__')
+        return task.sprintColumnId || task.sprintId || task.taskLabels?.some(tl => tl.labelId === '__sprint__')
       } else if (status === 'followup') {
         // Followup items have no column assignment but have followup label
-        return !task.columnId && !task.sprintColumnId && task.labels?.includes('__followup__')
+        return !task.columnId && !task.sprintColumnId && task.taskLabels?.some(tl => tl.labelId === '__followup__')
       }
       return false
     }) || []

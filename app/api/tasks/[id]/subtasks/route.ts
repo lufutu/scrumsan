@@ -41,13 +41,10 @@ export async function POST(
             }
           }
         },
-        sprintTasks: {
-          include: {
-            sprint: {
-              select: {
-                id: true,
-              }
-            }
+        sprint: {
+          select: {
+            id: true,
+            status: true
           }
         }
       }
@@ -122,8 +119,8 @@ export async function POST(
         boardId: parentTask.boardId,
         columnId: parentTask.columnId,
         sprintColumnId: parentTask.sprintColumnId,
+        sprintId: parentTask.sprintId, // Include sprint ID from parent
         parentId: parentTaskId,
-        assigneeId: validatedData.assigneeId,
         priority: validatedData.priority,
         storyPoints: validatedData.storyPoints,
         itemCode,
@@ -131,27 +128,48 @@ export async function POST(
         position: newPosition
       },
       include: {
-        assignee: {
+        taskAssignees: {
           select: {
-            id: true,
-            fullName: true,
-            avatarUrl: true
+            user: {
+              select: {
+                id: true,
+                fullName: true,
+                avatarUrl: true
+              }
+            }
           }
         }
       }
     })
-    
-    // If parent is in a sprint, add the subtask to the same sprint
-    if (parentTask.sprintTasks.length > 0) {
-      const activeSprint = parentTask.sprintTasks.find(st => st.sprint.status === 'active')?.sprint
-      if (activeSprint) {
-        await prisma.sprintTask.create({
-          data: {
-            taskId: subtask.id,
-            sprintId: activeSprint.id
+
+    // Create assignee relationship if provided
+    if (validatedData.assigneeId) {
+      await prisma.taskAssignee.create({
+        data: {
+          taskId: subtask.id,
+          userId: validatedData.assigneeId
+        }
+      })
+      
+      // Refetch the subtask with assignee data
+      const updatedSubtask = await prisma.task.findUnique({
+        where: { id: subtask.id },
+        include: {
+          taskAssignees: {
+            select: {
+              user: {
+                select: {
+                  id: true,
+                  fullName: true,
+                  avatarUrl: true
+                }
+              }
+            }
           }
-        })
-      }
+        }
+      })
+      
+      return NextResponse.json(updatedSubtask)
     }
 
     return NextResponse.json(subtask)

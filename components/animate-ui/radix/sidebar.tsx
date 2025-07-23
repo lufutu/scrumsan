@@ -1,10 +1,10 @@
 'use client';
 
 import * as React from 'react';
-import { Slot } from '@radix-ui/react-slot';
+import { Slot } from 'radix-ui';
 import { VariantProps, cva } from 'class-variance-authority';
 import { PanelLeftIcon } from 'lucide-react';
-import { type Transition } from 'framer-motion';
+import { type Transition } from 'motion/react';
 
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -453,7 +453,7 @@ function SidebarGroupLabel({
   asChild = false,
   ...props
 }: SidebarGroupLabelProps) {
-  const Comp = asChild ? Slot : 'div';
+  const Comp = asChild ? Slot.Root : 'div';
 
   return (
     <Comp
@@ -478,7 +478,7 @@ function SidebarGroupAction({
   asChild = false,
   ...props
 }: SidebarGroupActionProps) {
-  const Comp = asChild ? Slot : 'button';
+  const Comp = asChild ? Slot.Root : 'button';
 
   return (
     <Comp
@@ -592,7 +592,7 @@ function SidebarMenuButton({
   className,
   ...props
 }: SidebarMenuButtonProps) {
-  const Comp = asChild ? Slot : 'button';
+  const Comp = asChild ? Slot.Root : 'button';
   const { isMobile, state } = useSidebar();
 
   const button = (
@@ -644,7 +644,7 @@ function SidebarMenuAction({
   showOnHover = false,
   ...props
 }: SidebarMenuActionProps) {
-  const Comp = asChild ? Slot : 'button';
+  const Comp = asChild ? Slot.Root : 'button';
 
   return (
     <Comp
@@ -771,7 +771,7 @@ function SidebarMenuSubButton({
   className,
   ...props
 }: SidebarMenuSubButtonProps) {
-  const Comp = asChild ? Slot : 'a';
+  const Comp = asChild ? Slot.Root : 'a';
 
   return (
     <MotionHighlightItem activeClassName="bg-sidebar-accent text-sidebar-accent-foreground rounded-md">

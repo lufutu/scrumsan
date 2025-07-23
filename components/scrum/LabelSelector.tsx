@@ -16,11 +16,19 @@ import { toast } from 'sonner'
 
 interface LabelSelectorProps {
   boardId: string
+  taskId?: string // Optional: if provided, will directly update task labels
   selectedLabels?: Array<{ id: string; name: string; color: string }>
   onLabelsChange?: (labels: Array<{ id: string; name: string; color: string }>) => void
+  onTaskUpdate?: () => void // Called after task labels are updated
 }
 
-export default function LabelSelector({ boardId, selectedLabels = [], onLabelsChange }: LabelSelectorProps) {
+export default function LabelSelector({ 
+  boardId, 
+  taskId, 
+  selectedLabels = [], 
+  onLabelsChange,
+  onTaskUpdate 
+}: LabelSelectorProps) {
   const { labels, createLabel } = useLabels(boardId)
   const [isPopoverOpen, setIsPopoverOpen] = useState(false)
   const [showCreateForm, setShowCreateForm] = useState(false)
@@ -30,22 +38,48 @@ export default function LabelSelector({ boardId, selectedLabels = [], onLabelsCh
     color: '#3B82F6'
   })
 
-  const handleToggleLabel = (label: { id: string; name: string; color: string | null }) => {
+  const handleToggleLabel = async (label: { id: string; name: string; color: string | null }) => {
     const isSelected = selectedLabels.some(l => l.id === label.id)
+    
+    let newLabels: Array<{ id: string; name: string; color: string }>
     
     if (isSelected) {
       // Remove label
-      const newLabels = selectedLabels.filter(l => l.id !== label.id)
-      onLabelsChange?.(newLabels)
+      newLabels = selectedLabels.filter(l => l.id !== label.id)
     } else {
       // Add label
-      const newLabels = [...selectedLabels, {
+      newLabels = [...selectedLabels, {
         id: label.id,
         name: label.name,
         color: label.color || '#3B82F6'
       }]
-      onLabelsChange?.(newLabels)
     }
+    
+    // If taskId is provided, update the task directly
+    if (taskId) {
+      try {
+        const response = await fetch(`/api/tasks/${taskId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            labels: newLabels.map(l => l.id)
+          })
+        })
+        
+        if (!response.ok) {
+          throw new Error('Failed to update task labels')
+        }
+        
+        toast.success(isSelected ? 'Label removed' : 'Label added')
+        onTaskUpdate?.()
+      } catch (error) {
+        toast.error('Failed to update labels')
+        return // Don't update local state if API call failed
+      }
+    }
+    
+    // Update local state
+    onLabelsChange?.(newLabels)
   }
 
   const handleCreateLabel = async () => {
@@ -67,11 +101,32 @@ export default function LabelSelector({ boardId, selectedLabels = [], onLabelsCh
         name: label.name,
         color: label.color || '#3B82F6'
       }]
+      
+      // If taskId is provided, update the task directly
+      if (taskId) {
+        try {
+          const response = await fetch(`/api/tasks/${taskId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              labels: newLabels.map(l => l.id)
+            })
+          })
+          
+          if (!response.ok) {
+            throw new Error('Failed to assign label to task')
+          }
+          
+          onTaskUpdate?.()
+        } catch (error) {
+          toast.error('Failed to assign label to task')
+          return
+        }
+      }
+      
       onLabelsChange?.(newLabels)
-
       setNewLabelForm({ name: '', color: '#3B82F6' })
-      // Keep form open so users can create multiple labels
-      toast.success('Label created successfully')
+      toast.success('Label created and assigned')
     } catch (error) {
       toast.error('Failed to create label')
     } finally {
@@ -79,8 +134,32 @@ export default function LabelSelector({ boardId, selectedLabels = [], onLabelsCh
     }
   }
 
-  const handleRemoveLabel = (labelId: string) => {
+  const handleRemoveLabel = async (labelId: string) => {
     const newLabels = selectedLabels.filter(l => l.id !== labelId)
+    
+    // If taskId is provided, update the task directly
+    if (taskId) {
+      try {
+        const response = await fetch(`/api/tasks/${taskId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            labels: newLabels.map(l => l.id)
+          })
+        })
+        
+        if (!response.ok) {
+          throw new Error('Failed to remove label from task')
+        }
+        
+        toast.success('Label removed')
+        onTaskUpdate?.()
+      } catch (error) {
+        toast.error('Failed to remove label')
+        return
+      }
+    }
+    
     onLabelsChange?.(newLabels)
   }
 
@@ -141,12 +220,17 @@ export default function LabelSelector({ boardId, selectedLabels = [], onLabelsCh
                     <Input
                       id="new-label-name"
                       value={newLabelForm.name}
-                      onChange={(e) => setNewLabelForm(prev => ({ ...prev, name: e.target.value }))}
+                      onChange={(e) => {
+                        e.stopPropagation()
+                        setNewLabelForm(prev => ({ ...prev, name: e.target.value }))
+                      }}
                       placeholder="Label name"
                       className="h-8 text-sm"
                       autoFocus
                       onClick={(e) => e.stopPropagation()}
+                      onFocus={(e) => e.stopPropagation()}
                       onKeyDown={(e) => {
+                        e.stopPropagation()
                         if (e.key === 'Enter' && !isCreating) {
                           handleCreateLabel()
                         }
@@ -160,18 +244,24 @@ export default function LabelSelector({ boardId, selectedLabels = [], onLabelsCh
                         id="new-label-color"
                         type="color"
                         value={newLabelForm.color}
-                        onChange={(e) => setNewLabelForm(prev => ({ ...prev, color: e.target.value }))}
+                        onChange={(e) => {
+                          e.stopPropagation()
+                          setNewLabelForm(prev => ({ ...prev, color: e.target.value }))
+                        }}
+                        onClick={(e) => e.stopPropagation()}
                         className="w-8 h-8 border rounded cursor-pointer"
                       />
                       <span className="text-xs text-gray-500">{newLabelForm.color}</span>
                     </div>
                   </div>
                   <Button 
+                    type="button"
                     onClick={(e) => {
                       e.preventDefault()
                       e.stopPropagation()
                       handleCreateLabel()
-                    }} 
+                    }}
+                    onMouseDown={(e) => e.stopPropagation()}
                     disabled={!newLabelForm.name.trim() || isCreating}
                     size="sm"
                     className="w-full"

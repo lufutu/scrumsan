@@ -60,11 +60,15 @@ export async function GET(
             tasks: {
               orderBy: { createdAt: 'asc' },
               include: {
-                assignee: {
+                taskAssignees: {
                   select: {
-                    id: true,
-                    fullName: true,
-                    avatarUrl: true
+                    user: {
+                      select: {
+                        id: true,
+                        fullName: true,
+                        avatarUrl: true
+                      }
+                    }
                   }
                 }
               }

@@ -41,11 +41,15 @@ export async function GET(
             priority: true,
             storyPoints: true,
             estimatedHours: true,
-            assignee: {
+            taskAssignees: {
               select: {
-                id: true,
-                fullName: true,
-                avatarUrl: true
+                user: {
+                  select: {
+                    id: true,
+                    fullName: true,
+                    avatarUrl: true
+                  }
+                }
               }
             },
             creator: {
@@ -204,11 +208,15 @@ export async function PATCH(
             id: true,
             title: true,
             storyPoints: true,
-            assignee: {
+            taskAssignees: {
               select: {
-                id: true,
-                fullName: true,
-                avatarUrl: true
+                user: {
+                  select: {
+                    id: true,
+                    fullName: true,
+                    avatarUrl: true
+                  }
+                }
               }
             }
           }

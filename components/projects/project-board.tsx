@@ -21,30 +21,7 @@ import { useTasks } from '@/hooks/useTasks'
 import { useUsers } from '@/hooks/useUsers'
 import { useLabels } from '@/hooks/useLabels'
 
-type BoardColumn = {
-  id: string
-  name: string
-  position: number
-  tasks: Array<{
-    id: string
-    title: string
-    description: string | null
-    taskType: string | null
-    priority: string | null
-    storyPoints: number | null
-    assigneeId: string | null
-    createdAt: string
-    assignee?: {
-      id: string
-      fullName: string | null
-      avatarUrl: string | null
-    } | null
-  }>
-}
-
-interface ProjectBoardProps {
-  projectId: string
-}
+import { BoardColumn, ProjectBoardProps } from '@/types/shared';
 
 export default function ProjectBoard({ projectId }: ProjectBoardProps) {
   const { toast } = useToast()
@@ -487,13 +464,17 @@ export default function ProjectBoard({ projectId }: ProjectBoardProps) {
                       description={task.description}
                       taskType={task.taskType as 'story' | 'bug' | 'task' | 'epic' | 'improvement' | 'idea' | 'note' || 'task'}
                       storyPoints={task.storyPoints || 0}
-                      assignee={task.assignee ? {
-                        name: task.assignee.fullName || '',
-                        initials: task.assignee.fullName?.split(' ').map(n => n[0]).join('') || '',
-                        avatar: task.assignee.avatarUrl
-                      } : undefined}
+                      assignees={task.taskAssignees?.map((ta: any) => ({
+                        id: ta.user.id,
+                        name: ta.user.fullName || 'Unknown User',
+                        avatar: ta.user.avatarUrl || undefined,
+                        initials: ta.user.fullName?.split(' ').map((n: string) => n[0]).join('') || 'U'
+                      })) || []}
+                      organizationId={board.organizationId}
+                      boardId={board.id}
                       status={'todo'}
                       onClick={() => setSelectedTask(task)}
+                      onAssigneesChange={() => mutate()}
                     />
                   </div>
                 ))}
@@ -582,7 +563,7 @@ export default function ProjectBoard({ projectId }: ProjectBoardProps) {
           onClose={() => setSelectedTask(null)}
           taskId={selectedTask.id}
           onUpdate={() => {
-            setSelectedTask(null);
+            mutate();
           }}
         />
       )}

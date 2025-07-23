@@ -14,7 +14,7 @@ import useSWR, { mutate } from 'swr'
 import { useSupabase } from '@/providers/supabase-provider'
 import { useLabels } from '@/hooks/useLabels'
 import { useUsers } from '@/hooks/useUsers'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion, AnimatePresence } from 'motion/react'
 import {
   DndContext,
   DragEndEvent,
@@ -61,58 +61,8 @@ import {
 } from '@/components/ui/select'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-
-interface Sprint {
-  id: string
-  name: string
-  goal?: string | null
-  status?: string | null
-  startDate?: string | null
-  endDate?: string | null
-  position: number
-  isBacklog: boolean
-  isDeleted: boolean
-  isFinished: boolean
-  maxColumns?: number | null
-  boardId: string
-  tasks?: Task[]
-  _count?: {
-    tasks: number
-  }
-}
-
-interface Task {
-  id: string
-  title: string
-  description?: string | null
-  taskType?: string | null
-  priority?: string | null
-  storyPoints?: number | null
-  assignee?: {
-    id: string
-    fullName: string | null
-    email: string
-    avatarUrl?: string | null
-  } | null
-  boardId: string
-  columnId?: string | null
-  sprintColumnId?: string | null
-  sprintId?: string | null
-  position?: number | null
-  labels?: string[]
-}
-
 import { BoardData } from '@/hooks/useBoardData'
-
-interface ProductBacklogRedesignedProps {
-  boardId: string
-  organizationId?: string
-  projectId?: string
-  initialTaskId?: string | null
-  boardColor?: string | null
-  boardData?: BoardData | null
-  onDataChange?: () => void
-}
+import { Sprint, Task, ProductBacklogProps as ProductBacklogRedesignedProps } from '@/types/shared'
 
 const fetcher = (url: string) => fetch(url).then(res => res.json())
 
@@ -120,11 +70,13 @@ const fetcher = (url: string) => fetch(url).then(res => res.json())
 function DraggableTask({ 
   task, 
   onTaskClick,
-  labels
+  labels,
+  boardId
 }: { 
   task: Task
   onTaskClick?: (task: Task) => void
   labels: Array<{ id: string; name: string; color: string | null }>
+  boardId: string
 }) {
   const {
     attributes,
@@ -145,43 +97,57 @@ function DraggableTask({
     <motion.div
       layout
       layoutId={task.id}
-      initial={{ opacity: 0, scale: 0.9 }}
+      initial={{ opacity: 0, scale: 0.95, y: 10 }}
       animate={{ 
         opacity: isDragging ? 0.5 : 1, 
         scale: isDragging ? 0.95 : 1,
+        y: 0
       }}
-      exit={{ opacity: 0, scale: 0.9 }}
+      exit={{ opacity: 0, scale: 0.9, y: -10 }}
       transition={{
-        layout: { type: "spring", damping: 25, stiffness: 300 },
-        opacity: { duration: 0.2 },
-        scale: { duration: 0.2 }
+        layout: { 
+          type: "spring", 
+          damping: 20, 
+          stiffness: 300,
+          mass: 0.8
+        },
+        opacity: { duration: 0.15 },
+        scale: { duration: 0.15 },
+        y: { duration: 0.15 }
       }}
       ref={setNodeRef} 
       style={style} 
       {...attributes} 
       {...listeners}
       className="cursor-grab active:cursor-grabbing"
-      whileHover={{ scale: 1.02 }}
-      whileTap={{ scale: 0.98 }}
+      whileHover={{ scale: 1.01, transition: { duration: 0.1 } }}
+      whileTap={{ scale: 0.98, transition: { duration: 0.1 } }}
     >
       <TaskCardModern
         id={task.id}
         itemCode={task.id}
         title={task.title}
-        description={task.description}
+        description={task.description || ''}
         taskType={task.taskType as any}
-        storyPoints={task.storyPoints}
+        storyPoints={task.storyPoints || 0}
         priority={task.priority as any}
-        assignee={task.assignee ? {
-          name: task.assignee.fullName || task.assignee.email,
-          initials: (task.assignee.fullName || task.assignee.email).split(' ').map(n => n[0]).join('').toUpperCase(),
-          avatar: task.assignee.avatarUrl
-        } : undefined}
-        labels={task.labels ? labels.filter(l => task.labels?.includes(l.id)).map(l => ({
-          name: l.name,
-          color: l.color || '#6B7280'
+        assignees={task.taskAssignees?.map((ta: any) => ({
+          id: ta.user.id,
+          name: ta.user.fullName || ta.user.email || 'Unknown User',
+          avatar: ta.user.avatarUrl || undefined,
+          initials: ta.user.fullName?.split(' ').map((n: string) => n[0]).join('') || 'U'
+        })) || []}
+        labels={task.taskLabels ? task.taskLabels.map(tl => ({
+          id: tl.label.id,
+          name: tl.label.name,
+          color: tl.label.color || '#6B7280'
         })) : []}
+        organizationId={task.board?.organizationId}
+        boardId={boardId}
         onClick={!isDragging ? () => onTaskClick?.(task) : undefined}
+        onAssigneesChange={() => {
+          // This could trigger a refetch if needed
+        }}
       />
     </motion.div>
   )
@@ -197,17 +163,19 @@ function DroppableSprintColumn({
   labels,
   users,
   boardColor,
-  isActiveSprint
+  isActiveSprint,
+  boardId
 }: { 
   sprint: Sprint
   tasks: Task[]
   onTaskClick?: (task: Task) => void
   onSprintAction: (action: string, sprintId: string) => void
-  onAddTask?: (sprintId: string, data: any) => Promise<void>
+  onAddTask?: (sprintId: string, data: unknown) => Promise<void>
   labels: Array<{ id: string; name: string; color: string | null }>
   users: Array<{ id: string; fullName: string; email: string }>
   boardColor?: string | null
   isActiveSprint: boolean
+  boardId: string
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: sprint.id })
   const [showAddForm, setShowAddForm] = useState(false)
@@ -313,27 +281,31 @@ function DroppableSprintColumn({
       </div>
 
       {/* Sprint Tasks */}
-      <div className="p-4 space-y-3 max-h-[600px] overflow-y-auto">
+      <div 
+        className="p-4 space-y-3 max-h-[600px] overflow-y-auto"
+      >
         <SortableContext items={tasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
-          <AnimatePresence mode="popLayout">
+          <AnimatePresence mode="popLayout" initial={false}>
             {tasks.length === 0 ? (
               <motion.div 
                 key="empty"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.2 }}
                 className="text-center py-8 text-gray-400"
               >
                 <p className="text-sm">No items in this sprint</p>
                 <p className="text-xs mt-1">Drag items here to add them</p>
               </motion.div>
             ) : (
-              tasks.map(task => (
+              tasks.map((task, index) => (
                 <DraggableTask 
-                  key={task.id} 
+                  key={task.id}
                   task={task} 
                   onTaskClick={onTaskClick}
                   labels={labels}
+                  boardId={boardId}
                 />
               ))
             )}
@@ -781,7 +753,7 @@ export default function ProductBacklogRedesigned({
       setStartSprintData({ dueDate: '', goal: '' })
       
       // Redirect to the active sprint view
-      router.push(`/boards/${boardId}/sprint-backlog?sprintId=${startingSprintId}`)
+      router.push(`/sprints/${startingSprintId}/active`)
     } catch (error: any) {
       toast.error(error.message)
     }
@@ -868,6 +840,7 @@ export default function ProductBacklogRedesigned({
                   users={users || []}
                   boardColor={boardColor}
                   isActiveSprint={sprint.id === activeSprint?.id}
+                  boardId={boardId}
                 />
               ))}
             </SortableContext>
@@ -875,15 +848,21 @@ export default function ProductBacklogRedesigned({
 
           <DragOverlay 
             dropAnimation={{
-              duration: 300,
+              duration: 250,
               easing: 'cubic-bezier(0.18, 0.67, 0.6, 1.22)',
             }}
           >
             {activeTask && (
-              <div 
-                className="rotate-3 scale-105 shadow-2xl"
+              <motion.div 
+                className="rotate-2 scale-105 shadow-2xl"
                 style={{
                   filter: 'drop-shadow(0 20px 25px rgb(0 0 0 / 0.15)) drop-shadow(0 10px 10px rgb(0 0 0 / 0.04))',
+                }}
+                initial={{ rotate: 0, scale: 1 }}
+                animate={{ 
+                  rotate: 2, 
+                  scale: 1.05,
+                  transition: { duration: 0.15, ease: "easeOut" }
                 }}
               >
                 <TaskCardModern
@@ -898,12 +877,13 @@ export default function ProductBacklogRedesigned({
                     initials: (activeTask.assignee.fullName || activeTask.assignee.email).split(' ').map(n => n[0]).join('').toUpperCase(),
                     avatar: activeTask.assignee.avatarUrl
                   } : undefined}
-                  labels={activeTask.labels ? labels.filter(l => activeTask.labels?.includes(l.id)).map(l => ({
-                    name: l.name,
-                    color: l.color || '#6B7280'
+                  labels={activeTask.taskLabels ? activeTask.taskLabels.map(tl => ({
+                    id: tl.label.id,
+                    name: tl.label.name,
+                    color: tl.label.color || '#6B7280'
                   })) : []}
                 />
-              </div>
+              </motion.div>
             )}
           </DragOverlay>
         </DndContext>
@@ -917,7 +897,6 @@ export default function ProductBacklogRedesigned({
           taskId={selectedTask.id}
           onUpdate={() => {
             mutateTasks()
-            setSelectedTask(null)
           }}
         />
       )}

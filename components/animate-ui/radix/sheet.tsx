@@ -1,13 +1,13 @@
 'use client';
 
 import * as React from 'react';
-import * as SheetPrimitive from '@radix-ui/react-dialog';
+import { Dialog as SheetPrimitive } from 'radix-ui';
 import {
   AnimatePresence,
   motion,
   type HTMLMotionProps,
   type Transition,
-} from 'framer-motion';
+} from 'motion/react';
 import { cva, type VariantProps } from 'class-variance-authority';
 import { X } from 'lucide-react';
 

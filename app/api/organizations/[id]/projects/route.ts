@@ -21,6 +21,7 @@ export async function GET(
     const { id: organizationId } = await params
     const { searchParams } = new URL(req.url)
     const overview = searchParams.get('overview') === 'true'
+    const limit = searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : undefined
     
     const supabase = await createClient()
     const user = await getCurrentUser(supabase)
@@ -100,7 +101,8 @@ export async function GET(
       include: includeClause,
       orderBy: {
         createdAt: 'desc'
-      }
+      },
+      ...(limit && { take: limit })
     })
     
     return NextResponse.json(projects)

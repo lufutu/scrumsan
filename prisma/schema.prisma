@@ -28,8 +28,6 @@ model User {
   projectMembers      ProjectMember[]
   createdProjects     Project[]            @relation("ProjectCreator")
   createdBoards       Board[]              @relation("BoardCreator")
-  assignedTasks       Task[]               @relation("TaskAssignee")
-  reviewedTasks       Task[]               @relation("TaskReviewer")
   createdTasks        Task[]               @relation("TaskCreator")
   comments            Comment[]
   attachments         Attachment[]         @relation
@@ -201,10 +199,7 @@ model Task {
   effortUnits      Int?      @map("effort_units") // Alternative to story points
   estimationType   String?   @default("story_points") @map("estimation_type") // "story_points" or "effort_units"
   itemValue        String?   @map("item_value") // Business value separate from effort (XS, S, M, L, XL, XXL)
-  labels           String[]
   position         Int?
-  assigneeId       String?   @map("assignee_id") @db.Uuid
-  reviewerId       String?   @map("reviewer_id") @db.Uuid
   createdBy        String?   @map("created_by") @db.Uuid
   dueDate          DateTime? @map("due_date") @db.Date
   isPriority       Boolean   @default(false) @map("is_priority") // Priority flag
@@ -221,8 +216,6 @@ model Task {
   subtasks          Task[]         @relation("EpicTasks")
   parent            Task?          @relation("ParentSubitems", fields: [parentId], references: [id])
   subitems          Task[]         @relation("ParentSubitems")
-  assignee          User?          @relation("TaskAssignee", fields: [assigneeId], references: [id])
-  reviewer          User?          @relation("TaskReviewer", fields: [reviewerId], references: [id])
   creator           User?          @relation("TaskCreator", fields: [createdBy], references: [id])
   comments          Comment[]
   attachments       Attachment[]

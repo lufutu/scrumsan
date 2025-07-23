@@ -15,7 +15,7 @@ const taskSchema = z.object({
   estimationType: z.enum(['story_points', 'effort_units']).optional(),
   itemValue: z.string().optional(),
   estimatedHours: z.number().optional(),
-  labels: z.array(z.string()).optional(), // Allow array of strings
+  labels: z.array(z.string()).optional(), // Array of label IDs for junction table
   assignees: z.array(z.object({
     id: z.string()
   })).optional(),
@@ -92,11 +92,20 @@ export async function GET(req: NextRequest) {
     const tasks = await prisma.task.findMany({
       where: whereClause,
       include: {
-        assignee: {
+        taskAssignees: {
           select: {
-            id: true,
-            fullName: true,
-            avatarUrl: true
+            user: {
+              select: {
+                id: true,
+                fullName: true,
+                avatarUrl: true
+              }
+            }
+          }
+        },
+        taskLabels: {
+          include: {
+            label: true
           }
         },
         creator: {
@@ -130,11 +139,52 @@ export async function GET(req: NextRequest) {
             title: true
           }
         },
+        // Include relation data to avoid separate API calls
+        parent: {
+          select: {
+            id: true,
+            title: true,
+            taskType: true,
+            itemCode: true
+          }
+        },
+        relationsAsTarget: {
+          where: {
+            relationType: 'blocks'
+          },
+          select: {
+            sourceTask: {
+              select: {
+                id: true,
+                title: true,
+                taskType: true,
+                itemCode: true
+              }
+            }
+          }
+        },
+        relationsAsSource: {
+          where: {
+            relationType: 'blocks'
+          },
+          select: {
+            targetTask: {
+              select: {
+                id: true,
+                title: true,
+                taskType: true,
+                itemCode: true
+              }
+            }
+          }
+        },
         _count: {
           select: {
             comments: true,
             attachments: true,
-            subtasks: true
+            subtasks: true,
+            relationsAsSource: true,
+            relationsAsTarget: true
           }
         }
       },
@@ -220,7 +270,7 @@ export async function POST(req: NextRequest) {
         estimationType: validatedData.estimationType || 'story_points',
         itemValue: validatedData.itemValue,
         estimatedHours: validatedData.estimatedHours || 0,
-        labels: validatedData.labels || [],
+        // labels removed - handled via junction table below
         boardId: validatedData.boardId,
         columnId: validatedData.columnId,
         sprintColumnId: sprintColumnId, // Use calculated sprint column ID
@@ -233,11 +283,20 @@ export async function POST(req: NextRequest) {
         createdBy: user.id
       },
       include: {
-        assignee: {
+        taskAssignees: {
           select: {
-            id: true,
-            fullName: true,
-            avatarUrl: true
+            user: {
+              select: {
+                id: true,
+                fullName: true,
+                avatarUrl: true
+              }
+            }
+          }
+        },
+        taskLabels: {
+          include: {
+            label: true
           }
         },
         creator: {
@@ -297,7 +356,16 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    // Labels are now handled directly as string array in the task creation above
+    // Handle labels via junction table
+    if (validatedData.labels && validatedData.labels.length > 0) {
+      await prisma.taskLabel.createMany({
+        data: validatedData.labels.map(labelId => ({
+          taskId: task.id,
+          labelId: labelId
+        })),
+        skipDuplicates: true
+      })
+    }
 
     // Handle custom field values
     if (validatedData.customFieldValues && validatedData.customFieldValues.length > 0) {
