@@ -443,13 +443,6 @@ export function TaskCardModern({
                     </Avatar>
                   )}
                 </div>
-              ) : assignee ? (
-                <Avatar className="h-8 w-8 border-2 border-green-500 cursor-pointer">
-                  <AvatarImage src={assignee.avatar || ''} />
-                  <AvatarFallback className="text-xs bg-blue-500 text-white">
-                    {assignee.initials}
-                  </AvatarFallback>
-                </Avatar>
               ) : (
                 <Avatar className="h-8 w-8 border-2 border-green-500 cursor-pointer bg-gray-100 hover:bg-green-200 transition-colors">
                   <AvatarFallback className="text-lg bg-green-100 text-green-600 hover:bg-green-200">
