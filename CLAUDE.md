@@ -504,29 +504,50 @@ import { motion } from 'framer-motion' // DON'T USE
 3. **Update CLAUDE.md**: When new library versions or syntax changes are discovered
 4. **Verify compatibility**: Always test build and runtime after updating library usage
 
-## 🚨 CRITICAL: Auto-Commit Rule
+## 🚨 CRITICAL: Auto-Commit Rule (ZERO TOLERANCE)
 
-### ALWAYS Auto-Commit After Completing Tasks
-- **MANDATORY**: After completing each user request or chat prompt, create a git commit
-- **Purpose**: Create restore checkpoints for rollback if needed
-- **Commit Message Format**: 
-  ```
-  🤖 Auto-commit: [Brief description of changes]
-  
-  - [Key change 1]
-  - [Key change 2]
-  - [Key change 3]
-  
-  🤖 Generated with Claude Code
-  Co-Authored-By: Claude <noreply@anthropic.com>
-  ```
+### ⚠️ MANDATORY AUTO-COMMIT AFTER EVERY USER REQUEST ⚠️
+- **ABSOLUTE REQUIREMENT**: Must create git commit after completing ANY user request
+- **NO EXCEPTIONS**: This rule applies to ALL changes, no matter how small
+- **ENFORCEMENT**: If auto-commit is skipped, immediately create one when reminded
+- **PURPOSE**: Create restore checkpoints for rollback if needed
 
-### Auto-Commit Protocol
-1. **After task completion**: Always run `git add .` followed by `git commit`
-2. **Include all changes**: Stage all modified files in the working directory
-3. **Descriptive messages**: Clearly describe what was accomplished
-4. **Build verification**: Only commit if build/tests pass
-5. **Restore capability**: Each commit serves as a checkpoint for potential rollback
+### 🔴 WHEN TO AUTO-COMMIT (Always Required)
+- ✅ After fixing any error or bug
+- ✅ After adding/modifying any code 
+- ✅ After updating any file or configuration
+- ✅ After creating new files or utilities
+- ✅ After refactoring or optimization changes
+- ✅ After schema updates or database changes
+- ✅ After any kind of code improvement
+- ✅ Even for single-line changes or typo fixes
+
+### 📝 Standard Commit Message Format
+```bash
+🤖 Auto-commit: [Brief description of changes]
+
+- [Key change 1]
+- [Key change 2] 
+- [Key change 3]
+
+🤖 Generated with Claude Code
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+```
+
+### 🔄 Auto-Commit Protocol (Mandatory Steps)
+1. **STEP 1**: Complete the user's request
+2. **STEP 2**: IMMEDIATELY run `git add .`
+3. **STEP 3**: IMMEDIATELY run `git commit -m "..."` with descriptive message
+4. **STEP 4**: Verify commit succeeded with `git status`
+5. **FAILURE TO FOLLOW**: If reminded about missing auto-commit, create it immediately
+
+### 🎯 Auto-Commit Benefits
+- ✅ **Checkpoint Creation**: Every change can be easily reverted
+- ✅ **Progress Tracking**: Clear history of all modifications
+- ✅ **Collaboration**: Transparent record of all AI-assisted changes
+- ✅ **Safety Net**: User can restore to any previous state
+- ✅ **Accountability**: Complete audit trail of development work
 
 ### When to Auto-Commit
 - ✅ After fixing bugs or performance issues
