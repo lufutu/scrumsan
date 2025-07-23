@@ -12,6 +12,7 @@ import { ComprehensiveInlineForm } from '@/components/scrum/ComprehensiveInlineF
 import { ItemModal } from '@/components/scrum/ItemModal'
 import { useUsers } from '@/hooks/useUsers'
 import { useLabels } from '@/hooks/useLabels'
+import { Task } from '@/types/shared'
 
 type Board = {
   id: string
@@ -127,10 +128,10 @@ export default function StandaloneBoardView({ board, onUpdate }: StandaloneBoard
 
     try {
       let sourceColumn: BoardColumn | null = null
-      let task: BoardColumn['tasks'][0] | null = null
+      let task: Task | null = null
 
       for (const column of board.columns) {
-        const foundTask = column.tasks.find(t => t.id === draggedTask)
+        const foundTask = column.tasks.find((t: Task) => t.id === draggedTask)
         if (foundTask) {
           sourceColumn = column
           task = foundTask
@@ -226,7 +227,7 @@ export default function StandaloneBoardView({ board, onUpdate }: StandaloneBoard
                     </div>
                   ) : (
                     <>
-                      {column.tasks.map((task) => (
+                      {column.tasks.map((task: Task) => (
                         <div
                           key={task.id}
                           draggable
@@ -236,7 +237,7 @@ export default function StandaloneBoardView({ board, onUpdate }: StandaloneBoard
                           <TaskCardModern
                             id={task.id}
                             title={task.title}
-                            description={task.description}
+                            description={task.description || ''}
                             taskType={task.taskType as 'story' | 'bug' | 'task' | 'epic' | 'improvement' | 'idea' | 'note' || 'task'}
                             storyPoints={task.storyPoints || 0}
                             assignees={task.taskAssignees?.map((ta: any) => ({

@@ -39,7 +39,6 @@ export function TaskCardModern({
   title,
   taskType,
   storyPoints,
-  assignee,
   assignees = [],
   labels = [],
   priority,

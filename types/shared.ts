@@ -27,7 +27,6 @@ export interface Task {
   taskType?: string | null
   priority?: string | null
   storyPoints?: number | null
-  assignee?: User | null // Legacy field - use taskAssignees instead
   boardId: string
   columnId?: string | null
   sprintColumnId?: string | null
@@ -139,11 +138,6 @@ export interface TaskCardProps {
   description?: string
   taskType: 'story' | 'bug' | 'task' | 'epic' | 'improvement' | 'idea' | 'note'
   storyPoints?: number
-  assignee?: {
-    name: string
-    avatar?: string
-    initials: string
-  }
   assignees?: Array<{
     id: string
     name: string
