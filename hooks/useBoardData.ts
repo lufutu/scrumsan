@@ -2,6 +2,7 @@
 
 import useSWR from 'swr'
 import { useState, useEffect } from 'react'
+import { Task, Board, Sprint } from '@/types/shared'
 
 const fetcher = (url: string) => fetch(url).then(res => {
   if (!res.ok) {
@@ -20,61 +21,10 @@ export interface BoardData {
   activeSprint: Sprint | null
 }
 
-interface Board {
-  id: string
-  name: string
-  boardType: string | null
-  organizationId: string
-  description: string | null
-  color: string | null
-  createdAt: string
-  organization?: {
-    id: string
-    name: string
-  } | null
-}
-
-interface Sprint {
-  id: string
-  name: string
-  goal?: string | null
-  status?: string | null
-  startDate?: string | null
-  endDate?: string | null
-  position: number
-  isBacklog: boolean
-  isDeleted: boolean
-  isFinished: boolean
-  boardId: string
-  _count?: {
-    tasks: number
-  }
-}
-
 interface SprintDetail extends Sprint {
   tasks?: Task[]
 }
 
-interface Task {
-  id: string
-  title: string
-  description?: string | null
-  taskType?: string | null
-  priority?: string | null
-  storyPoints?: number | null
-  assignee?: {
-    id: string
-    fullName: string | null
-    email: string
-    avatarUrl?: string | null
-  } | null
-  boardId: string
-  columnId?: string | null
-  sprintColumnId?: string | null
-  sprintId?: string | null
-  position?: number | null
-  labels?: string[]
-}
 
 interface Label {
   id: string

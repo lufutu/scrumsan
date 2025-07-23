@@ -1,60 +1,12 @@
 import useSWR from 'swr'
 import { useCallback } from 'react'
 import { toast } from 'sonner'
+import { Sprint } from '@/types/shared'
 
 const fetcher = (url: string) => fetch(url).then(res => {
   if (!res.ok) throw new Error('Failed to fetch')
   return res.json()
 })
-
-export interface Sprint {
-  id: string
-  name: string
-  goal: string | null
-  status: string | null
-  startDate: string | null
-  endDate: string | null
-  boardId: string | null
-  projectId: string | null
-  createdAt: string
-  board?: {
-    id: string
-    name: string
-    organizationId: string | null
-  } | null
-  project?: {
-    id: string
-    name: string
-  } | null
-  sprintTasks?: Array<{
-    id: string
-    task: {
-      id: string
-      title: string
-      description: string | null
-      status: string | null
-      taskType: string | null
-      priority: string | null
-      storyPoints: number | null
-      assignee?: {
-        id: string
-        fullName: string | null
-        avatarUrl: string | null
-      } | null
-    }
-  }>
-  analytics?: Array<{
-    id: string
-    date: string
-    remainingPoints: number | null
-    completedPoints: number | null
-    addedPoints: number | null
-    removedPoints: number | null
-  }>
-  _count?: {
-    sprintTasks: number
-  }
-}
 
 export function useSprints(boardId?: string, projectId?: string, organizationId?: string, status?: string) {
   const params = new URLSearchParams()

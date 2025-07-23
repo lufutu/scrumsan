@@ -62,7 +62,7 @@ import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import TaskCard from '@/components/tasks/task-card'
 import BurndownChart from './BurndownChart'
-import { Sprint } from '@/hooks/useSprints'
+import { Sprint, Task } from '@/types/shared'
 import { useSprintColumns } from '@/hooks/useSprintColumns'
 import { toast } from 'sonner'
 
@@ -173,17 +173,18 @@ export default function SprintBacklogView({
       initializeDefaultColumns()
     }
   }, [columnsLoading, columns.length, initializeDefaultColumns])
-
-  const sprintTasks = sprint.sprintTasks || []
+  
+  const sprintTasks: Task[] = sprint.tasks || []
+  console.log('sprintTasks', sprintTasks)
   const totalTasks = sprintTasks.length
-  const completedTasks = 0
-  const inProgressTasks = 0
-  const todoTasks = sprintTasks.length
+  const completedTasks = sprintTasks.filter(st => st.done)  
+  const todoTasks = sprintTasks.filter(st => !st.done).length
+  const inProgressTasks = todoTasks || 0
 
-  const totalStoryPoints = sprintTasks.reduce((sum, st) => sum + (st.task.storyPoints || 0), 0)
-  const completedStoryPoints = 0
+  const totalStoryPoints = sprintTasks.reduce((sum, st) => sum + (st.storyPoints || 0), 0)
+  const completedStoryPoints = completedTasks.reduce((sum, st) => sum + (st.storyPoints || 0), 0)
 
-  const completionPercentage = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0
+  const completionPercentage = totalTasks > 0 ? (completedTasks.length / totalTasks) * 100 : 0
   const storyPointsPercentage = totalStoryPoints > 0 ? (completedStoryPoints / totalStoryPoints) * 100 : 0
 
   // Calculate days remaining
@@ -196,8 +197,8 @@ export default function SprintBacklogView({
 
   // Filter and search tasks
   const filteredTasks = sprintTasks.filter(st => {
-    const matchesSearch = st.task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (st.task.description?.toLowerCase() || '').includes(searchTerm.toLowerCase())
+    const matchesSearch = st.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                        (st.description?.toLowerCase() || '').includes(searchTerm.toLowerCase())
     const matchesFilter = true
     return matchesSearch && matchesFilter
   })
@@ -210,7 +211,7 @@ export default function SprintBacklogView({
     // Filter column tasks based on search and filter criteria
     return column.tasks.filter(task => {
       const matchesSearch = task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           (task.description?.toLowerCase() || '').includes(searchTerm.toLowerCase())
+                          (task.description?.toLowerCase() || '').includes(searchTerm.toLowerCase())
       const matchesFilter = true
       return matchesSearch && matchesFilter
     })

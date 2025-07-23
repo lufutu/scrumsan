@@ -116,7 +116,7 @@ export async function GET(
       status: string | null
       startDate: string | null
       endDate: string | null
-      tasks: any[]
+      tasks: unknown[]
     }>)
 
     // Calculate statistics

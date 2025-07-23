@@ -46,7 +46,9 @@ export interface Task {
   checklistsCount?: number
   completedChecklists?: number
   subitemsCount?: number
-  status?: 'todo' | 'in_progress' | 'done' // Column-based status, not stored in DB
+  relationsAsSource?: Task[]
+  relationsAsTarget?: Task[]
+  done?: boolean // which belong to sprint column marked as done
 }
 
 export interface Sprint {

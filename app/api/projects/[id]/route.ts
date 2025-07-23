@@ -79,10 +79,10 @@ export async function GET(
     }
     
     return NextResponse.json(project)
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error fetching project:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch project' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch project' },
       { status: 500 }
     )
   }
@@ -119,7 +119,7 @@ export async function PATCH(
     }
     
     // Prepare update data
-    const updateData: any = {}
+    const updateData: Record<string, unknown> = {}
     if (validatedData.name) updateData.name = validatedData.name
     if (validatedData.description !== undefined) updateData.description = validatedData.description
     if (validatedData.clientName !== undefined) updateData.clientName = validatedData.clientName
@@ -167,7 +167,7 @@ export async function PATCH(
     })
     
     return NextResponse.json(project)
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error updating project:', error)
     if (error instanceof z.ZodError) {
       return NextResponse.json(
@@ -176,7 +176,7 @@ export async function PATCH(
       )
     }
     return NextResponse.json(
-      { error: error.message || 'Failed to update project' },
+      { error: error instanceof Error ? error.message : 'Failed to update project' },
       { status: 500 }
     )
   }
@@ -212,10 +212,10 @@ export async function DELETE(
     })
     
     return NextResponse.json({ success: true })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error deleting project:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to delete project' },
+      { error: error instanceof Error ? error.message : 'Failed to delete project' },
       { status: 500 }
     )
   }

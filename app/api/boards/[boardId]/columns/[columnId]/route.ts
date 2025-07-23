@@ -71,7 +71,7 @@ export async function PATCH(
     }
     
     // Prepare update data
-    const updateData: any = {}
+    const updateData: { name?: string; position?: number } = {}
     if (validatedData.name !== undefined) updateData.name = validatedData.name
     if (validatedData.position !== undefined) updateData.position = validatedData.position
     
@@ -112,7 +112,7 @@ export async function PATCH(
     })
     
     return NextResponse.json(column)
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error updating board column:', error)
     if (error instanceof z.ZodError) {
       return NextResponse.json(
@@ -121,7 +121,7 @@ export async function PATCH(
       )
     }
     return NextResponse.json(
-      { error: error.message || 'Failed to update board column' },
+      { error: error instanceof Error ? error.message : 'Failed to update board column' },
       { status: 500 }
     )
   }
@@ -202,10 +202,10 @@ export async function DELETE(
     })
     
     return NextResponse.json({ success: true })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error deleting board column:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to delete board column' },
+      { error: error instanceof Error ? error.message : 'Failed to delete board column' },
       { status: 500 }
     )
   }

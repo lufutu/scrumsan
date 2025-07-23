@@ -9,9 +9,6 @@ const memberSchema = z.object({
   role: z.enum(['owner', 'admin', 'member']),
 })
 
-const memberUpdateSchema = z.object({
-  role: z.enum(['owner', 'admin', 'member']),
-})
 
 export async function GET(
   req: NextRequest,
@@ -56,10 +53,10 @@ export async function GET(
     })
     
     return NextResponse.json(members)
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error fetching project members:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch project members' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch project members' },
       { status: 500 }
     )
   }
@@ -144,7 +141,7 @@ export async function POST(
     })
     
     return NextResponse.json(newMember)
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error adding project member:', error)
     if (error instanceof z.ZodError) {
       return NextResponse.json(
@@ -153,7 +150,7 @@ export async function POST(
       )
     }
     return NextResponse.json(
-      { error: error.message || 'Failed to add project member' },
+      { error: error instanceof Error ? error.message : 'Failed to add project member' },
       { status: 500 }
     )
   }

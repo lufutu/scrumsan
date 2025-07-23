@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
     const status = url.searchParams.get('status')
     const includeDetails = url.searchParams.get('includeDetails') === 'true'
     
-    let whereClause: any = {
+    const whereClause: Record<string, unknown> = {
       isDeleted: false // Always exclude deleted sprints
     }
     
@@ -154,10 +154,10 @@ export async function GET(req: NextRequest) {
     })
     
     return NextResponse.json(sprints)
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error fetching sprints:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch sprints' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch sprints' },
       { status: 500 }
     )
   }
@@ -265,7 +265,7 @@ export async function POST(req: NextRequest) {
     })
 
     return NextResponse.json(sprint)
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error creating sprint:', error)
     if (error instanceof z.ZodError) {
       return NextResponse.json(
@@ -274,7 +274,7 @@ export async function POST(req: NextRequest) {
       )
     }
     return NextResponse.json(
-      { error: error.message || 'Failed to create sprint' },
+      { error: error instanceof Error ? error.message : 'Failed to create sprint' },
       { status: 500 }
     )
   }

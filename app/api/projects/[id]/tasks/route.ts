@@ -27,7 +27,7 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
     
-    let whereClause: any = {
+    const whereClause: Record<string, unknown> = {
       projectId: projectId
     }
     
@@ -78,10 +78,10 @@ export async function GET(
     })
     
     return NextResponse.json(tasks)
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error fetching project tasks:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch tasks' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch tasks' },
       { status: 500 }
     )
   }

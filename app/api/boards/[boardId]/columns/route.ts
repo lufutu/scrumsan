@@ -103,10 +103,10 @@ export async function GET(
     })
     
     return NextResponse.json(columns)
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error fetching board columns:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch board columns' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch board columns' },
       { status: 500 }
     )
   }
@@ -212,7 +212,7 @@ export async function POST(
     })
 
     return NextResponse.json(column)
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error creating board column:', error)
     if (error instanceof z.ZodError) {
       return NextResponse.json(
@@ -221,7 +221,7 @@ export async function POST(
       )
     }
     return NextResponse.json(
-      { error: error.message || 'Failed to create board column' },
+      { error: error instanceof Error ? error.message : 'Failed to create board column' },
       { status: 500 }
     )
   }

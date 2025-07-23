@@ -196,7 +196,7 @@ export async function GET(req: NextRequest) {
         { createdAt: 'desc' }
       ]
     })
-    
+    console.log('tasks', tasks)
     return NextResponse.json(tasks)
   } catch (error: any) {
     console.error('Error fetching tasks:', error)
