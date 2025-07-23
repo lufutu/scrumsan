@@ -28,7 +28,6 @@ export interface Task {
   priority?: string | null
   storyPoints?: number | null
   boardId?: string
-  assigneeId?: string | null // For compatibility with legacy data
   columnId?: string | null
   sprintColumnId?: string | null
   sprintId?: string | null
