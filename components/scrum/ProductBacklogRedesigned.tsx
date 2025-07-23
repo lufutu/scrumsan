@@ -170,7 +170,14 @@ function DroppableSprintColumn({
   tasks: Task[]
   onTaskClick?: (task: Task) => void
   onSprintAction: (action: string, sprintId: string) => void
-  onAddTask?: (sprintId: string, data: unknown) => Promise<void>
+  onAddTask?: (sprintId: string, data: {
+    title: string;
+    taskType: string;
+    assigneeId?: string;
+    labels?: string[];
+    storyPoints?: number;
+    priority?: string;
+  }) => Promise<void>
   labels: Array<{ id: string; name: string; color: string | null }>
   users: Array<{ id: string; fullName: string; email: string }>
   boardColor?: string | null
@@ -383,8 +390,8 @@ export default function ProductBacklogRedesigned({
   
   const sprintsLoading = !boardData
   const tasksLoading = !boardData
-  const sprintsError = null
-  const tasksError = null
+  const sprintsError: any = null
+  const tasksError: any = null
 
   // Mutation functions - trigger parent data refresh
   const mutateSprints = onDataChange || (() => {})
@@ -394,11 +401,11 @@ export default function ProductBacklogRedesigned({
   }
 
   // Filter sprints
-  const visibleSprints = sprints.filter(s => !s.isDeleted && (showFinishedSprints || !s.isFinished))
+  const visibleSprints = sprints.filter((s: Sprint) => !s.isDeleted && (showFinishedSprints || !s.isFinished))
 
   // Group tasks by sprint
   const getTasksForSprint = (sprintId: string) => {
-    const sprint = sprintDetails.find(s => s.id === sprintId) || sprints.find(s => s.id === sprintId)
+    const sprint = sprintDetails.find((s: Sprint) => s.id === sprintId) || sprints.find((s: Sprint) => s.id === sprintId)
     if (!sprint) return []
     
     // For all sprints (including backlog), return tasks directly from tasks relation
@@ -426,7 +433,7 @@ export default function ProductBacklogRedesigned({
   )
 
   const handleDragStart = (event: DragStartEvent) => {
-    const task = tasks.find(t => t.id === event.active.id)
+    const task = tasks.find((t: Task) => t.id === event.active.id)
     if (task) {
       setActiveTask(task)
     }
@@ -442,21 +449,21 @@ export default function ProductBacklogRedesigned({
     const overId = over.id as string
 
     // Find the dragged task
-    const activeTask = tasks.find(t => t.id === activeId)
+    const activeTask = tasks.find((t: Task) => t.id === activeId)
     if (!activeTask) return
 
     // Check if we're dropping on a task or a sprint
-    const overTask = tasks.find(t => t.id === overId)
-    const overSprint = sprints.find(s => s.id === overId)
+    const overTask = tasks.find((t: Task) => t.id === overId)
+    const overSprint = sprints.find((s: Sprint) => s.id === overId)
 
     if (overTask && activeTask.sprintId === overTask.sprintId) {
       // Reordering within the same sprint
       const sprintTasks = tasks
-        .filter(t => t.sprintId === activeTask.sprintId)
-        .sort((a, b) => (a.position || 0) - (b.position || 0))
+        .filter((t: Task) => t.sprintId === activeTask.sprintId)
+        .sort((a: Task, b: Task) => (a.position || 0) - (b.position || 0))
 
-      const oldIndex = sprintTasks.findIndex(t => t.id === activeId)
-      const newIndex = sprintTasks.findIndex(t => t.id === overId)
+      const oldIndex = sprintTasks.findIndex((t: Task) => t.id === activeId)
+      const newIndex = sprintTasks.findIndex((t: Task) => t.id === overId)
 
       if (oldIndex !== newIndex) {
         // Calculate new positions for all affected tasks
@@ -465,7 +472,7 @@ export default function ProductBacklogRedesigned({
         reorderedTasks.splice(newIndex, 0, movedTask)
 
         // Optimistic update - immediately show the new order
-        const updatedTasks = tasks.map(task => {
+        const updatedTasks = tasks.map((task: Task) => {
           const reorderedIndex = reorderedTasks.findIndex(t => t.id === task.id)
           if (reorderedIndex !== -1) {
             return { ...task, position: reorderedIndex }
@@ -502,11 +509,11 @@ export default function ProductBacklogRedesigned({
       return // No need to move if already in the same sprint
     }
 
-    const targetSprint = sprints.find(s => s.id === targetSprintId)
+    const targetSprint = sprints.find((s: Sprint) => s.id === targetSprintId)
     if (!targetSprint) return
 
     // Optimistic update - immediately move task to target sprint
-    const updatedTasks = tasks.map(t => {
+    const updatedTasks = tasks.map((t: Task) => {
       if (t.id === activeId) {
         return { ...t, sprintId: targetSprintId }
       }
@@ -538,7 +545,7 @@ export default function ProductBacklogRedesigned({
   }
 
   const handleSprintAction = async (action: string, sprintId: string) => {
-    const sprint = sprints.find(s => s.id === sprintId)
+    const sprint = sprints.find((s: Sprint) => s.id === sprintId)
     if (!sprint) return
 
     switch (action) {
@@ -688,7 +695,7 @@ export default function ProductBacklogRedesigned({
     priority?: string;
   }) => {
     try {
-      const sprint = sprints.find(s => s.id === sprintId)
+      const sprint = sprints.find((s: Sprint) => s.id === sprintId)
       if (!sprint) {
         toast.error('Sprint not found')
         return
@@ -728,7 +735,7 @@ export default function ProductBacklogRedesigned({
   const handleStartSprint = async () => {
     if (!startingSprintId) return
 
-    const sprint = sprints.find(s => s.id === startingSprintId)
+    const sprint = sprints.find((s: Sprint) => s.id === startingSprintId)
     if (!sprint) return
 
     try {
@@ -825,10 +832,10 @@ export default function ProductBacklogRedesigned({
         >
           <div className="flex gap-4 p-6 min-h-full">
             <SortableContext 
-              items={visibleSprints.map(s => s.id)} 
+              items={visibleSprints.map((s: Sprint) => s.id)} 
               strategy={horizontalListSortingStrategy}
             >
-              {visibleSprints.map(sprint => (
+              {visibleSprints.map((sprint: Sprint) => (
                 <DroppableSprintColumn
                   key={sprint.id}
                   sprint={sprint}
@@ -867,21 +874,25 @@ export default function ProductBacklogRedesigned({
               >
                 <TaskCardModern
                   id={activeTask.id}
+                  itemCode={activeTask.id}
                   title={activeTask.title}
                   description={activeTask.description || ''}
                   taskType={activeTask.taskType as any}
                   storyPoints={activeTask.storyPoints || 0}
                   priority={activeTask.priority as any}
-                  assignee={activeTask.assignee ? {
-                    name: activeTask.assignee.fullName || activeTask.assignee.email,
-                    initials: (activeTask.assignee.fullName || activeTask.assignee.email).split(' ').map(n => n[0]).join('').toUpperCase(),
-                    avatar: activeTask.assignee.avatarUrl
-                  } : undefined}
+                  assignees={activeTask.taskAssignees?.map((ta: any) => ({
+                    id: ta.user.id,
+                    name: ta.user.fullName || ta.user.email || 'Unknown User',
+                    avatar: ta.user.avatarUrl || undefined,
+                    initials: ta.user.fullName?.split(' ').map((n: string) => n[0]).join('') || 'U'
+                  })) || []}
                   labels={activeTask.taskLabels ? activeTask.taskLabels.map(tl => ({
                     id: tl.label.id,
                     name: tl.label.name,
                     color: tl.label.color || '#6B7280'
                   })) : []}
+                  organizationId={activeTask.board?.organizationId}
+                  boardId={boardId}
                 />
               </motion.div>
             )}

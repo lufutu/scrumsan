@@ -16,6 +16,10 @@ export interface TaskReviewer {
   user: User
 }
 
+export interface TaskLabel {
+  label: Label
+}
+
 export interface Task {
   id: string
   title: string
@@ -31,6 +35,7 @@ export interface Task {
   position?: number | null
   taskAssignees?: TaskAssignee[]
   taskReviewers?: TaskReviewer[]
+  taskLabels?: TaskLabel[]
   labels?: string[]
   dueDate?: string | null
   createdAt?: string

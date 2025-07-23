@@ -120,7 +120,9 @@ export function ComprehensiveInlineForm({
   }, [input])
 
   const calculateDropdownPosition = () => {
-    if (!containerRef.current || !inputRef.current) return null
+    if (!containerRef.current || !inputRef.current) {
+      return null
+    }
     
     const containerRect = containerRef.current.getBoundingClientRect()
     const inputRect = inputRef.current.getBoundingClientRect()
@@ -145,9 +147,14 @@ export function ComprehensiveInlineForm({
       if (spaceIndex === -1) {
         // No space after #, show dropdown
         setFilterQuery(afterHash.toLowerCase())
-        const position = calculateDropdownPosition()
-        setDropdownPosition(position)
-        setShowDropdown(true)
+        // Add small delay to ensure proper positioning after render
+        setTimeout(() => {
+          const position = calculateDropdownPosition()
+          if (position) {
+            setDropdownPosition(position)
+            setShowDropdown(true)
+          }
+        }, 0)
       } else {
         setShowDropdown(false)
         setDropdownPosition(null)
@@ -413,8 +420,8 @@ export function ComprehensiveInlineForm({
       </div>
 
       {/* Comprehensive Dropdown Portal */}
-      {showDropdown && filteredItems.length > 0 && dropdownPosition && (
-        typeof window !== 'undefined' && createPortal(
+      {showDropdown && filteredItems.length > 0 && dropdownPosition && typeof window !== 'undefined' && (
+        createPortal(
           <div 
             ref={dropdownRef}
             className="fixed bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] max-h-80 overflow-y-auto"
