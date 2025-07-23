@@ -136,6 +136,13 @@ export async function GET(req: NextRequest) {
             name: true
           }
         },
+        sprintColumn: {
+          select: {
+            id: true,
+            name: true,
+            isDone: true
+          }
+        },
         epic: {
           select: {
             id: true,
@@ -202,12 +209,19 @@ export async function GET(req: NextRequest) {
         { createdAt: 'desc' }
       ]
     })
-    console.log('tasks', JSON.stringify(tasks))
-    return NextResponse.json(tasks)
-  } catch (error: any) {
+    
+    // Map tasks to include the 'done' attribute based on sprint column isDone
+    const tasksWithDoneStatus = tasks.map(task => ({
+      ...task,
+      done: task.sprintColumn?.isDone || false
+    }))
+    
+    console.log('tasks', JSON.stringify(tasksWithDoneStatus))
+    return NextResponse.json(tasksWithDoneStatus)
+  } catch (error: unknown) {
     console.error('Error fetching tasks:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch tasks' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch tasks' },
       { status: 500 }
     )
   }
@@ -330,6 +344,13 @@ export async function POST(req: NextRequest) {
             name: true
           }
         },
+        sprintColumn: {
+          select: {
+            id: true,
+            name: true,
+            isDone: true
+          }
+        },
         epic: {
           select: {
             id: true,
@@ -395,8 +416,14 @@ export async function POST(req: NextRequest) {
 
     // Real-time updates are automatically handled by Supabase when data changes
 
-    return NextResponse.json(task)
-  } catch (error: any) {
+    // Add done attribute based on sprint column isDone status
+    const taskWithDoneStatus = {
+      ...task,
+      done: task.sprintColumn?.isDone || false
+    }
+
+    return NextResponse.json(taskWithDoneStatus)
+  } catch (error: unknown) {
     console.error('Error creating task:', error)
     if (error instanceof z.ZodError) {
       return NextResponse.json(
@@ -405,7 +432,7 @@ export async function POST(req: NextRequest) {
       )
     }
     return NextResponse.json(
-      { error: error.message || 'Failed to create task' },
+      { error: error instanceof Error ? error.message : 'Failed to create task' },
       { status: 500 }
     )
   }

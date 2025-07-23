@@ -18,34 +18,34 @@ export async function GET(req: NextRequest) {
   try {
     const supabase = await createClient()
     const user = await getCurrentUser(supabase)
-    
+
     const url = new URL(req.url)
     const boardId = url.searchParams.get('boardId')
     const organizationId = url.searchParams.get('organizationId')
     const status = url.searchParams.get('status')
     const includeDetails = url.searchParams.get('includeDetails') === 'true'
-    
+
     let whereClause: Record<string, unknown> = {
       isDeleted: false // Always exclude deleted sprints
     }
-    
+
     // Filter by board
     if (boardId) {
       whereClause.boardId = boardId
-      
+
       // Check if user has access to the board
       const board = await prisma.board.findUnique({
         where: { id: boardId },
         include: { organization: true }
       })
-      
+
       if (!board) {
         return NextResponse.json(
           { error: 'Board not found' },
           { status: 404 }
         )
       }
-      
+
       // Check if user is a member of the organization
       const orgMember = await prisma.organizationMember.findFirst({
         where: {
@@ -53,7 +53,7 @@ export async function GET(req: NextRequest) {
           userId: user.id
         }
       })
-      
+
       if (!orgMember) {
         return NextResponse.json(
           { error: 'Unauthorized' },
@@ -61,7 +61,7 @@ export async function GET(req: NextRequest) {
         )
       }
     }
-    
+
     // Filter by organization
     if (organizationId && !boardId) {
       // Check if user is a member of the organization
@@ -71,14 +71,14 @@ export async function GET(req: NextRequest) {
           userId: user.id
         }
       })
-      
+
       if (!orgMember) {
         return NextResponse.json(
           { error: 'Unauthorized' },
           { status: 403 }
         )
       }
-      
+
       // Get sprints from boards in this organization
       whereClause = {
         board: {
@@ -86,7 +86,7 @@ export async function GET(req: NextRequest) {
         }
       }
     }
-    
+
     // If no specific filters, get all sprints user has access to
     if (!boardId && !organizationId) {
       // Get all organizations user is member of
@@ -94,19 +94,19 @@ export async function GET(req: NextRequest) {
         where: { userId: user.id },
         select: { organizationId: true }
       })
-      
+
       whereClause = {
         board: {
           organizationId: { in: userOrgs.map(o => o.organizationId) }
         }
       }
     }
-    
+
     // Filter by status
     if (status) {
       whereClause.status = status
     }
-    
+
     const includeClause = includeDetails ? {
       board: {
         select: {
@@ -124,6 +124,17 @@ export async function GET(req: NextRequest) {
                   id: true,
                   fullName: true,
                   avatarUrl: true
+                }
+              }
+            }
+          },
+          taskLabels: {
+            select: {
+              label: {
+                select: {
+                  id: true,
+                  color: true,
+                  name: true
                 }
               }
             }
@@ -145,7 +156,7 @@ export async function GET(req: NextRequest) {
         }
       }
     }
-    
+
     const sprints = await prisma.sprint.findMany({
       where: whereClause,
       include: includeClause as Prisma.SprintInclude,
@@ -153,7 +164,7 @@ export async function GET(req: NextRequest) {
         position: 'asc'
       }
     })
-    
+
     return NextResponse.json(sprints)
   } catch (error: unknown) {
     console.error('Error fetching sprints:', error)
@@ -168,26 +179,26 @@ export async function POST(req: NextRequest) {
   try {
     const supabase = await createClient()
     const body = await req.json()
-    
+
     // Validate input
     const validatedData = sprintSchema.parse(body)
-    
+
     // Get current user
     const user = await getCurrentUser(supabase)
-    
+
     // Validate that user has access to the board
     const board = await prisma.board.findUnique({
       where: { id: validatedData.boardId },
       include: { organization: true }
     })
-    
+
     if (!board) {
       return NextResponse.json(
         { error: 'Board not found' },
         { status: 404 }
       )
     }
-    
+
     // Check if user is a member of the organization
     const orgMember = await prisma.organizationMember.findFirst({
       where: {
@@ -195,25 +206,25 @@ export async function POST(req: NextRequest) {
         userId: user.id
       }
     })
-    
+
     if (!orgMember) {
       return NextResponse.json(
         { error: 'You are not a member of this organization' },
         { status: 403 }
       )
     }
-    
+
     // Get the highest position for ordering
     const lastSprint = await prisma.sprint.findFirst({
-      where: { 
+      where: {
         boardId: validatedData.boardId,
         isDeleted: false
       },
       orderBy: { position: 'desc' }
     })
-    
+
     const nextPosition = (lastSprint?.position ?? 0) + 1
-    
+
     // Create sprint with default columns in a transaction
     const sprint = await prisma.$transaction(async (tx) => {
       // Create the sprint
@@ -228,21 +239,21 @@ export async function POST(req: NextRequest) {
           position: nextPosition,
         }
       })
-      
+
       // Create default columns for the sprint
       const defaultColumns = [
         { name: 'To Do', position: 0, isDone: false },
         { name: 'In Progress', position: 1, isDone: false },
         { name: 'Done', position: 2, isDone: true }
       ]
-      
+
       await tx.sprintColumn.createMany({
         data: defaultColumns.map(col => ({
           ...col,
           sprintId: newSprint.id
         }))
       })
-      
+
       // Return sprint with all relationships
       return await tx.sprint.findUnique({
         where: { id: newSprint.id },

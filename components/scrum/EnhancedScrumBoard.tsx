@@ -536,7 +536,7 @@ export default function EnhancedScrumBoard({
                         <TaskCardModern
                           id={task.id}
                           title={task.title}
-                          description={task.description}
+                          description={task.description || ''}
                           taskType={task.taskType as any}
                           storyPoints={task.storyPoints || 0}
                           assignees={task.taskAssignees?.map((ta: any) => ({
@@ -545,7 +545,6 @@ export default function EnhancedScrumBoard({
                             avatar: ta.user.avatarUrl || undefined,
                             initials: ta.user.fullName?.split(' ').map((n: string) => n[0]).join('') || 'U'
                           })) || []}
-                          organizationId={board?.organizationId}
                           boardId={boardId}
                           labels={task.taskLabels?.map((tl: any) => ({
                             id: tl.label.id,
@@ -598,7 +597,7 @@ export default function EnhancedScrumBoard({
                               <TaskCardModern
                                 id={task.id}
                                 title={task.title}
-                                description={task.description}
+                                description={task.description || ''}
                                 taskType={task.taskType as any}
                                 storyPoints={task.storyPoints || 0}
                                 assignees={task.taskAssignees?.map((ta: any) => ({
@@ -607,9 +606,12 @@ export default function EnhancedScrumBoard({
                                   avatar: ta.user.avatarUrl || undefined,
                                   initials: ta.user.fullName?.split(' ').map((n: string) => n[0]).join('') || 'U'
                                 })) || []}
-                                organizationId={board?.organizationId}
                                 boardId={boardId}
-                                labels={[]}
+                                labels={task.taskLabels?.map((tl: any) => ({
+                                  id: tl.label.id,
+                                  name: tl.label.name,
+                                  color: tl.label.color
+                                })) || []}
                                 onClick={() => setSelectedTask(task)}
                                 onAssigneesChange={() => {
                                   // Trigger refetch if needed

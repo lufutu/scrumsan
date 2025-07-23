@@ -907,6 +907,7 @@ export default function ProductBacklogRedesigned({
           taskId={selectedTask.id}
           onUpdate={() => {
             mutateTasks()
+            mutateSprints() // Also invalidate sprints cache since sprint.tasks contains the updated task data
           }}
         />
       )}

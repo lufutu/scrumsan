@@ -37,7 +37,9 @@ export const junctionFields = {
   reviewers: z.array(z.object({ 
     id: commonFields.uuid 
   })).optional(),
-  labels: z.array(commonFields.uuid).optional(),
+  labels: z.array(z.object({ 
+    id: commonFields.uuid 
+  })).optional(),
   customFieldValues: z.array(z.object({
     customFieldId: commonFields.uuid,
     value: z.string()

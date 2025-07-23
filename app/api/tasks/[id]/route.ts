@@ -81,6 +81,13 @@ export async function GET(
             name: true
           }
         },
+        sprintColumn: {
+          select: {
+            id: true,
+            name: true,
+            isDone: true
+          }
+        },
         epic: {
           select: {
             id: true,
@@ -159,11 +166,17 @@ export async function GET(
       )
     }
     
-    return NextResponse.json(task)
-  } catch (error: any) {
+    // Add done attribute based on sprint column isDone status
+    const taskWithDoneStatus = {
+      ...task,
+      done: task.sprintColumn?.isDone || false
+    }
+    
+    return NextResponse.json(taskWithDoneStatus)
+  } catch (error: unknown) {
     console.error('Error fetching task:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch task' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch task' },
       { status: 500 }
     )
   }
@@ -357,10 +370,16 @@ export async function PATCH(
           }
         }
       }
-    }) as any
+    })
     
-    return NextResponse.json(task)
-  } catch (error: any) {
+    // Add done attribute based on sprint column isDone status
+    const taskWithDoneStatus = {
+      ...task,
+      done: task.sprintColumn?.isDone || false
+    }
+    
+    return NextResponse.json(taskWithDoneStatus)
+  } catch (error: unknown) {
     console.error('Error updating task:', error)
     if (error instanceof z.ZodError) {
       return NextResponse.json(
@@ -369,7 +388,7 @@ export async function PATCH(
       )
     }
     return NextResponse.json(
-      { error: error.message || 'Failed to update task' },
+      { error: error instanceof Error ? error.message : 'Failed to update task' },
       { status: 500 }
     )
   }
