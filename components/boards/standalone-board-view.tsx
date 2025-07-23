@@ -250,7 +250,7 @@ export default function StandaloneBoardView({ board, onUpdate }: StandaloneBoard
                                     boardId: board.id,
                                     columnId: column.id,
                                     taskType: data.taskType,
-                                    labels: data.taskLabels || [],
+                                    labels: data.labels || [],
                                     taskAssignees: data.assignees || [],
                                     priority: data.priority,
                                     storyPoints: data.storyPoints,
@@ -355,7 +355,7 @@ export default function StandaloneBoardView({ board, onUpdate }: StandaloneBoard
                     <TaskCardModern
                       id={task.id}
                       title={task.title}
-                      description={task.description}
+                      description={task.description || ''}
                       taskType={task.taskType as 'story' | 'bug' | 'task' | 'epic' | 'improvement' | 'idea' | 'note' || 'task'}
                       storyPoints={task.storyPoints || 0}
                       assignees={task.taskAssignees?.map((ta: any) => ({
@@ -399,11 +399,10 @@ export default function StandaloneBoardView({ board, onUpdate }: StandaloneBoard
                             },
                             body: JSON.stringify({
                               title: data.title,
-                              projectId: board.projectId,
                               boardId: board.id,
                               columnId: column.id,
                               taskType: data.taskType,
-                              assigneeId: data.assigneeId,
+                              assignees: data.assignees || [],
                               labels: data.labels || [],
                               priority: data.priority,
                               storyPoints: data.storyPoints,

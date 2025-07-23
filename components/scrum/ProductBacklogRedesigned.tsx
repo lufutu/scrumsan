@@ -358,10 +358,7 @@ function DroppableSprintColumn({
 }
 
 export default function ProductBacklogRedesigned({ 
-  boardId, 
-  organizationId, 
-  projectId,
-  initialTaskId,
+  boardId,
   boardColor,
   boardData,
   onDataChange
@@ -411,6 +408,7 @@ export default function ProductBacklogRedesigned({
     
     // For all sprints (including backlog), return tasks directly from tasks relation
     if (!sprint.tasks) return []
+    console.log('sprint.tasks', sprint.tasks)
     return sprint.tasks
   }
 

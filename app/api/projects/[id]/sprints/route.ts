@@ -37,10 +37,8 @@ export async function GET(
         boardId: { in: boardIds }
       },
       include: {
-        sprintTasks: {
+        tasks: {
           include: {
-            task: {
-              include: {
                 taskAssignees: {
                   select: {
                     user: {
@@ -51,13 +49,20 @@ export async function GET(
                       }
                     }
                   }
+                },
+                taskLabels: {
+                  select: {
+                    label: {
+                      select: {
+                        id: true,
+                        name: true,
+                        color: true
+                      }
+                    }
+                  }
                 }
               }
             }
-          }
-        },
-        sprintColumns: {
-          orderBy: { position: 'asc' }
         }
       },
       orderBy: {
