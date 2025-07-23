@@ -59,10 +59,10 @@ export async function GET(
     })
     
     return NextResponse.json(linkedBoards)
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error fetching project boards:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch project boards' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch project boards' },
       { status: 500 }
     )
   }
@@ -155,7 +155,7 @@ export async function POST(
     
     
     return NextResponse.json(projectBoard)
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error linking board to project:', error)
     if (error instanceof z.ZodError) {
       return NextResponse.json(
@@ -164,7 +164,7 @@ export async function POST(
       )
     }
     return NextResponse.json(
-      { error: error.message || 'Failed to link board to project' },
+      { error: error instanceof Error ? error.message : 'Failed to link board to project' },
       { status: 500 }
     )
   }
@@ -221,10 +221,10 @@ export async function DELETE(
     
     
     return NextResponse.json({ success: true })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error unlinking board from project:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to unlink board from project' },
+      { error: error instanceof Error ? error.message : 'Failed to unlink board from project' },
       { status: 500 }
     )
   }

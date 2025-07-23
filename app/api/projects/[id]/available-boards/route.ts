@@ -79,10 +79,10 @@ export async function GET(
     })
     
     return NextResponse.json(availableBoards)
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error fetching available boards:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch available boards' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch available boards' },
       { status: 500 }
     )
   }

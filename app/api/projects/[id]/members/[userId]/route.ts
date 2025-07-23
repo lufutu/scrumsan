@@ -75,7 +75,7 @@ export async function PATCH(
     })
     
     return NextResponse.json(updatedMember)
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error updating project member:', error)
     if (error instanceof z.ZodError) {
       return NextResponse.json(
@@ -84,7 +84,7 @@ export async function PATCH(
       )
     }
     return NextResponse.json(
-      { error: error.message || 'Failed to update project member' },
+      { error: error instanceof Error ? error.message : 'Failed to update project member' },
       { status: 500 }
     )
   }
@@ -154,10 +154,10 @@ export async function DELETE(
     })
     
     return NextResponse.json({ success: true })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error removing project member:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to remove project member' },
+      { error: error instanceof Error ? error.message : 'Failed to remove project member' },
       { status: 500 }
     )
   }

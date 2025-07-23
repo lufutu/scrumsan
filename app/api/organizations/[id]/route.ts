@@ -57,10 +57,10 @@ export async function GET(
     }
     
     return NextResponse.json(organization)
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error fetching organization:', error);
     return NextResponse.json(
-      { message: error.message || 'Failed to fetch organization' },
+      { message: error instanceof Error ? error.message : 'Failed to fetch organization' },
       { status: 500 }
     )
   }
@@ -111,7 +111,7 @@ export async function PATCH(
     })
     
     return NextResponse.json(organization)
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error updating organization:', error);
     if (error instanceof z.ZodError) {
       return NextResponse.json(
@@ -120,7 +120,7 @@ export async function PATCH(
       )
     }
     return NextResponse.json(
-      { message: error.message || 'Failed to update organization' },
+      { message: error instanceof Error ? error.message : 'Failed to update organization' },
       { status: 500 }
     )
   }
@@ -158,10 +158,10 @@ export async function DELETE(
     })
     
     return NextResponse.json({ success: true })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error fetching organization:', error);
     return NextResponse.json(
-      { message: error.message || 'Failed to fetch organization' },
+      { message: error instanceof Error ? error.message : 'Failed to fetch organization' },
       { status: 500 }
     )
   }

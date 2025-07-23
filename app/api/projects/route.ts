@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
     const url = new URL(req.url)
     const organizationId = url.searchParams.get('organizationId')
     
-    const whereClause: any = {
+    const whereClause: Record<string, unknown> = {
       members: {
         some: {
           userId: user.id
@@ -75,10 +75,10 @@ export async function GET(req: NextRequest) {
     })
     
     return NextResponse.json(projects)
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error fetching projects:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch projects' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch projects' },
       { status: 500 }
     )
   }
@@ -163,7 +163,7 @@ export async function POST(req: NextRequest) {
     })
 
     return NextResponse.json(project)
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error creating project:', error)
     if (error instanceof z.ZodError) {
       return NextResponse.json(
@@ -172,7 +172,7 @@ export async function POST(req: NextRequest) {
       )
     }
     return NextResponse.json(
-      { error: error.message || 'Failed to create project' },
+      { error: error instanceof Error ? error.message : 'Failed to create project' },
       { status: 500 }
     )
   }
