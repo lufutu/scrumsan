@@ -300,9 +300,9 @@ function DroppableSprintColumn({
               ))}
             </div>
           )}
-            {provided.placeholder}
-          </div>
+          {provided.placeholder}
         </div>
+      </div>
       )}
     </Droppable>
   )
