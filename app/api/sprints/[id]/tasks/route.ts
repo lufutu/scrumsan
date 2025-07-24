@@ -192,7 +192,7 @@ export async function POST(
     })
     
     return NextResponse.json(sprint)
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error updating sprint tasks:', error)
     if (error instanceof z.ZodError) {
       return NextResponse.json(
@@ -201,7 +201,7 @@ export async function POST(
       )
     }
     return NextResponse.json(
-      { error: error.message || 'Failed to update sprint tasks' },
+      { error: error instanceof Error ? error.message : 'Failed to update sprint tasks' },
       { status: 500 }
     )
   }
@@ -262,10 +262,10 @@ export async function DELETE(
     })
     
     return NextResponse.json({ success: true })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error removing task from sprint:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to remove task from sprint' },
+      { error: error instanceof Error ? error.message : 'Failed to remove task from sprint' },
       { status: 500 }
     )
   }

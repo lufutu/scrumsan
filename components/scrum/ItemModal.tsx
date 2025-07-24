@@ -38,8 +38,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/animate-ui/radix/collapsible';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/animate-ui/radix/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -62,7 +62,7 @@ import { toast } from 'sonner';
 import { useUsers } from '@/hooks/useUsers';
 import { useLabels } from '@/hooks/useLabels';
 import { ItemModalProps } from '@/types/shared';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/animate-ui/radix/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Calendar } from '@/components/ui/calendar';
 import { Search } from 'lucide-react';
@@ -1373,23 +1373,6 @@ export function ItemModal({
                   onTaskUpdate={fetchTask}
                 />
               </div>
-
-              {/* Progress */}
-              <div>
-                <Label className="text-sm font-semibold text-slate-700 mb-3 block">PROGRESS</Label>
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-slate-600">Completion</span>
-                    <span className="font-medium">65%</span>
-                  </div>
-                  <div className="w-full bg-slate-200 rounded-full h-2">
-                    <div className="bg-emerald-500 h-2 rounded-full" style={{ width: '65%' }}></div>
-                  </div>
-                  <div className="text-xs text-slate-500">
-                    Based on completed checklist items and subtasks
-                  </div>
-                </div>
-                </div>
               </TabsContent>
 
               {/* Activity Tab */}

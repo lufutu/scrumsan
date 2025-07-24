@@ -19,7 +19,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/animate-ui/radix/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
@@ -614,7 +614,7 @@ export function TaskCardModern({
 
                       {filteredMembers.length === 0 && !loadingMembers && (
                         <div className="p-4 text-center text-sm text-slate-500">
-                          No members found matching "{searchTerm}"
+                          No members found matching &quot;{searchTerm}&quot;
                         </div>
                       )}
                     </>

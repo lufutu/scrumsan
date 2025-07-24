@@ -443,10 +443,10 @@ export async function DELETE(
     })
     
     return NextResponse.json({ success: true })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error deleting task:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to delete task' },
+      { error: error instanceof Error ? error.message : 'Failed to delete task' },
       { status: 500 }
     )
   }

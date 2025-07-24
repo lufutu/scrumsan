@@ -216,7 +216,6 @@ export async function GET(req: NextRequest) {
       done: task.sprintColumn?.isDone || false
     }))
     
-    console.log('tasks', JSON.stringify(tasksWithDoneStatus))
     return NextResponse.json(tasksWithDoneStatus)
   } catch (error: unknown) {
     console.error('Error fetching tasks:', error)

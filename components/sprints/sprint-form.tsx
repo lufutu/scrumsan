@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Plus, Loader2, Calendar, Edit } from 'lucide-react'
 import { Tables } from '@/types/database'
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/animate-ui/radix/tabs'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 

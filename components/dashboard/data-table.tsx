@@ -91,7 +91,7 @@ import {
     SheetHeader,
     SheetTitle,
     SheetTrigger,
-} from "@/components/ui/sheet"
+} from "@/components/animate-ui/radix/sheet"
 import {
     Table,
     TableBody,
@@ -105,7 +105,7 @@ import {
     TabsContent,
     TabsList,
     TabsTrigger,
-} from "@/components/ui/tabs"
+} from "@/components/animate-ui/radix/tabs"
 
 export const schema = z.object({
     id: z.number(),

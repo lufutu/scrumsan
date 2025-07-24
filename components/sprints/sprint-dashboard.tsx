@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Progress } from '@/components/ui/progress'
+import { Progress } from '@/components/animate-ui/radix/progress'
 import { Button } from '@/components/ui/button'
 import { Calendar, Target, Users, Clock, Play, Pause, CheckCircle } from 'lucide-react'
 

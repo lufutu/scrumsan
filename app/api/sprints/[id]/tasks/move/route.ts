@@ -109,7 +109,7 @@ export async function POST(
     })
     
     return NextResponse.json(updatedTask)
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error moving task:', error)
     if (error instanceof z.ZodError) {
       return NextResponse.json(
@@ -118,7 +118,7 @@ export async function POST(
       )
     }
     return NextResponse.json(
-      { error: error.message || 'Failed to move task' },
+      { error: error instanceof Error ? error.message : 'Failed to move task' },
       { status: 500 }
     )
   }

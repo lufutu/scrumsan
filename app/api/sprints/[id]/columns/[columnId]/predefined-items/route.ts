@@ -141,10 +141,10 @@ export async function POST(
       message: `Added ${addedTasks.length} predefined items to ${targetColumn.name}`,
       tasks: addedTasks
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error adding predefined items:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to add predefined items' },
+      { error: error instanceof Error ? error.message : 'Failed to add predefined items' },
       { status: 500 }
     )
   }

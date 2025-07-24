@@ -8,7 +8,7 @@ import { Loader2, ArrowLeft, Edit, Target, Clock, CheckCircle } from 'lucide-rea
 import Link from 'next/link'
 import { useState } from 'react'
 import { Badge } from '@/components/ui/badge'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/animate-ui/radix/tabs'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
   Dialog,

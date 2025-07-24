@@ -7,7 +7,7 @@ import { useLabels } from '@/hooks/useLabels'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/animate-ui/radix/tabs'
 // Progress component - using a simple div for now
 const Progress = ({ value, className }: { value: number; className?: string }) => (
   <div className={`bg-gray-200 rounded-full overflow-hidden ${className}`}>

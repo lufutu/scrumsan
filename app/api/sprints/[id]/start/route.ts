@@ -158,10 +158,10 @@ export async function POST(
       sprint: updatedSprint,
       message: `Sprint "${sprint.name}" has been started successfully!`
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error starting sprint:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to start sprint' },
+      { error: error instanceof Error ? error.message : 'Failed to start sprint' },
       { status: 500 }
     )
   }

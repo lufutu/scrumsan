@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -20,6 +20,7 @@ import {
   DragEndEvent,
   DragOverlay,
   DragStartEvent,
+  DragOverEvent,
   PointerSensor,
   MouseSensor,
   TouchSensor,
@@ -67,16 +68,18 @@ import { Sprint, Task, ProductBacklogProps as ProductBacklogRedesignedProps } fr
 const fetcher = (url: string) => fetch(url).then(res => res.json())
 
 // Draggable Task Component
-function DraggableTask({ 
-  task, 
+function DraggableTask({
+  task,
   onTaskClick,
   labels,
-  boardId
-}: { 
+  boardId,
+  onTaskUpdate
+}: {
   task: Task
   onTaskClick?: (task: Task) => void
   labels: Array<{ id: string; name: string; color: string | null }>
   boardId: string
+  onTaskUpdate?: () => void
 }) {
   const {
     attributes,
@@ -91,37 +94,17 @@ function DraggableTask({
     transform: CSS.Transform.toString(transform),
     transition: isDragging ? 'none' : transition,
     zIndex: isDragging ? 50 : 'auto',
+    opacity: isDragging ? 0.5 : 1,
+    filter: isDragging ? 'blur(1px)' : 'blur(0)'
   }
 
   return (
-    <motion.div
-      layout
-      layoutId={task.id}
-      initial={{ opacity: 0, scale: 0.95, y: 10 }}
-      animate={{ 
-        opacity: isDragging ? 0.5 : 1, 
-        scale: isDragging ? 0.95 : 1,
-        y: 0
-      }}
-      exit={{ opacity: 0, scale: 0.9, y: -10 }}
-      transition={{
-        layout: { 
-          type: "spring", 
-          damping: 20, 
-          stiffness: 300,
-          mass: 0.8
-        },
-        opacity: { duration: 0.15 },
-        scale: { duration: 0.15 },
-        y: { duration: 0.15 }
-      }}
-      ref={setNodeRef} 
-      style={style} 
-      {...attributes} 
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
       {...listeners}
       className="cursor-grab active:cursor-grabbing"
-      whileHover={{ scale: 1.01, transition: { duration: 0.1 } }}
-      whileTap={{ scale: 0.98, transition: { duration: 0.1 } }}
     >
       <TaskCardModern
         id={task.id}
@@ -146,15 +129,15 @@ function DraggableTask({
         boardId={boardId}
         onClick={!isDragging ? () => onTaskClick?.(task) : undefined}
         onAssigneesChange={() => {
-          mutateTasks() // Invalidate cache when labels or assignees are changed
+          onTaskUpdate?.() // Invalidate cache when labels or assignees are changed
         }}
       />
-    </motion.div>
+    </div>
   )
 }
 
 // Droppable Sprint Column Component
-function DroppableSprintColumn({ 
+function DroppableSprintColumn({
   sprint,
   tasks,
   onTaskClick,
@@ -164,8 +147,11 @@ function DroppableSprintColumn({
   users,
   boardColor,
   isActiveSprint,
-  boardId
-}: { 
+  boardId,
+  onTaskUpdate,
+  isDragOver,
+  draggedTask
+}: {
   sprint: Sprint
   tasks: Task[]
   onTaskClick?: (task: Task) => void
@@ -183,10 +169,13 @@ function DroppableSprintColumn({
   boardColor?: string | null
   isActiveSprint: boolean
   boardId: string
+  onTaskUpdate?: () => void
+  isDragOver?: boolean
+  draggedTask?: Task | null
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: sprint.id })
   const [showAddForm, setShowAddForm] = useState(false)
-  
+
   const totalPoints = tasks.reduce((sum, task) => sum + (task.storyPoints || 0), 0)
 
   const getSprintStatus = () => {
@@ -199,28 +188,29 @@ function DroppableSprintColumn({
   const status = getSprintStatus()
 
   return (
-    <motion.div 
+    <motion.div
       ref={setNodeRef}
       className={cn(
         "bg-white rounded-lg shadow-sm border border-gray-200 w-80 flex-shrink-0",
-        isOver && "border-blue-300 border-2"
+        isOver && "border-blue-300 border-2",
+        isDragOver && "border-blue-500 border-2 bg-blue-50/30"
       )}
       initial={{ opacity: 0, y: 20 }}
-      animate={{ 
-        opacity: 1, 
+      animate={{
+        opacity: 1,
         y: 0,
         scale: isOver ? 1.02 : 1,
         boxShadow: isOver ? "0 10px 25px -5px rgba(0, 0, 0, 0.1)" : "0 1px 3px 0 rgba(0, 0, 0, 0.1)"
       }}
-      transition={{ 
-        type: "spring", 
-        damping: 20, 
+      transition={{
+        type: "spring",
+        damping: 20,
         stiffness: 300,
         scale: { duration: 0.2 }
       }}
     >
       {/* Sprint Header */}
-      <div 
+      <div
         className="p-4 border-b border-gray-200"
         style={boardColor ? { backgroundColor: `${boardColor}20` } : undefined}
       >
@@ -267,7 +257,7 @@ function DroppableSprintColumn({
                     <DropdownMenuSeparator />
                   </>
                 )}
-                <DropdownMenuItem 
+                <DropdownMenuItem
                   onClick={() => onSprintAction('delete', sprint.id)}
                   className="text-red-600"
                 >
@@ -321,13 +311,13 @@ function DroppableSprintColumn({
       )}
 
       {/* Sprint Tasks */}
-      <div 
+      <div
         className="p-4 space-y-3 max-h-[600px] overflow-y-auto"
       >
         <SortableContext items={tasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
           <AnimatePresence mode="popLayout" initial={false}>
-            {tasks.length === 0 ? (
-              <motion.div 
+            {tasks.length === 0 && !isDragOver ? (
+              <motion.div
                 key="empty"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -339,15 +329,53 @@ function DroppableSprintColumn({
                 <p className="text-xs mt-1">Drag items here to add them</p>
               </motion.div>
             ) : (
-              tasks.map((task, index) => (
-                <DraggableTask 
-                  key={task.id}
-                  task={task} 
-                  onTaskClick={onTaskClick}
-                  labels={labels}
-                  boardId={boardId}
-                />
-              ))
+              <>
+                {/* Show dragged task preview when dragging over this sprint */}
+                {isDragOver && draggedTask && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 0.6, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="mb-3"
+                  >
+                    <div className="opacity-60 scale-[0.98]">
+                      <TaskCardModern
+                        id={draggedTask.id}
+                        itemCode={draggedTask.itemCode}
+                        title={draggedTask.title}
+                        description={draggedTask.description || ''}
+                        taskType={draggedTask.taskType}
+                        storyPoints={draggedTask.storyPoints || 0}
+                        priority={draggedTask.priority}
+                        assignees={draggedTask.taskAssignees?.map((ta: any) => ({
+                          id: ta.user.id,
+                          name: ta.user.fullName || ta.user.email || 'Unknown User',
+                          avatar: ta.user.avatarUrl || undefined,
+                          initials: ta.user.fullName?.split(' ').map((n: string) => n[0]).join('') || 'U'
+                        })) || []}
+                        labels={draggedTask.taskLabels ? draggedTask.taskLabels.map((tl: any) => ({
+                          id: tl.label.id,
+                          name: tl.label.name,
+                          color: tl.label.color || '#6B7280'
+                        })) : []}
+                        organizationId={draggedTask.board?.organizationId}
+                        boardId={boardId}
+                      />
+                    </div>
+                  </motion.div>
+                )}
+                {tasks.map((task, index) => (
+                  <DraggableTask
+                    key={task.id || index}
+                    task={task}
+                    onTaskClick={onTaskClick}
+                    labels={labels}
+                    boardId={boardId}
+                    onTaskUpdate={onTaskUpdate}
+                  />
+                ))}
+              </>
             )}
           </AnimatePresence>
         </SortableContext>
@@ -357,7 +385,7 @@ function DroppableSprintColumn({
   )
 }
 
-export default function ProductBacklogRedesigned({ 
+export default function ProductBacklogRedesigned({
   boardId,
   boardColor,
   boardData,
@@ -377,40 +405,49 @@ export default function ProductBacklogRedesigned({
   const [startingSprintId, setStartingSprintId] = useState<string | null>(null)
   const [startSprintData, setStartSprintData] = useState({ dueDate: '', goal: '' })
   const [optimisticTasks, setOptimisticTasks] = useState<Task[]>([])
+  const [dragOverSprintId, setDragOverSprintId] = useState<string | null>(null)
 
   // Use provided data instead of fetching
-  const sprints = boardData?.sprints || []
-  const sprintDetails = boardData?.sprintDetails || []
-  const tasks = optimisticTasks.length > 0 ? optimisticTasks : (boardData?.tasks || [])
-  const labels = boardData?.labels || []
-  const users = boardData?.users || []
+  const sprints = useMemo(() => boardData?.sprints || [], [boardData?.sprints])
+  const sprintDetails = useMemo(() => boardData?.sprintDetails || [], [boardData?.sprintDetails])
+  const tasks = useMemo(() =>
+    optimisticTasks.length > 0 ? optimisticTasks : (boardData?.tasks || []),
+    [optimisticTasks, boardData?.tasks]
+  )
+  const labels = useMemo(() => boardData?.labels || [], [boardData?.labels])
+  const users = useMemo(() => boardData?.users || [], [boardData?.users])
   const activeSprint = boardData?.activeSprint || null
-  
+
   const sprintsLoading = !boardData
   const tasksLoading = !boardData
   const sprintsError: any = null
   const tasksError: any = null
 
   // Mutation functions - trigger parent data refresh
-  const mutateSprints = onDataChange || (() => {})
-  const mutateTasks = () => {
+  const mutateSprints = useCallback(() => {
+    if (onDataChange) onDataChange()
+  }, [onDataChange])
+
+  const mutateTasks = useCallback(() => {
     setOptimisticTasks([]) // Clear optimistic state
     if (onDataChange) onDataChange() // This invalidates all caches including sprintDetails
-  }
+  }, [onDataChange])
 
   // Filter sprints
-  const visibleSprints = sprints.filter((s: Sprint) => !s.isDeleted && (showFinishedSprints || !s.isFinished))
+  const visibleSprints = useMemo(() =>
+    sprints.filter((s: Sprint) => !s.isDeleted && (showFinishedSprints || !s.isFinished)),
+    [sprints, showFinishedSprints]
+  )
 
-  // Group tasks by sprint
-  const getTasksForSprint = (sprintId: string) => {
+  // Group tasks by sprint - memoized to prevent infinite loops
+  const getTasksForSprint = useCallback((sprintId: string) => {
     const sprint = sprintDetails.find((s: Sprint) => s.id === sprintId) || sprints.find((s: Sprint) => s.id === sprintId)
     if (!sprint) return []
-    
+
     // For all sprints (including backlog), return tasks directly from tasks relation
     if (!sprint.tasks) return []
-    console.log('sprint.tasks', sprint.tasks)
     return sprint.tasks
-  }
+  }, [sprintDetails, sprints])
 
   const sensors = useSensors(
     useSensor(MouseSensor, {
@@ -431,16 +468,42 @@ export default function ProductBacklogRedesigned({
     })
   )
 
-  const handleDragStart = (event: DragStartEvent) => {
+  const handleDragStart = useCallback((event: DragStartEvent) => {
     const task = tasks.find((t: Task) => t.id === event.active.id)
+    console.log('Drag start - task found:', !!task, 'activeId:', event.active.id, 'task:', task?.title)
     if (task) {
       setActiveTask(task)
     }
-  }
+  }, [tasks])
 
-  const handleDragEnd = async (event: DragEndEvent) => {
+  const handleDragOver = useCallback((event: DragOverEvent) => {
     const { active, over } = event
+    if (!over) {
+      setDragOverSprintId(null)
+      return
+    }
+
+    const overId = over.id as string
+    const activeId = active.id as string
+    
+    // Find if we're over a sprint or a task
+    const overTask = tasks.find((t: Task) => t.id === overId)
+    const overSprint = sprints.find((s: Sprint) => s.id === overId)
+    
+    // Determine the target sprint ID
+    const targetSprintId = overSprint?.id || overTask?.sprintId
+    
+    // Set the dragOverSprintId for visual feedback
+    if (targetSprintId) {
+      setDragOverSprintId(targetSprintId)
+    }
+  }, [tasks, sprints])
+
+  const handleDragEnd = useCallback(async (event: DragEndEvent) => {
+    const { active, over } = event
+    console.log('Drag end - clearing activeTask')
     setActiveTask(null)
+    setDragOverSprintId(null)
 
     if (!over || active.id === over.id) return
 
@@ -537,11 +600,11 @@ export default function ProductBacklogRedesigned({
       toast.success(`Task moved to ${targetSprint.name}`)
       mutateTasks()
       mutateSprints()
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to move task')
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : 'Failed to move task')
       setOptimisticTasks([]) // Clear optimistic state to revert
     }
-  }
+  }, [tasks, sprints, mutateTasks, mutateSprints])
 
   const handleSprintAction = async (action: string, sprintId: string) => {
     const sprint = sprints.find((s: Sprint) => s.id === sprintId)
@@ -551,9 +614,9 @@ export default function ProductBacklogRedesigned({
       case 'start':
         // Show start sprint dialog
         setStartingSprintId(sprintId)
-        setStartSprintData({ 
-          dueDate: '', 
-          goal: sprint.goal || '' 
+        setStartSprintData({
+          dueDate: '',
+          goal: sprint.goal || ''
         })
         setIsStartSprintOpen(true)
         break
@@ -571,7 +634,7 @@ export default function ProductBacklogRedesigned({
           mutateSprints()
           mutateTasks()
           toast.success(result.message)
-        } catch (error: any) {
+        } catch (error: unknown) {
           toast.error(error.message)
         }
         break
@@ -588,7 +651,7 @@ export default function ProductBacklogRedesigned({
             }
             mutateSprints()
             toast.success(`Sprint "${sprint.name}" deleted successfully!`)
-          } catch (error: any) {
+          } catch (error: unknown) {
             toast.error(error.message)
           }
         }
@@ -596,9 +659,9 @@ export default function ProductBacklogRedesigned({
 
       case 'edit':
         setEditingSprintId(sprintId)
-        setEditSprintData({ 
-          name: sprint.name, 
-          goal: sprint.goal || '' 
+        setEditSprintData({
+          name: sprint.name,
+          goal: sprint.goal || ''
         })
         setIsEditSprintOpen(true)
         break
@@ -630,7 +693,7 @@ export default function ProductBacklogRedesigned({
       toast.success(`Sprint "${newSprintData.name}" created successfully!`)
       setIsCreateSprintOpen(false)
       setNewSprintData({ name: '', goal: '' })
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error(error.message)
     }
   }
@@ -660,7 +723,7 @@ export default function ProductBacklogRedesigned({
       setIsEditSprintOpen(false)
       setEditingSprintId(null)
       setEditSprintData({ name: '', goal: '' })
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error(error.message)
     }
   }
@@ -680,8 +743,8 @@ export default function ProductBacklogRedesigned({
 
       mutateSprints()
       toast.success('Sprint reordered successfully')
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to reorder sprint')
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : 'Failed to reorder sprint')
     }
   }
 
@@ -726,8 +789,8 @@ export default function ProductBacklogRedesigned({
 
       mutateTasks()
       toast.success('Task created successfully')
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to create task')
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : 'Failed to create task')
     }
   }
 
@@ -757,10 +820,10 @@ export default function ProductBacklogRedesigned({
       setIsStartSprintOpen(false)
       setStartingSprintId(null)
       setStartSprintData({ dueDate: '', goal: '' })
-      
+
       // Redirect to the active sprint view
       router.push(`/sprints/${startingSprintId}/active`)
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error(error.message)
     }
   }
@@ -827,11 +890,12 @@ export default function ProductBacklogRedesigned({
           sensors={sensors}
           collisionDetection={closestCenter}
           onDragStart={handleDragStart}
+          onDragOver={handleDragOver}
           onDragEnd={handleDragEnd}
         >
           <div className="flex gap-4 p-6 min-h-full">
-            <SortableContext 
-              items={visibleSprints.map((s: Sprint) => s.id)} 
+            <SortableContext
+              items={visibleSprints.map((s: Sprint) => s.id)}
               strategy={horizontalListSortingStrategy}
             >
               {visibleSprints.map((sprint: Sprint) => (
@@ -847,53 +911,66 @@ export default function ProductBacklogRedesigned({
                   boardColor={boardColor}
                   isActiveSprint={sprint.id === activeSprint?.id}
                   boardId={boardId}
+                  onTaskUpdate={mutateTasks}
+                  isDragOver={dragOverSprintId === sprint.id && activeTask?.sprintId !== sprint.id}
+                  draggedTask={activeTask}
                 />
               ))}
             </SortableContext>
           </div>
 
-          <DragOverlay 
+          <DragOverlay
             dropAnimation={{
               duration: 250,
               easing: 'cubic-bezier(0.18, 0.67, 0.6, 1.22)',
             }}
+            style={{ 
+              zIndex: 99999,
+              position: 'fixed',
+              pointerEvents: 'none'
+            }}
           >
             {activeTask && (
-              <motion.div 
-                className="rotate-2 scale-105 shadow-2xl"
-                style={{
-                  filter: 'drop-shadow(0 20px 25px rgb(0 0 0 / 0.15)) drop-shadow(0 10px 10px rgb(0 0 0 / 0.04))',
-                }}
-                initial={{ rotate: 0, scale: 1 }}
-                animate={{ 
-                  rotate: 2, 
-                  scale: 1.05,
-                  transition: { duration: 0.15, ease: "easeOut" }
-                }}
-              >
-                <TaskCardModern
-                  id={activeTask.id}
-                  itemCode={activeTask.id}
-                  title={activeTask.title}
-                  description={activeTask.description || ''}
-                  taskType={activeTask.taskType as any}
-                  storyPoints={activeTask.storyPoints || 0}
-                  priority={activeTask.priority as any}
-                  assignees={activeTask.taskAssignees?.map((ta: any) => ({
-                    id: ta.user.id,
-                    name: ta.user.fullName || ta.user.email || 'Unknown User',
-                    avatar: ta.user.avatarUrl || undefined,
-                    initials: ta.user.fullName?.split(' ').map((n: string) => n[0]).join('') || 'U'
-                  })) || []}
-                  labels={activeTask.taskLabels ? activeTask.taskLabels.map(tl => ({
-                    id: tl.label.id,
-                    name: tl.label.name,
-                    color: tl.label.color || '#6B7280'
-                  })) : []}
-                  organizationId={activeTask.board?.organizationId}
-                  boardId={boardId}
-                />
-              </motion.div>
+              <>
+                {console.log('DragOverlay rendering with activeTask:', activeTask.title)}
+                <motion.div
+                  className="rotate-2 scale-105 shadow-2xl pointer-events-none"
+                  style={{
+                    filter: 'drop-shadow(0 20px 25px rgb(0 0 0 / 0.15)) drop-shadow(0 10px 10px rgb(0 0 0 / 0.04))',
+                    zIndex: 99999,
+                    position: 'relative'
+                  }}
+                  initial={{ rotate: 0, scale: 1 }}
+                  animate={{
+                    rotate: 2,
+                    scale: 1.05,
+                    transition: { duration: 0.15, ease: "easeOut" }
+                  }}
+                >
+                  <TaskCardModern
+                    id={activeTask.id}
+                    itemCode={activeTask.id}
+                    title={activeTask.title}
+                    description={activeTask.description || ''}
+                    taskType={activeTask.taskType as unknown}
+                    storyPoints={activeTask.storyPoints || 0}
+                    priority={activeTask.priority as any}
+                    assignees={activeTask.taskAssignees?.map((ta: unknown) => ({
+                      id: ta.user.id,
+                      name: ta.user.fullName || ta.user.email || 'Unknown User',
+                      avatar: ta.user.avatarUrl || undefined,
+                      initials: ta.user.fullName?.split(' ').map((n: string) => n[0]).join('') || 'U'
+                    })) || []}
+                    labels={activeTask.taskLabels ? activeTask.taskLabels.map(tl => ({
+                      id: tl.label.id,
+                      name: tl.label.name,
+                      color: tl.label.color || '#6B7280'
+                    })) : []}
+                    organizationId={activeTask.board?.organizationId}
+                    boardId={boardId}
+                  />
+                </motion.div>
+              </>
             )}
           </DragOverlay>
         </DndContext>

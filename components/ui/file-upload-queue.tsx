@@ -4,7 +4,7 @@ import React, { useRef, useState, useCallback, useEffect } from 'react'
 import { Upload, X, FileText, Image, Video, Archive, File, Check, AlertCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
-import { Progress } from '@/components/ui/progress'
+import { Progress } from '@/components/animate-ui/radix/progress'
 import { Card, CardContent } from '@/components/ui/card'
 import { toast } from 'sonner'
 

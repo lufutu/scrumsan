@@ -130,8 +130,8 @@ export default function EnhancedScrumBoard({
       if (!response.ok) throw new Error('Failed to fetch backlog tasks')
       const data = await response.json()
       setBacklogTasks(data)
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to fetch backlog tasks')
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : 'Failed to fetch backlog tasks')
     }
   }
 
@@ -145,8 +145,8 @@ export default function EnhancedScrumBoard({
       // Find active sprint
       const active = data.find((s: Sprint) => s.status === 'active')
       setActiveSprint(active || null)
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to fetch sprints')
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : 'Failed to fetch sprints')
     }
   }
 
@@ -167,8 +167,8 @@ export default function EnhancedScrumBoard({
       if (!response.ok) throw new Error('Failed to fetch sprint columns')
       const data = await response.json()
       setSprintColumns(data)
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to fetch sprint columns')
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : 'Failed to fetch sprint columns')
     }
   }
 
@@ -196,8 +196,8 @@ export default function EnhancedScrumBoard({
       setIsCreateSprintOpen(false)
       setNewSprint({ name: '', goal: '', duration: 14, startDate: new Date().toISOString().split('T')[0] })
       fetchSprints()
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to create sprint')
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : 'Failed to create sprint')
     }
   }
 
@@ -222,8 +222,8 @@ export default function EnhancedScrumBoard({
       toast.success('Sprint started successfully')
       setIsStartSprintOpen(false)
       fetchSprints()
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to start sprint')
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : 'Failed to start sprint')
     }
   }
 
@@ -239,8 +239,8 @@ export default function EnhancedScrumBoard({
       const result = await response.json()
       toast.success(result.message || 'Sprint finished successfully')
       fetchData()
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to finish sprint')
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : 'Failed to finish sprint')
     }
   }
 
@@ -303,8 +303,8 @@ export default function EnhancedScrumBoard({
         toast.success('Task moved successfully')
         fetchData()
       }
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to move task')
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : 'Failed to move task')
     }
   }
 
@@ -336,8 +336,8 @@ export default function EnhancedScrumBoard({
 
       toast.success('Task created successfully')
       fetchData()
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to create task')
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : 'Failed to create task')
     }
   }
 

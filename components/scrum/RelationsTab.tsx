@@ -36,7 +36,7 @@ import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from '@/components/ui/popover';
+} from '@/components/animate-ui/radix/popover';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { getItemTypeColor } from '@/lib/constants';

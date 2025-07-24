@@ -4,16 +4,16 @@ import { useState, useCallback, useEffect, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Progress } from '@/components/ui/progress'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Progress } from '@/components/animate-ui/radix/progress'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/animate-ui/radix/tabs'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { 
-  Square, 
-  Calendar, 
-  Target, 
+import {
+  Square,
+  Calendar,
+  Target,
   TrendingDown,
   Clock,
   CheckCircle,
@@ -86,7 +86,7 @@ interface SprintBacklogViewProps {
   onFinishSprint?: (sprintId: string) => void
 }
 
-const SortableTask = ({ task, ...props }: any) => {
+const SortableTask = ({ task, ...props }: unknown) => {
   const {
     attributes,
     listeners,
@@ -106,8 +106,8 @@ const SortableTask = ({ task, ...props }: any) => {
   return (
     <div ref={setNodeRef} style={style} className="relative group">
       {/* Drag handle */}
-      <div 
-        {...attributes} 
+      <div
+        {...attributes}
         {...listeners}
         className="absolute top-2 right-2 z-10 cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity bg-white rounded p-1 shadow-sm"
       >
@@ -125,8 +125,8 @@ const DroppableColumn = ({ column, children }: { column: SprintColumn; children:
   })
 
   return (
-    <div 
-      ref={setNodeRef} 
+    <div
+      ref={setNodeRef}
       className={`min-h-[500px] transition-colors ${isOver ? 'bg-blue-50 border-blue-300' : ''}`}
     >
       {children}
@@ -173,11 +173,10 @@ export default function SprintBacklogView({
       initializeDefaultColumns()
     }
   }, [columnsLoading, columns.length, initializeDefaultColumns])
-  
+
   const sprintTasks: Task[] = sprint.tasks || []
-  console.log('sprintTasks', sprintTasks)
   const totalTasks = sprintTasks.length
-  const completedTasks = sprintTasks.filter(st => st.done)  
+  const completedTasks = sprintTasks.filter(st => st.done)
   const todoTasks = sprintTasks.filter(st => !st.done).length
   const inProgressTasks = todoTasks || 0
 
@@ -198,7 +197,7 @@ export default function SprintBacklogView({
   // Filter and search tasks
   const filteredTasks = sprintTasks.filter(st => {
     const matchesSearch = st.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                        (st.description?.toLowerCase() || '').includes(searchTerm.toLowerCase())
+      (st.description?.toLowerCase() || '').includes(searchTerm.toLowerCase())
     const matchesFilter = true
     return matchesSearch && matchesFilter
   })
@@ -207,11 +206,11 @@ export default function SprintBacklogView({
   const getTasksByColumn = (columnId: string) => {
     const column = columns.find(c => c.id === columnId)
     if (!column) return []
-    
+
     // Filter column tasks based on search and filter criteria
     return column.tasks.filter(task => {
       const matchesSearch = task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          (task.description?.toLowerCase() || '').includes(searchTerm.toLowerCase())
+        (task.description?.toLowerCase() || '').includes(searchTerm.toLowerCase())
       const matchesFilter = true
       return matchesSearch && matchesFilter
     })
@@ -230,8 +229,8 @@ export default function SprintBacklogView({
       toast.success('Sprint updated successfully')
       setIsEditSprintOpen(false)
       onRefresh()
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to update sprint')
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : 'Failed to update sprint')
     }
   }
 
@@ -242,14 +241,14 @@ export default function SprintBacklogView({
       setIsFinishSprintOpen(false)
       onFinishSprint?.(sprint.id)
       onRefresh()
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to finish sprint')
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : 'Failed to finish sprint')
     }
   }
 
   const handleAddColumn = async () => {
     if (!newColumnName.trim()) return
-    
+
     try {
       await createColumn({
         name: newColumnName.trim(),
@@ -259,8 +258,8 @@ export default function SprintBacklogView({
       setNewColumnName('')
       setIsAddColumnOpen(false)
       toast.success('Column added successfully')
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to add column')
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : 'Failed to add column')
     }
   }
 
@@ -268,8 +267,8 @@ export default function SprintBacklogView({
     try {
       await deleteColumn(columnId)
       toast.success('Column deleted successfully')
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to delete column')
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : 'Failed to delete column')
     }
   }
 
@@ -277,8 +276,8 @@ export default function SprintBacklogView({
     try {
       await updateColumn(columnId, { name: newName })
       toast.success('Column renamed successfully')
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to rename column')
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : 'Failed to rename column')
     }
   }
 
@@ -286,8 +285,8 @@ export default function SprintBacklogView({
     try {
       await updateColumn(columnId, { isDone })
       toast.success(`Column marked as ${isDone ? 'done' : 'not done'}`)
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to update column')
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : 'Failed to update column')
     }
   }
 
@@ -295,8 +294,8 @@ export default function SprintBacklogView({
     try {
       await updateColumn(columnId, { wipLimit: limit > 0 ? limit : null })
       toast.success('Column limit updated')
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to update column limit')
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : 'Failed to update column limit')
     }
   }
 
@@ -319,7 +318,7 @@ export default function SprintBacklogView({
         Object.keys(data[0] || {}).join(','),
         ...data.map(row => Object.values(row).map(v => `"${v || ''}"`).join(','))
       ].join('\n')
-      
+
       const blob = new Blob([csv], { type: 'text/csv' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
@@ -335,7 +334,7 @@ export default function SprintBacklogView({
       a.download = `${column.name}_tasks.json`
       a.click()
     }
-    
+
     toast.success(`${column.name} exported as ${format.toUpperCase()}`)
   }
 
@@ -355,7 +354,7 @@ export default function SprintBacklogView({
     // Find current task and column
     const currentTask = columns.flatMap(col => col.tasks).find(task => task.id === taskId)
     const currentColumn = columns.find(col => col.tasks.some(task => task.id === taskId))
-    
+
     if (!currentTask || !currentColumn) return
 
     try {
@@ -364,10 +363,10 @@ export default function SprintBacklogView({
         const columnTasks = currentColumn.tasks
         const currentTaskIndex = columnTasks.findIndex(task => task.id === taskId)
         const targetTask = columnTasks.find(task => task.id === over.id)
-        
+
         if (targetTask && targetTask.id !== taskId) {
           const targetTaskIndex = columnTasks.findIndex(task => task.id === targetTask.id)
-          
+
           if (currentTaskIndex !== -1 && targetTaskIndex !== -1 && currentTaskIndex !== targetTaskIndex) {
             // Use the regular task API for position updates since sprint API doesn't handle position properly
             const response = await fetch(`/api/tasks/${taskId}`, {
@@ -403,8 +402,8 @@ export default function SprintBacklogView({
         toast.success('Task moved successfully')
         onRefresh()
       }
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to move task')
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : 'Failed to move task')
     }
   }
 
@@ -424,7 +423,7 @@ export default function SprintBacklogView({
               />
             </div>
           </div>
-          
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" className="border-gray-200">
@@ -458,14 +457,13 @@ export default function SprintBacklogView({
                   <CardHeader className="pb-4 border-b bg-gray-50/50">
                     <CardTitle className="text-lg font-semibold flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <div className={`w-3 h-3 rounded-full shadow-sm ${
-                          column.isDone ? 'bg-green-500' : 'bg-blue-500'
-                        }`} />
+                        <div className={`w-3 h-3 rounded-full shadow-sm ${column.isDone ? 'bg-green-500' : 'bg-blue-500'
+                          }`} />
                         <span className="text-gray-900">{column.name}</span>
                         {column.isDone && <Badge variant="secondary" className="bg-green-100 text-green-800 border-green-200">Done</Badge>}
                       </div>
                       <div className="flex items-center gap-2">
-                        <Badge 
+                        <Badge
                           variant={isLimitExceeded ? "destructive" : "secondary"}
                           className={isLimitExceeded ? "" : "bg-gray-100 text-gray-700"}
                         >
@@ -485,7 +483,7 @@ export default function SprintBacklogView({
                               <Edit className="h-4 w-4 mr-2" />
                               Rename Column
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => 
+                            <DropdownMenuItem onClick={() =>
                               handleMarkColumnAsDone(column.id, !column.isDone)
                             }>
                               <CheckCircle className="h-4 w-4 mr-2" />
@@ -500,8 +498,8 @@ export default function SprintBacklogView({
                                 const result = await response.json()
                                 toast.success(result.message)
                                 onRefresh()
-                              } catch (error: any) {
-                                toast.error(error.message || 'Failed to add predefined items')
+                              } catch (error: unknown) {
+                                toast.error(error instanceof Error ? error.message : 'Failed to add predefined items')
                               }
                             }}>
                               <Upload className="h-4 w-4 mr-2" />
@@ -524,7 +522,7 @@ export default function SprintBacklogView({
                               Export as JSON
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem 
+                            <DropdownMenuItem
                               onClick={() => handleDeleteColumn(column.id)}
                               className="text-destructive"
                             >
@@ -545,9 +543,8 @@ export default function SprintBacklogView({
                           projectId={undefined}
                           organizationId={organizationId}
                           onUpdate={onRefresh}
-                          className={`hover:shadow-lg transition-all border-l-4 bg-white ${
-                            column.isDone ? 'border-l-green-400 opacity-75' : 'border-l-blue-400'
-                          }`}
+                          className={`hover:shadow-lg transition-all border-l-4 bg-white ${column.isDone ? 'border-l-green-400 opacity-75' : 'border-l-blue-400'
+                            }`}
                         />
                       ))}
                     </SortableContext>
@@ -566,15 +563,16 @@ export default function SprintBacklogView({
             )
           })}
         </div>
-        
+
         <DragOverlay>
           {activeId ? (
             <div className="opacity-50">
-              <TaskCard 
-                task={columns.flatMap(col => col.tasks).find(task => task.id === activeId)} 
+              <SortableTask
+                task={sprintTasks.find(task => task.id === activeId)}
                 projectId={undefined}
                 organizationId={organizationId}
-                onUpdate={() => {}}
+                onUpdate={onRefresh}
+                className={`hover:shadow-lg transition-all border-l-4 bg-white`}
               />
             </div>
           ) : null}
@@ -592,75 +590,75 @@ export default function SprintBacklogView({
             <div className="flex items-start gap-2">
               <Target className="h-5 w-5 text-blue-600 mt-0.5" />
               <div>
-                <h3 className="font-semibold text-blue-900 flex items-center gap-2">Sprint Goal: <p className="text-blue-800">{sprint.goal}</p></h3>                
+                <h3 className="font-semibold text-blue-900 flex items-center gap-2">Sprint Goal: <p className="text-blue-800">{sprint.goal}</p></h3>
               </div>
             </div>
           </CardContent>
         </Card>
       )}
 
-        {/* Sprint Progress */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <Card className='p-2'>
-            <CardContent className="py-0 px-2">
-              <div className="flex items-center gap-2">                
-                <div>
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className="h-5 w-5 text-green-600" />
-                    <p className="text-sm text-muted-foreground">Tasks Completed</p>
-                    <p className="text-lg font-bold">{completedTasks}/{totalTasks}</p>
-                  </div>                  
-                  <Progress value={completionPercentage} className="mt-2" />
+      {/* Sprint Progress */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <Card className='p-2'>
+          <CardContent className="py-0 px-2">
+            <div className="flex items-center gap-2">
+              <div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-5 w-5 text-green-600" />
+                  <p className="text-sm text-muted-foreground">Tasks Completed</p>
+                  <p className="text-lg font-bold">{completedTasks.length}/{totalTasks}</p>
                 </div>
+                <Progress value={completionPercentage} className="mt-2" />
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </CardContent>
+        </Card>
 
-          <Card className='p-2'>
-            <CardContent className="py-0 px-2">
-              <div className="flex items-center gap-2">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <Target className="h-5 w-5 text-blue-600" />
-                    <p className="text-sm text-muted-foreground">Story Points</p>
-                    <p className="text-lg font-bold">{completedStoryPoints}/{totalStoryPoints}</p>
-                  </div>
-                  <Progress value={storyPointsPercentage} className="mt-2" />
+        <Card className='p-2'>
+          <CardContent className="py-0 px-2">
+            <div className="flex items-center gap-2">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Target className="h-5 w-5 text-blue-600" />
+                  <p className="text-sm text-muted-foreground">Story Points</p>
+                  <p className="text-lg font-bold">{completedStoryPoints}/{totalStoryPoints}</p>
                 </div>
+                <Progress value={storyPointsPercentage} className="mt-2" />
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </CardContent>
+        </Card>
 
-          <Card className='p-2'>
-            <CardContent className="py-0 px-2">
-              <div className="flex items-center gap-2">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <AlertCircle className="h-5 w-5 text-yellow-600" />
-                    <p className="text-sm text-muted-foreground">WIP</p>
-                    <p className="text-lg font-bold">{inProgressTasks}</p>
-                  </div>
-                  <p className="text-sm text-muted-foreground mt-2">tasks active</p>
+        <Card className='p-2'>
+          <CardContent className="py-0 px-2">
+            <div className="flex items-center gap-2">
+              <div>
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="h-5 w-5 text-yellow-600" />
+                  <p className="text-sm text-muted-foreground">WIP</p>
+                  <p className="text-lg font-bold">{inProgressTasks}</p>
                 </div>
+                <p className="text-sm text-muted-foreground mt-2">tasks active</p>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </CardContent>
+        </Card>
 
-          <Card className='p-2'>
-            <CardContent className="py-0 px-2">
-              <div className="flex items-center gap-2">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <Clock className="h-5 w-5 text-orange-600" />
-                    <p className="text-sm text-muted-foreground">Sprint Ends In</p>
-                    <p className="text-lg font-bold">{daysRemaining} days</p>
-                  </div>
-                  <p className="text-sm text-muted-foreground mt-2">Time left to complete sprint goals</p>
+        <Card className='p-2'>
+          <CardContent className="py-0 px-2">
+            <div className="flex items-center gap-2">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Clock className="h-5 w-5 text-orange-600" />
+                  <p className="text-sm text-muted-foreground">Sprint Ends In</p>
+                  <p className="text-lg font-bold">{daysRemaining} days</p>
                 </div>
+                <p className="text-sm text-muted-foreground mt-2">Time left to complete sprint goals</p>
               </div>
-            </CardContent>
-          </Card>
-        </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Sprint Content */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1">
@@ -684,7 +682,7 @@ export default function SprintBacklogView({
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <BurndownChart 
+              <BurndownChart
                 sprint={sprint}
                 totalStoryPoints={totalStoryPoints}
                 completedStoryPoints={completedStoryPoints}
@@ -693,222 +691,220 @@ export default function SprintBacklogView({
           </Card>
         </TabsContent>
 
-          <TabsContent value="analytics" className="mt-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <Card className="shadow-sm hover:shadow-md transition-shadow">
-                <CardHeader className="border-b bg-gradient-to-r from-blue-50 to-indigo-50">
-                  <CardTitle className="flex items-center gap-2">
-                    <BarChart3 className="h-5 w-5 text-blue-600" />
-                    Sprint Velocity
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-6">
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                      <span className="text-sm font-medium text-gray-600">Planned Story Points:</span>
-                      <span className="font-bold text-lg">{totalStoryPoints}</span>
-                    </div>
-                    <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
-                      <span className="text-sm font-medium text-gray-600">Completed Story Points:</span>
-                      <span className="font-bold text-lg text-green-600">{completedStoryPoints}</span>
-                    </div>
-                    <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
-                      <span className="text-sm font-medium text-gray-600">Velocity (points/day):</span>
-                      <span className="font-bold text-lg text-blue-600">
-                        {daysElapsed > 0 ? (completedStoryPoints / daysElapsed).toFixed(1) : '0'}
-                      </span>
-                    </div>
+        <TabsContent value="analytics" className="mt-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <Card className="shadow-sm hover:shadow-md transition-shadow">
+              <CardHeader className="border-b bg-gradient-to-r from-blue-50 to-indigo-50">
+                <CardTitle className="flex items-center gap-2">
+                  <BarChart3 className="h-5 w-5 text-blue-600" />
+                  Sprint Velocity
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                    <span className="text-sm font-medium text-gray-600">Planned Story Points:</span>
+                    <span className="font-bold text-lg">{totalStoryPoints}</span>
                   </div>
-                </CardContent>
-              </Card>
+                  <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
+                    <span className="text-sm font-medium text-gray-600">Completed Story Points:</span>
+                    <span className="font-bold text-lg text-green-600">{completedStoryPoints}</span>
+                  </div>
+                  <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
+                    <span className="text-sm font-medium text-gray-600">Velocity (points/day):</span>
+                    <span className="font-bold text-lg text-blue-600">
+                      {daysElapsed > 0 ? (completedStoryPoints / daysElapsed).toFixed(1) : '0'}
+                    </span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
-              <Card className="shadow-sm hover:shadow-md transition-shadow">
-                <CardHeader className="border-b bg-gradient-to-r from-green-50 to-emerald-50">
-                  <CardTitle className="flex items-center gap-2">
-                    <Users className="h-5 w-5 text-green-600" />
-                    Team Performance
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-6">
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                      <span className="text-sm font-medium text-gray-600">Total Tasks:</span>
-                      <span className="font-bold text-lg">{totalTasks}</span>
-                    </div>
-                    <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
-                      <span className="text-sm font-medium text-gray-600">Completion Rate:</span>
-                      <span className="font-bold text-lg text-green-600">{completionPercentage.toFixed(1)}%</span>
-                    </div>
-                    <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
-                      <span className="text-sm font-medium text-gray-600">Average Task Size:</span>
-                      <span className="font-bold text-lg text-blue-600">
-                        {totalTasks > 0 ? (totalStoryPoints / totalTasks).toFixed(1) : '0'} pts
-                      </span>
-                    </div>
+            <Card className="shadow-sm hover:shadow-md transition-shadow">
+              <CardHeader className="border-b bg-gradient-to-r from-green-50 to-emerald-50">
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5 text-green-600" />
+                  Team Performance
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                    <span className="text-sm font-medium text-gray-600">Total Tasks:</span>
+                    <span className="font-bold text-lg">{totalTasks}</span>
                   </div>
-                </CardContent>
-              </Card>
-              
-              <Card className="shadow-sm hover:shadow-md transition-shadow">
-                <CardHeader className="border-b bg-gradient-to-r from-orange-50 to-yellow-50">
-                  <CardTitle className="flex items-center gap-2">
-                    <Clock className="h-5 w-5 text-orange-600" />
-                    Sprint Health
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-6">
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                      <span className="text-sm font-medium text-gray-600">Days Elapsed:</span>
-                      <span className="font-bold text-lg">{daysElapsed}</span>
-                    </div>
-                    <div className="flex justify-between items-center p-3 bg-orange-50 rounded-lg">
-                      <span className="text-sm font-medium text-gray-600">Days Remaining:</span>
-                      <span className="font-bold text-lg text-orange-600">{daysRemaining}</span>
-                    </div>
-                    <div className={`flex justify-between items-center p-3 rounded-lg ${
-                      storyPointsPercentage >= (daysElapsed / totalDays) * 100 
-                        ? 'bg-green-50' 
-                        : 'bg-red-50'
+                  <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
+                    <span className="text-sm font-medium text-gray-600">Completion Rate:</span>
+                    <span className="font-bold text-lg text-green-600">{completionPercentage.toFixed(1)}%</span>
+                  </div>
+                  <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
+                    <span className="text-sm font-medium text-gray-600">Average Task Size:</span>
+                    <span className="font-bold text-lg text-blue-600">
+                      {totalTasks > 0 ? (totalStoryPoints / totalTasks).toFixed(1) : '0'} pts
+                    </span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="shadow-sm hover:shadow-md transition-shadow">
+              <CardHeader className="border-b bg-gradient-to-r from-orange-50 to-yellow-50">
+                <CardTitle className="flex items-center gap-2">
+                  <Clock className="h-5 w-5 text-orange-600" />
+                  Sprint Health
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                    <span className="text-sm font-medium text-gray-600">Days Elapsed:</span>
+                    <span className="font-bold text-lg">{daysElapsed}</span>
+                  </div>
+                  <div className="flex justify-between items-center p-3 bg-orange-50 rounded-lg">
+                    <span className="text-sm font-medium text-gray-600">Days Remaining:</span>
+                    <span className="font-bold text-lg text-orange-600">{daysRemaining}</span>
+                  </div>
+                  <div className={`flex justify-between items-center p-3 rounded-lg ${storyPointsPercentage >= (daysElapsed / totalDays) * 100
+                    ? 'bg-green-50'
+                    : 'bg-red-50'
                     }`}>
-                      <span className="text-sm font-medium text-gray-600">Progress Trend:</span>
-                      <span className={`font-bold text-lg ${
-                        storyPointsPercentage >= (daysElapsed / totalDays) * 100 
-                          ? 'text-green-600' 
-                          : 'text-red-600'
+                    <span className="text-sm font-medium text-gray-600">Progress Trend:</span>
+                    <span className={`font-bold text-lg ${storyPointsPercentage >= (daysElapsed / totalDays) * 100
+                      ? 'text-green-600'
+                      : 'text-red-600'
                       }`}>
-                        {storyPointsPercentage >= (daysElapsed / totalDays) * 100 ? 'On Track' : 'Behind'}
-                      </span>
+                      {storyPointsPercentage >= (daysElapsed / totalDays) * 100 ? 'On Track' : 'Behind'}
+                    </span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="reports" className="mt-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Card className="shadow-sm hover:shadow-md transition-shadow">
+              <CardHeader className="border-b bg-gradient-to-r from-purple-50 to-pink-50">
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-purple-600" />
+                  Sprint Summary Report
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6 p-6">
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-blue-600" />
+                    Sprint Overview
+                  </h4>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Sprint:</span>
+                      <span className="font-medium">{sprint.name}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Goal:</span>
+                      <span className="font-medium text-right max-w-[200px]">{sprint.goal || 'No goal specified'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Duration:</span>
+                      <span className="font-medium">{totalDays} days</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Status:</span>
+                      <span className="font-medium text-green-600">Active ({daysElapsed}/{totalDays} days)</span>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-        
-          <TabsContent value="reports" className="mt-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Card className="shadow-sm hover:shadow-md transition-shadow">
-                <CardHeader className="border-b bg-gradient-to-r from-purple-50 to-pink-50">
-                  <CardTitle className="flex items-center gap-2">
-                    <FileText className="h-5 w-5 text-purple-600" />
-                    Sprint Summary Report
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-6 p-6">
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                      <Calendar className="h-4 w-4 text-blue-600" />
-                      Sprint Overview
-                    </h4>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Sprint:</span>
-                        <span className="font-medium">{sprint.name}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Goal:</span>
-                        <span className="font-medium text-right max-w-[200px]">{sprint.goal || 'No goal specified'}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Duration:</span>
-                        <span className="font-medium">{totalDays} days</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Status:</span>
-                        <span className="font-medium text-green-600">Active ({daysElapsed}/{totalDays} days)</span>
-                      </div>
+                </div>
+
+                <div className="bg-blue-50 p-4 rounded-lg">
+                  <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4 text-blue-600" />
+                    Work Summary
+                  </h4>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Total Items:</span>
+                      <span className="font-medium">{totalTasks}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Completed:</span>
+                      <span className="font-medium text-green-600">{completedTasks} ({completionPercentage.toFixed(1)}%)</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">In Progress:</span>
+                      <span className="font-medium text-yellow-600">{inProgressTasks}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Remaining:</span>
+                      <span className="font-medium">{todoTasks}</span>
                     </div>
                   </div>
-                  
-                  <div className="bg-blue-50 p-4 rounded-lg">
-                    <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-blue-600" />
-                      Work Summary
-                    </h4>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Total Items:</span>
-                        <span className="font-medium">{totalTasks}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Completed:</span>
-                        <span className="font-medium text-green-600">{completedTasks} ({completionPercentage.toFixed(1)}%)</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">In Progress:</span>
-                        <span className="font-medium text-yellow-600">{inProgressTasks}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Remaining:</span>
-                        <span className="font-medium">{todoTasks}</span>
-                      </div>
+                </div>
+
+                <div className="bg-green-50 p-4 rounded-lg">
+                  <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                    <Target className="h-4 w-4 text-green-600" />
+                    Story Points
+                  </h4>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Planned:</span>
+                      <span className="font-medium">{totalStoryPoints} pts</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Completed:</span>
+                      <span className="font-medium text-green-600">{completedStoryPoints} pts ({storyPointsPercentage.toFixed(1)}%)</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Remaining:</span>
+                      <span className="font-medium">{totalStoryPoints - completedStoryPoints} pts</span>
                     </div>
                   </div>
-                  
-                  <div className="bg-green-50 p-4 rounded-lg">
-                    <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                      <Target className="h-4 w-4 text-green-600" />
-                      Story Points
-                    </h4>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Planned:</span>
-                        <span className="font-medium">{totalStoryPoints} pts</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Completed:</span>
-                        <span className="font-medium text-green-600">{completedStoryPoints} pts ({storyPointsPercentage.toFixed(1)}%)</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Remaining:</span>
-                        <span className="font-medium">{totalStoryPoints - completedStoryPoints} pts</span>
-                      </div>
-                    </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="shadow-sm hover:shadow-md transition-shadow">
+              <CardHeader className="border-b bg-gradient-to-r from-indigo-50 to-blue-50">
+                <CardTitle className="flex items-center gap-2">
+                  <Download className="h-5 w-5 text-indigo-600" />
+                  Export Options
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4 p-6">
+                <Button variant="outline" className="w-full h-12 justify-start gap-3 hover:bg-gray-50">
+                  <FileText className="h-4 w-4 text-red-600" />
+                  <div className="text-left">
+                    <div className="font-medium">Sprint Report</div>
+                    <div className="text-xs text-muted-foreground">PDF format</div>
                   </div>
-                </CardContent>
-              </Card>
-              
-              <Card className="shadow-sm hover:shadow-md transition-shadow">
-                <CardHeader className="border-b bg-gradient-to-r from-indigo-50 to-blue-50">
-                  <CardTitle className="flex items-center gap-2">
-                    <Download className="h-5 w-5 text-indigo-600" />
-                    Export Options
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4 p-6">
-                  <Button variant="outline" className="w-full h-12 justify-start gap-3 hover:bg-gray-50">
-                    <FileText className="h-4 w-4 text-red-600" />
-                    <div className="text-left">
-                      <div className="font-medium">Sprint Report</div>
-                      <div className="text-xs text-muted-foreground">PDF format</div>
-                    </div>
-                  </Button>
-                  <Button variant="outline" className="w-full h-12 justify-start gap-3 hover:bg-gray-50">
-                    <FileSpreadsheet className="h-4 w-4 text-green-600" />
-                    <div className="text-left">
-                      <div className="font-medium">Task List</div>
-                      <div className="text-xs text-muted-foreground">CSV format</div>
-                    </div>
-                  </Button>
-                  <Button variant="outline" className="w-full h-12 justify-start gap-3 hover:bg-gray-50">
-                    <BarChart3 className="h-4 w-4 text-blue-600" />
-                    <div className="text-left">
-                      <div className="font-medium">Burndown Data</div>
-                      <div className="text-xs text-muted-foreground">Excel format</div>
-                    </div>
-                  </Button>
-                  <Button variant="outline" className="w-full h-12 justify-start gap-3 hover:bg-gray-50">
-                    <Upload className="h-4 w-4 text-purple-600" />
-                    <div className="text-left">
-                      <div className="font-medium">Share Dashboard</div>
-                      <div className="text-xs text-muted-foreground">Generate link</div>
-                    </div>
-                  </Button>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
+                </Button>
+                <Button variant="outline" className="w-full h-12 justify-start gap-3 hover:bg-gray-50">
+                  <FileSpreadsheet className="h-4 w-4 text-green-600" />
+                  <div className="text-left">
+                    <div className="font-medium">Task List</div>
+                    <div className="text-xs text-muted-foreground">CSV format</div>
+                  </div>
+                </Button>
+                <Button variant="outline" className="w-full h-12 justify-start gap-3 hover:bg-gray-50">
+                  <BarChart3 className="h-4 w-4 text-blue-600" />
+                  <div className="text-left">
+                    <div className="font-medium">Burndown Data</div>
+                    <div className="text-xs text-muted-foreground">Excel format</div>
+                  </div>
+                </Button>
+                <Button variant="outline" className="w-full h-12 justify-start gap-3 hover:bg-gray-50">
+                  <Upload className="h-4 w-4 text-purple-600" />
+                  <div className="text-left">
+                    <div className="font-medium">Share Dashboard</div>
+                    <div className="text-xs text-muted-foreground">Generate link</div>
+                  </div>
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
       </Tabs>
 
       {/* Edit Sprint Dialog */}

@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
-import { Progress } from '@/components/ui/progress'
+import { Progress } from '@/components/animate-ui/radix/progress'
 import { Calendar, Plus, Target, Clock, User } from 'lucide-react'
 import TaskCreationDialog from '@/components/common/TaskCreationDialog'
 

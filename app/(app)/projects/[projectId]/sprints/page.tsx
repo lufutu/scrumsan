@@ -1,7 +1,7 @@
 "use client"
 
 import { use } from 'react'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/animate-ui/radix/tabs'
 import { Calendar, Target, BarChart3, Settings } from 'lucide-react'
 import SprintDashboard from '@/components/sprints/sprint-dashboard'
 import SprintPlanning from '@/components/sprints/sprint-planning'

@@ -92,10 +92,10 @@ export async function GET(
     }
     
     return NextResponse.json(sprint)
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error fetching sprint:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch sprint' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch sprint' },
       { status: 500 }
     )
   }
@@ -230,7 +230,7 @@ export async function PATCH(
     })
     
     return NextResponse.json(sprint)
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error updating sprint:', error)
     if (error instanceof z.ZodError) {
       return NextResponse.json(
@@ -239,7 +239,7 @@ export async function PATCH(
       )
     }
     return NextResponse.json(
-      { error: error.message || 'Failed to update sprint' },
+      { error: error instanceof Error ? error.message : 'Failed to update sprint' },
       { status: 500 }
     )
   }
@@ -305,10 +305,10 @@ export async function DELETE(
     })
     
     return NextResponse.json({ success: true })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error deleting sprint:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to delete sprint' },
+      { error: error instanceof Error ? error.message : 'Failed to delete sprint' },
       { status: 500 }
     )
   }
