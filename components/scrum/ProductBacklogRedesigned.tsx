@@ -174,11 +174,11 @@ function DroppableSprintColumn({
             snapshot.isDraggingOver && "border-blue-500 border-2 bg-blue-50/30"
           )}
         >
-      {/* Sprint Header */}
-      <div
-        className="p-4 border-b border-gray-200"
-        style={boardColor ? { backgroundColor: `${boardColor}20` } : undefined}
-      >
+          {/* Sprint Header */}
+          <div
+            className="p-4 border-b border-gray-200"
+            style={boardColor ? { backgroundColor: `${boardColor}20` } : undefined}
+          >
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <h3 className="font-semibold text-lg">{sprint.name}</h3>
@@ -242,8 +242,8 @@ function DroppableSprintColumn({
         )}
       </div>
 
-      {/* Add Task Button */}
-      {!showAddForm && (
+          {/* Add Task Button */}
+          {!showAddForm && (
         <div className="px-4 py-3 border-b border-gray-200">
           <Button
             variant="ghost"
@@ -255,10 +255,10 @@ function DroppableSprintColumn({
             Add item
           </Button>
         </div>
-      )}
+          )}
 
-      {/* Inline Form */}
-      {showAddForm && (
+          {/* Inline Form */}
+          {showAddForm && (
         <div className="px-4 py-3 border-b border-gray-200">
           <ComprehensiveInlineForm
             onAdd={async (data) => {
@@ -273,12 +273,12 @@ function DroppableSprintColumn({
             labels={labels}
           />
         </div>
-      )}
+          )}
 
-      {/* Sprint Tasks */}
-      <div
-        className="p-4 space-y-3 max-h-[600px] overflow-y-auto"
-      >
+          {/* Sprint Tasks */}
+          <div
+            className="p-4 space-y-3 max-h-[600px] overflow-y-auto"
+          >
         <div>
           {tasks.length === 0 ? (
             <div className="text-center py-8 text-gray-400">
@@ -299,10 +299,10 @@ function DroppableSprintColumn({
                 />
               ))}
             </div>
-          )}
-          {provided.placeholder}
+            )}
+            {provided.placeholder}
+          </div>
         </div>
-      </div>
       )}
     </Droppable>
   )
