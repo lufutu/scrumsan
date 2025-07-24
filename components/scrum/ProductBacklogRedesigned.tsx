@@ -14,28 +14,12 @@ import useSWR, { mutate } from 'swr'
 import { useSupabase } from '@/providers/supabase-provider'
 import { useLabels } from '@/hooks/useLabels'
 import { useUsers } from '@/hooks/useUsers'
-import { motion, AnimatePresence } from 'motion/react'
 import {
-  DndContext,
-  DragEndEvent,
-  DragOverlay,
-  DragStartEvent,
-  DragOverEvent,
-  PointerSensor,
-  MouseSensor,
-  TouchSensor,
-  useSensor,
-  useSensors,
-  closestCenter,
-} from '@dnd-kit/core'
-import {
-  SortableContext,
-  useSortable,
-  horizontalListSortingStrategy,
-  verticalListSortingStrategy,
-} from '@dnd-kit/sortable'
-import { CSS } from '@dnd-kit/utilities'
-import { useDroppable } from '@dnd-kit/core'
+  DragDropContext,
+  Droppable,
+  Draggable,
+  DropResult,
+} from '@hello-pangea/dnd'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -70,42 +54,32 @@ const fetcher = (url: string) => fetch(url).then(res => res.json())
 // Draggable Task Component
 function DraggableTask({
   task,
+  index,
   onTaskClick,
   labels,
   boardId,
   onTaskUpdate
 }: {
   task: Task
+  index: number
   onTaskClick?: (task: Task) => void
   labels: Array<{ id: string; name: string; color: string | null }>
   boardId: string
   onTaskUpdate?: () => void
 }) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: task.id })
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition: isDragging ? 'none' : transition,
-    zIndex: isDragging ? 50 : 'auto',
-    opacity: isDragging ? 0.5 : 1,
-    filter: isDragging ? 'blur(1px)' : 'blur(0)'
-  }
-
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      {...attributes}
-      {...listeners}
-      className="cursor-grab active:cursor-grabbing"
-    >
+    <Draggable draggableId={task.id} index={index}>
+      {(provided, snapshot) => (
+        <div
+          ref={provided.innerRef}
+          {...provided.draggableProps}
+          {...provided.dragHandleProps}
+          className="cursor-grab active:cursor-grabbing"
+          style={{
+            ...provided.draggableProps.style,
+            opacity: snapshot.isDragging ? 0.8 : 1,
+          }}
+        >
       <TaskCardModern
         id={task.id}
         itemCode={task.id}
@@ -127,12 +101,15 @@ function DraggableTask({
         })) : []}
         organizationId={task.board?.organizationId}
         boardId={boardId}
-        onClick={!isDragging ? () => onTaskClick?.(task) : undefined}
+        onClick={!snapshot.isDragging ? () => onTaskClick?.(task) : undefined}
         onAssigneesChange={() => {
           onTaskUpdate?.() // Invalidate cache when labels or assignees are changed
         }}
+        onUpdate={onTaskUpdate}
       />
-    </div>
+        </div>
+      )}
+    </Draggable>
   )
 }
 
@@ -173,7 +150,6 @@ function DroppableSprintColumn({
   isDragOver?: boolean
   draggedTask?: Task | null
 }) {
-  const { setNodeRef, isOver } = useDroppable({ id: sprint.id })
   const [showAddForm, setShowAddForm] = useState(false)
 
   const totalPoints = tasks.reduce((sum, task) => sum + (task.storyPoints || 0), 0)
@@ -188,27 +164,16 @@ function DroppableSprintColumn({
   const status = getSprintStatus()
 
   return (
-    <motion.div
-      ref={setNodeRef}
-      className={cn(
-        "bg-white rounded-lg shadow-sm border border-gray-200 w-80 flex-shrink-0",
-        isOver && "border-blue-300 border-2",
-        isDragOver && "border-blue-500 border-2 bg-blue-50/30"
-      )}
-      initial={{ opacity: 0, y: 20 }}
-      animate={{
-        opacity: 1,
-        y: 0,
-        scale: isOver ? 1.02 : 1,
-        boxShadow: isOver ? "0 10px 25px -5px rgba(0, 0, 0, 0.1)" : "0 1px 3px 0 rgba(0, 0, 0, 0.1)"
-      }}
-      transition={{
-        type: "spring",
-        damping: 20,
-        stiffness: 300,
-        scale: { duration: 0.2 }
-      }}
-    >
+    <Droppable droppableId={sprint.id}>
+      {(provided, snapshot) => (
+        <div
+          ref={provided.innerRef}
+          {...provided.droppableProps}
+          className={cn(
+            "bg-white rounded-lg shadow-sm border border-gray-200 w-80 flex-shrink-0",
+            snapshot.isDraggingOver && "border-blue-500 border-2 bg-blue-50/30"
+          )}
+        >
       {/* Sprint Header */}
       <div
         className="p-4 border-b border-gray-200"
@@ -314,74 +279,32 @@ function DroppableSprintColumn({
       <div
         className="p-4 space-y-3 max-h-[600px] overflow-y-auto"
       >
-        <SortableContext items={tasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
-          <AnimatePresence mode="popLayout" initial={false}>
-            {tasks.length === 0 && !isDragOver ? (
-              <motion.div
-                key="empty"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                transition={{ duration: 0.2 }}
-                className="text-center py-8 text-gray-400"
-              >
-                <p className="text-sm">No items in this sprint</p>
-                <p className="text-xs mt-1">Drag items here to add them</p>
-              </motion.div>
-            ) : (
-              <div>
-                {/* Show dragged task preview when dragging over this sprint */}
-                {isDragOver && draggedTask && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 0.6, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    transition={{ duration: 0.2 }}
-                    className="mb-3"
-                  >
-                    <div className="opacity-60 scale-[0.98]">
-                      <TaskCardModern
-                        id={draggedTask.id}
-                        itemCode={draggedTask.itemCode}
-                        title={draggedTask.title}
-                        description={draggedTask.description || ''}
-                        taskType={draggedTask.taskType}
-                        storyPoints={draggedTask.storyPoints || 0}
-                        priority={draggedTask.priority}
-                        assignees={draggedTask.taskAssignees?.map((ta: any) => ({
-                          id: ta.user.id,
-                          name: ta.user.fullName || ta.user.email || 'Unknown User',
-                          avatar: ta.user.avatarUrl || undefined,
-                          initials: ta.user.fullName?.split(' ').map((n: string) => n[0]).join('') || 'U'
-                        })) || []}
-                        labels={draggedTask.taskLabels ? draggedTask.taskLabels.map((tl: any) => ({
-                          id: tl.label.id,
-                          name: tl.label.name,
-                          color: tl.label.color || '#6B7280'
-                        })) : []}
-                        organizationId={draggedTask.board?.organizationId}
-                        boardId={boardId}
-                      />
-                    </div>
-                  </motion.div>
-                )}
-                {tasks.map((task, index) => (
-                  <DraggableTask
-                    key={task.id || index}
-                    task={task}
-                    onTaskClick={onTaskClick}
-                    labels={labels}
-                    boardId={boardId}
-                    onTaskUpdate={onTaskUpdate}
-                  />
-                ))}
-              </div>
-            )}
-          </AnimatePresence>
-        </SortableContext>
-      </div>
-
-    </motion.div>
+        <div>
+          {tasks.length === 0 ? (
+            <div className="text-center py-8 text-gray-400">
+              <p className="text-sm">No items in this sprint</p>
+              <p className="text-xs mt-1">Drag items here to add them</p>
+            </div>
+          ) : (
+            <div>
+              {tasks.map((task, index) => (
+                <DraggableTask
+                  key={task.id || index}
+                  task={task}
+                  index={index}
+                  onTaskClick={onTaskClick}
+                  labels={labels}
+                  boardId={boardId}
+                  onTaskUpdate={onTaskUpdate}
+                />
+              ))}
+            </div>
+          )}
+            {provided.placeholder}
+          </div>
+        </div>
+      )}
+    </Droppable>
   )
 }
 
@@ -394,7 +317,6 @@ export default function ProductBacklogRedesigned({
   const { user } = useSupabase()
   const router = useRouter()
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
-  const [activeTask, setActiveTask] = useState<Task | null>(null)
   const [showFinishedSprints, setShowFinishedSprints] = useState(false)
   const [isCreateSprintOpen, setIsCreateSprintOpen] = useState(false)
   const [newSprintData, setNewSprintData] = useState({ name: '', goal: '' })
@@ -405,7 +327,6 @@ export default function ProductBacklogRedesigned({
   const [startingSprintId, setStartingSprintId] = useState<string | null>(null)
   const [startSprintData, setStartSprintData] = useState({ dueDate: '', goal: '' })
   const [optimisticTasks, setOptimisticTasks] = useState<Task[]>([])
-  const [dragOverSprintId, setDragOverSprintId] = useState<string | null>(null)
 
   // Use provided data instead of fetching
   const sprints = useMemo(() => boardData?.sprints || [], [boardData?.sprints])
@@ -449,160 +370,88 @@ export default function ProductBacklogRedesigned({
     return sprint.tasks
   }, [sprintDetails, sprints])
 
-  const sensors = useSensors(
-    useSensor(MouseSensor, {
-      activationConstraint: {
-        distance: 8,
-      },
-    }),
-    useSensor(TouchSensor, {
-      activationConstraint: {
-        delay: 250,
-        tolerance: 5,
-      },
-    }),
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8,
-      },
-    })
-  )
 
-  const handleDragStart = useCallback((event: DragStartEvent) => {
-    const task = tasks.find((t: Task) => t.id === event.active.id)
-    console.log('Drag start - task found:', !!task, 'activeId:', event.active.id, 'task:', task?.title)
-    if (task) {
-      setActiveTask(task)
-    }
-  }, [tasks])
 
-  const handleDragOver = useCallback((event: DragOverEvent) => {
-    const { active, over } = event
-    if (!over) {
-      setDragOverSprintId(null)
+  const handleDragEnd = useCallback(async (result: DropResult) => {
+    const { destination, source, draggableId } = result
+    console.log('Drag end')
+
+    if (!destination) return
+
+    // If dropped in same position, do nothing
+    if (destination.droppableId === source.droppableId && destination.index === source.index) {
       return
     }
-
-    const overId = over.id as string
-    const activeId = active.id as string
-    
-    // Find if we're over a sprint or a task
-    const overTask = tasks.find((t: Task) => t.id === overId)
-    const overSprint = sprints.find((s: Sprint) => s.id === overId)
-    
-    // Determine the target sprint ID
-    const targetSprintId = overSprint?.id || overTask?.sprintId
-    
-    // Set the dragOverSprintId for visual feedback
-    if (targetSprintId) {
-      setDragOverSprintId(targetSprintId)
-    }
-  }, [tasks, sprints])
-
-  const handleDragEnd = useCallback(async (event: DragEndEvent) => {
-    const { active, over } = event
-    console.log('Drag end - clearing activeTask')
-    setActiveTask(null)
-    setDragOverSprintId(null)
-
-    if (!over || active.id === over.id) return
-
-    const activeId = active.id as string
-    const overId = over.id as string
 
     // Find the dragged task
-    const activeTask = tasks.find((t: Task) => t.id === activeId)
-    if (!activeTask) return
+    const draggedTask = tasks.find((t: Task) => t.id === draggableId)
+    if (!draggedTask) return
 
-    // Check if we're dropping on a task or a sprint
-    const overTask = tasks.find((t: Task) => t.id === overId)
-    const overSprint = sprints.find((s: Sprint) => s.id === overId)
+    const sourceSprintId = source.droppableId
+    const targetSprintId = destination.droppableId
 
-    if (overTask && activeTask.sprintId === overTask.sprintId) {
+    if (sourceSprintId === targetSprintId) {
       // Reordering within the same sprint
-      const sprintTasks = tasks
-        .filter((t: Task) => t.sprintId === activeTask.sprintId)
-        .sort((a: Task, b: Task) => (a.position || 0) - (b.position || 0))
-
-      const oldIndex = sprintTasks.findIndex((t: Task) => t.id === activeId)
-      const newIndex = sprintTasks.findIndex((t: Task) => t.id === overId)
-
-      if (oldIndex !== newIndex) {
-        // Calculate new positions for all affected tasks
-        const reorderedTasks = [...sprintTasks]
-        const [movedTask] = reorderedTasks.splice(oldIndex, 1)
-        reorderedTasks.splice(newIndex, 0, movedTask)
-
-        // Optimistic update - immediately show the new order
-        const updatedTasks = tasks.map((task: Task) => {
-          const reorderedIndex = reorderedTasks.findIndex(t => t.id === task.id)
-          if (reorderedIndex !== -1) {
-            return { ...task, position: reorderedIndex }
-          }
-          return task
-        })
-        setOptimisticTasks(updatedTasks)
-
-        try {
-          // Update the main task that was moved
-          const response = await fetch(`/api/tasks/${activeId}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ position: newIndex })
+      // @hello-pangea/dnd handles visual reordering, we just need to persist position
+      try {
+        const response = await fetch(`/api/tasks/${draggableId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            position: destination.index
           })
+        })
 
-          if (!response.ok) {
-            throw new Error('Failed to update task position')
-          }
-
-          // Success - revalidate to get server state
-          mutateTasks()
-        } catch (error) {
-          toast.error('Failed to reorder tasks')
-          setOptimisticTasks([]) // Clear optimistic state to revert
+        if (!response.ok) {
+          throw new Error('Failed to update task position')
         }
+
+        mutateTasks()
+        toast.success('Task reordered successfully')
+      } catch (error: unknown) {
+        console.error('Error reordering task:', error)
+        toast.error('Failed to reorder task')
+        mutateTasks() // Revert on error
       }
-      return
-    }
+    } else {
+      // Moving between sprints
+      const targetSprint = sprints.find((s: Sprint) => s.id === targetSprintId)
+      if (!targetSprint) return
 
-    // Moving to a different sprint
-    const targetSprintId = overSprint?.id || overTask?.sprintId
-    if (!targetSprintId || activeTask.sprintId === targetSprintId) {
-      return // No need to move if already in the same sprint
-    }
-
-    const targetSprint = sprints.find((s: Sprint) => s.id === targetSprintId)
-    if (!targetSprint) return
-
-    // Optimistic update - immediately move task to target sprint
-    const updatedTasks = tasks.map((t: Task) => {
-      if (t.id === activeId) {
-        return { ...t, sprintId: targetSprintId }
-      }
-      return t
-    })
-    setOptimisticTasks(updatedTasks)
-
-    try {
-      // Add task to sprint
-      const response = await fetch(`/api/sprints/${targetSprintId}/tasks`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ taskId: activeId })
+      // Optimistic update - show task moved immediately
+      const optimisticUpdate = tasks.map((task: Task) => {
+        if (task.id === draggableId) {
+          return {
+            ...task,
+            sprintId: targetSprintId === 'backlog' ? null : targetSprintId,
+            position: destination.index
+          }
+        }
+        return task
       })
+      setOptimisticTasks(optimisticUpdate)
 
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Failed to move task')
+      try {
+        // Move task to new sprint
+        const response = await fetch(`/api/sprints/${targetSprintId}/tasks`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ taskId: draggableId })
+        })
+
+        if (!response.ok) {
+          const error = await response.json()
+          throw new Error(error.error || 'Failed to move task')
+        }
+
+        // Success - show toast and revalidate
+        toast.success(`Task moved to ${targetSprint.name}`)
+        mutateTasks()
+        mutateSprints()
+      } catch (error: unknown) {
+        toast.error(error instanceof Error ? error.message : 'Failed to move task')
+        setOptimisticTasks([]) // Clear optimistic state to revert
       }
-
-      // Success - show toast and revalidate
-      toast.success(`Task moved to ${targetSprint.name}`)
-      mutateTasks()
-      mutateSprints()
-    } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : 'Failed to move task')
-      setOptimisticTasks([]) // Clear optimistic state to revert
     }
   }, [tasks, sprints, mutateTasks, mutateSprints])
 
@@ -886,18 +735,8 @@ export default function ProductBacklogRedesigned({
 
       {/* Sprint Columns */}
       <div className="flex-1 overflow-x-auto">
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragStart={handleDragStart}
-          onDragOver={handleDragOver}
-          onDragEnd={handleDragEnd}
-        >
+        <DragDropContext onDragEnd={handleDragEnd}>
           <div className="flex gap-4 p-6 min-h-full">
-            <SortableContext
-              items={visibleSprints.map((s: Sprint) => s.id)}
-              strategy={horizontalListSortingStrategy}
-            >
               {visibleSprints.map((sprint: Sprint) => (
                 <DroppableSprintColumn
                   key={sprint.id}
@@ -912,68 +751,12 @@ export default function ProductBacklogRedesigned({
                   isActiveSprint={sprint.id === activeSprint?.id}
                   boardId={boardId}
                   onTaskUpdate={mutateTasks}
-                  isDragOver={dragOverSprintId === sprint.id && activeTask?.sprintId !== sprint.id}
-                  draggedTask={activeTask}
+                  isDragOver={false}
+                  draggedTask={null}
                 />
               ))}
-            </SortableContext>
           </div>
-
-          <DragOverlay
-            dropAnimation={{
-              duration: 250,
-              easing: 'cubic-bezier(0.18, 0.67, 0.6, 1.22)',
-            }}
-            style={{ 
-              zIndex: 99999,
-              position: 'fixed',
-              pointerEvents: 'none'
-            }}
-          >
-            {activeTask && (
-              <>
-                {console.log('DragOverlay rendering with activeTask:', activeTask.title)}
-                <motion.div
-                  className="rotate-2 scale-105 shadow-2xl pointer-events-none"
-                  style={{
-                    filter: 'drop-shadow(0 20px 25px rgb(0 0 0 / 0.15)) drop-shadow(0 10px 10px rgb(0 0 0 / 0.04))',
-                    zIndex: 99999,
-                    position: 'relative'
-                  }}
-                  initial={{ rotate: 0, scale: 1 }}
-                  animate={{
-                    rotate: 2,
-                    scale: 1.05,
-                    transition: { duration: 0.15, ease: "easeOut" }
-                  }}
-                >
-                  <TaskCardModern
-                    id={activeTask.id}
-                    itemCode={activeTask.id}
-                    title={activeTask.title}
-                    description={activeTask.description || ''}
-                    taskType={activeTask.taskType as unknown}
-                    storyPoints={activeTask.storyPoints || 0}
-                    priority={activeTask.priority as any}
-                    assignees={activeTask.taskAssignees?.map((ta: unknown) => ({
-                      id: ta.user.id,
-                      name: ta.user.fullName || ta.user.email || 'Unknown User',
-                      avatar: ta.user.avatarUrl || undefined,
-                      initials: ta.user.fullName?.split(' ').map((n: string) => n[0]).join('') || 'U'
-                    })) || []}
-                    labels={activeTask.taskLabels ? activeTask.taskLabels.map(tl => ({
-                      id: tl.label.id,
-                      name: tl.label.name,
-                      color: tl.label.color || '#6B7280'
-                    })) : []}
-                    organizationId={activeTask.board?.organizationId}
-                    boardId={boardId}
-                  />
-                </motion.div>
-              </>
-            )}
-          </DragOverlay>
-        </DndContext>
+        </DragDropContext>
       </div>
 
       {/* Item Modal */}

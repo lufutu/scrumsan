@@ -54,7 +54,7 @@ export function AppHeader({
       }
 
       let label = segment;
-      let href = currentPath;
+      const href = currentPath;
 
       // Map route segments to human-readable labels
       switch (segment) {
