@@ -12,6 +12,9 @@ import BoardEditForm from '@/components/boards/board-edit-form'
 import BoardDeleteDialog from '@/components/boards/board-delete-dialog'
 import { AppHeader } from '@/components/dashboard/app-header'
 import { useBoardData } from '@/hooks/useBoardData'
+import { useProductBacklogActions } from '@/hooks/useProductBacklogActions'
+import { useSupabase } from '@/providers/supabase-provider'
+import { useOrganization } from '@/providers/organization-provider'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,12 +25,21 @@ import {
 
 
 
+interface ProductBacklogState {
+  showFinishedSprints: boolean
+  onToggleFinishedSprints: () => void
+  onCreateSprint: () => void
+}
+
 function BoardContent() {
   const params = useParams()
   const searchParams = useSearchParams()
   const boardId = params?.boardId as string
+  const { user } = useSupabase()
+  const { currentMember } = useOrganization()
   const [initialTaskId, setInitialTaskId] = useState<string | null>(null)
-  
+  const [productBacklogState, setProductBacklogState] = useState<ProductBacklogState | null>(null)
+
   // Handle search params after hydration
   useEffect(() => {
     const taskId = searchParams?.get('task')
@@ -35,7 +47,7 @@ function BoardContent() {
       setInitialTaskId(taskId)
     }
   }, [searchParams])
-  
+
   const { data: boardData, error, isLoading, mutate } = useBoardData(boardId)
   const board = boardData?.board
 
@@ -91,7 +103,7 @@ function BoardContent() {
                 {error.message === 'Board not found' ? 'Board Not Found' : 'Oops! Something went wrong'}
               </h1>
               <p className="text-gray-600 dark:text-gray-300 animate-in fade-in-0 slide-in-from-bottom-2 duration-500 delay-300">
-                {error.message === 'Board not found' 
+                {error.message === 'Board not found'
                   ? "The board you're looking for doesn't exist or you don't have access to it."
                   : error.message
                 }
@@ -117,21 +129,41 @@ function BoardContent() {
     return boardType === 'scrum' ? Calendar : Kanban
   }
 
+  // Get Product Backlog view state - needs to be declared before breadcrumbs
+  const isProductBacklogView = board.boardType === 'scrum' && !searchParams?.get('sprintId')
 
   // Create breadcrumbs
   const BoardIcon = getBoardIcon(board.boardType)
   const breadcrumbs = [
     { label: 'Home', href: '/' },
     { label: 'Boards', href: '/boards' },
-    { 
-      label: board.name, 
+    {
+      label: board.name,
       icon: <BoardIcon className="w-4 h-4" />,
-      isCurrentPage: true 
+      href: `/boards/${board.id}`,
+      isCurrentPage: !isProductBacklogView
     }
   ]
 
+  // Add Product Backlog breadcrumb if we're in scrum mode
+  if (isProductBacklogView) {
+    breadcrumbs.push({
+      label: 'Product Backlog',
+      isCurrentPage: true
+    })
+  }
+  const productBacklogActions = useProductBacklogActions({
+    boardId: board.id,
+    activeSprint: boardData?.activeSprint || null,
+    showFinishedSprints: productBacklogState?.showFinishedSprints || false,
+    onToggleFinishedSprints: productBacklogState?.onToggleFinishedSprints || (() => { }),
+    onCreateSprint: productBacklogState?.onCreateSprint || (() => { })
+  })
+
   // Header actions
-  const headerActions = (
+  const canManageBoard = user?.id === board.created_by || ['owner', 'admin'].includes(currentMember?.role || '')
+  
+  const boardActions = canManageBoard ? (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="outline" size="sm">
@@ -146,7 +178,7 @@ function BoardContent() {
         </BoardEditForm>
         <DropdownMenuSeparator />
         <BoardDeleteDialog board={board}>
-          <DropdownMenuItem 
+          <DropdownMenuItem
             onSelect={(e) => e.preventDefault()}
             className="text-red-600"
           >
@@ -155,33 +187,38 @@ function BoardContent() {
         </BoardDeleteDialog>
       </DropdownMenuContent>
     </DropdownMenu>
+  ) : null
+
+  // Combine board actions with product backlog actions if applicable
+  const headerActions = (
+    <div className="flex items-center gap-2">
+      {isProductBacklogView && productBacklogState && productBacklogActions.actions}
+      {boardActions}
+    </div>
   )
 
   return (
     <>
-      <AppHeader 
+      <AppHeader
         title={board.name}
         breadcrumbs={breadcrumbs}
         actions={headerActions}
       />
-      <main className="flex-1 overflow-auto">
-        <div className="h-full flex flex-col">
-          <div className="flex-1 px-6">
-            {board.boardType === 'scrum' ? (
-              <Scrum 
-                boardId={board.id}
-                organizationId={board.organizationId}
-                initialTaskId={initialTaskId}
-                boardColor={board.color}
-                boardData={boardData}
-                onDataChange={mutate}
-              />
-            ) : (
-              <StandaloneBoardView board={board} onUpdate={mutate} />
-            )}
-          </div>
+        <div className='px-4 py-6'>
+          {board.boardType === 'scrum' ? (
+            <Scrum
+              boardId={board.id}
+              organizationId={board.organizationId}
+              initialTaskId={initialTaskId}
+              boardColor={board.color}
+              boardData={boardData}
+              onDataChange={mutate}
+              onProductBacklogStateChange={setProductBacklogState}
+            />
+          ) : (
+            <StandaloneBoardView board={board} onUpdate={mutate} />
+          )}
         </div>
-      </main>
     </>
   )
 }

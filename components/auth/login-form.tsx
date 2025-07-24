@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -10,6 +10,8 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 
 export function LoginForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const returnUrl = searchParams.get('returnUrl')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -30,7 +32,8 @@ export function LoginForm() {
       if (error) throw error
 
       router.refresh()
-      router.push('/')
+      // Redirect to return URL if provided, otherwise go to home
+      router.push(returnUrl || '/')
     } catch (error) {
       setError(error instanceof Error ? error.message : 'An error occurred')
     } finally {

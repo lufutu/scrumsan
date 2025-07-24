@@ -40,7 +40,8 @@ export function useOrganizations() {
       await mutate()
       toast.success('Organization created successfully')
     } catch (error: any) {
-      toast.error(error.message)
+      console.error('Failed to create organization:', error)
+      toast.error(error.message || 'Failed to create organization')
       throw error
     }
   }, [mutate])
@@ -61,7 +62,8 @@ export function useOrganizations() {
       await mutate()
       toast.success('Organization updated successfully')
     } catch (error: any) {
-      toast.error(error.message)
+      console.error('Failed to update organization:', error)
+      toast.error(error.message || 'Failed to update organization')
       throw error
     }
   }, [mutate])
@@ -80,7 +82,8 @@ export function useOrganizations() {
       await mutate()
       toast.success('Organization deleted successfully')
     } catch (error: any) {
-      toast.error(error.message)
+      console.error('Failed to delete organization:', error)
+      toast.error(error.message || 'Failed to delete organization')
       throw error
     }
   }, [mutate])

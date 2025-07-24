@@ -14,7 +14,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { EnhancedAvatar } from '@/components/ui/enhanced-avatar'
 import { 
   Calendar, 
   Users, 
@@ -254,12 +254,15 @@ export default function ProjectOverviewTable() {
                       <div className="flex flex-col gap-2">
                         <div className="flex -space-x-2">
                           {project.members.slice(0, 3).map((member) => (
-                            <Avatar key={member.id} className="h-8 w-8 border-2 border-background">
-                              <AvatarImage src={member.user.avatarUrl} />
-                              <AvatarFallback className="text-xs">
-                                {member.user.fullName?.split(' ').map(n => n[0]).join('') || 'U'}
-                              </AvatarFallback>
-                            </Avatar>
+                            <EnhancedAvatar
+                              key={member.id}
+                              src={member.user.avatarUrl}
+                              fallbackSeed={member.user.email || member.user.fullName || 'user'}
+                              fallbackSeeds={[member.user.fullName || '']}
+                              size="md"
+                              className="h-8 w-8 border-2 border-background"
+                              alt={member.user.fullName || member.user.email || 'User'}
+                            />
                           ))}
                           {project._count.members > 3 && (
                             <div className="h-8 w-8 rounded-full bg-muted border-2 border-background flex items-center justify-center">

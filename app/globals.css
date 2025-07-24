@@ -190,3 +190,103 @@
     font-family: var(--font-sans);
   }
 }
+
+@layer utilities {
+  /* Custom responsive breakpoints for team management */
+  .xs\:inline {
+    @media (min-width: 475px) {
+      display: inline;
+    }
+  }
+  
+  .xs\:hidden {
+    @media (min-width: 475px) {
+      display: none;
+    }
+  }
+  
+  /* Focus styles for better accessibility */
+  .focus-ring {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2;
+  }
+  
+  /* Enhanced focus styles for interactive elements */
+  .focus-enhanced {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background;
+  }
+  
+  /* Skip link for keyboard navigation */
+  .skip-link {
+    @apply absolute -top-10 left-4 z-50 bg-background text-foreground px-4 py-2 rounded-md border-2 border-ring;
+    @apply focus:top-4 transition-all duration-200;
+  }
+  
+  /* High contrast mode support */
+  @media (prefers-contrast: high) {
+    .border {
+      border-width: 2px;
+    }
+    
+    .text-muted-foreground {
+      @apply text-foreground;
+    }
+    
+    .bg-muted {
+      @apply bg-background border-2 border-foreground;
+    }
+    
+    .hover\:bg-muted\/50:hover {
+      @apply bg-accent;
+    }
+    
+    .focus-visible\:ring-ring\/50:focus-visible {
+      @apply ring-ring;
+    }
+  }
+  
+  /* Reduced motion support */
+  @media (prefers-reduced-motion: reduce) {
+    .animate-spin {
+      animation: none;
+    }
+    
+    .transition-all {
+      transition: none;
+    }
+  }
+  
+  /* Touch-friendly sizing */
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Mobile-specific optimizations */
+  @media (max-width: 640px) {
+    .mobile-scroll {
+      -webkit-overflow-scrolling: touch;
+      scroll-behavior: smooth;
+    }
+    
+    .mobile-tap {
+      -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
+    }
+    
+    /* Larger touch targets on mobile */
+    button, [role="button"], input, select, textarea {
+      min-height: 44px;
+    }
+    
+    /* Better spacing for mobile */
+    .mobile-spacing > * + * {
+      margin-top: 1rem;
+    }
+  }
+  
+  /* Hover states only on devices that support hover */
+  @media (hover: hover) and (pointer: fine) {
+    .hover-only:hover {
+      @apply bg-muted/50;
+    }
+  }
+}

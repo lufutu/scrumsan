@@ -69,7 +69,6 @@ export const useBoardData = (boardId: string | null) => {
     fetcher
   )
 
-  console.log("Load tasks from board")
   const { data: tasks, error: tasksError, mutate: mutateTasks } = useSWR<Task[]>(
     shouldFetchDetails ? `/api/tasks?boardId=${boardId}` : null,
     fetcher

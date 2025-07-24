@@ -15,11 +15,11 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { 
-  LinkIcon, 
-  Kanban, 
-  Calendar, 
-  Users, 
+import {
+  LinkIcon,
+  Kanban,
+  Calendar,
+  Users,
   Plus,
   Loader2
 } from 'lucide-react'
@@ -60,10 +60,10 @@ interface ProjectBoardLinkerProps {
   children?: React.ReactNode
 }
 
-export default function ProjectBoardLinker({ 
-  projectId, 
+export default function ProjectBoardLinker({
+  projectId,
   onBoardLinked,
-  children 
+  children
 }: ProjectBoardLinkerProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [availableBoards, setAvailableBoards] = useState<AvailableBoard[]>([])
@@ -116,7 +116,10 @@ export default function ProjectBoardLinker({
 
       if (!response.ok) {
         const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to link board')
+        const message = errorData.error || 'Failed to link board'
+        console.error('Failed to link board:', message, errorData)
+        toast.error(message)
+        return
       }
 
       toast.success('Board linked successfully')
@@ -139,7 +142,10 @@ export default function ProjectBoardLinker({
 
       if (!response.ok) {
         const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to unlink board')
+        const message = errorData.error || 'Failed to unlink board'
+        console.error('Failed to unlink board:', message, errorData)
+        toast.error(message)
+        return
       }
 
       toast.success('Board unlinked successfully')
@@ -162,8 +168,8 @@ export default function ProjectBoardLinker({
   }
 
   const getBoardTypeColor = (boardType: string) => {
-    return boardType === 'scrum' 
-      ? 'bg-green-100 text-green-700 border-green-200' 
+    return boardType === 'scrum'
+      ? 'bg-green-100 text-green-700 border-green-200'
       : 'bg-blue-100 text-blue-700 border-blue-200'
   }
 
@@ -211,13 +217,13 @@ export default function ProjectBoardLinker({
                     linkedBoards.map((link) => {
                       const board = link.board
                       const BoardIcon = getBoardIcon(board.boardType)
-                      
+
                       return (
                         <Card key={link.id} className="border-green-200 bg-green-50/50">
                           <CardHeader className="pb-3">
                             <div className="flex items-start justify-between">
                               <div className="flex items-center gap-2">
-                                <div 
+                                <div
                                   className="w-3 h-3 rounded-sm"
                                   style={{ backgroundColor: board.color || '#3B82F6' }}
                                 />
@@ -280,13 +286,13 @@ export default function ProjectBoardLinker({
                   ) : (
                     availableBoards.map((board) => {
                       const BoardIcon = getBoardIcon(board.boardType)
-                      
+
                       return (
                         <Card key={board.id} className="hover:shadow-md transition-shadow">
                           <CardHeader className="pb-3">
                             <div className="flex items-start justify-between">
                               <div className="flex items-center gap-2">
-                                <div 
+                                <div
                                   className="w-3 h-3 rounded-sm"
                                   style={{ backgroundColor: board.color || '#3B82F6' }}
                                 />

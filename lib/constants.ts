@@ -21,7 +21,7 @@ export const ITEM_TYPES: ItemType[] = [
     id: 'improvement',
     name: 'Improvement',
     description: 'Existing functionalities that require additional work',
-    icon: '📈',
+    icon: '🔥',
     color: 'text-green-700',
     bgColor: 'bg-green-100'
   },
@@ -37,7 +37,7 @@ export const ITEM_TYPES: ItemType[] = [
     id: 'task',
     name: 'Task',
     description: 'Technical work not covered by other types',
-    icon: '🔧',
+    icon: '📋',
     color: 'text-purple-700',
     bgColor: 'bg-purple-100'
   },

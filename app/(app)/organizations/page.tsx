@@ -27,18 +27,14 @@ export default function OrganizationsPage() {
   if (isLoading) {
     return (
       <>
-        <AppHeader 
+        <AppHeader
           title="Organizations"
           breadcrumbs={[
             { label: 'Home', href: '/' },
             { label: 'Organizations', icon: <Building2 className="w-4 h-4" />, isCurrentPage: true }
           ]}
         />
-        <main className="flex-1 overflow-auto">
-          <div className="container px-4 py-6">
-            <PageLoadingState message="Loading organizations..." />
-          </div>
-        </main>
+        <PageLoadingState message="Loading organizations..." />
       </>
     )
   }
@@ -46,29 +42,25 @@ export default function OrganizationsPage() {
   if (error) {
     return (
       <>
-        <AppHeader 
+        <AppHeader
           title="Organizations"
           breadcrumbs={[
             { label: 'Home', href: '/' },
             { label: 'Organizations', icon: <Building2 className="w-4 h-4" />, isCurrentPage: true }
           ]}
         />
-        <main className="flex-1 overflow-auto">
-          <div className="container px-4 py-6">
-            <PageErrorState 
-              error={error}
-              onRetry={() => window.location.reload()}
-              onGoHome={() => window.location.href = '/'}
-            />
-          </div>
-        </main>
+        <PageErrorState
+          error={error}
+          onRetry={() => window.location.reload()}
+          onGoHome={() => window.location.href = '/'}
+        />
       </>
     )
   }
 
   return (
     <>
-      <AppHeader 
+      <AppHeader
         title="Organizations"
         breadcrumbs={[
           { label: 'Home', href: '/' },
@@ -81,9 +73,7 @@ export default function OrganizationsPage() {
           </Button>
         }
       />
-      <main className="flex-1 overflow-auto">
-        <div className="container px-4 py-6">
-          <div className="space-y-6">
+      <div className="px-4 py-6 space-y-6">
 
         {organizations && organizations.length === 0 ? (
           <OrganizationEmptyState
@@ -98,48 +88,46 @@ export default function OrganizationsPage() {
         ) : (
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {organizations?.map((org) => (
-            <Card key={org.id} className="flex flex-col">
-              <CardHeader className="flex-1">
-                <CardTitle className="flex items-center justify-between">
-                  {org.name}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleEditOrganization(org)}
-                    className="h-8 w-8 p-0"
-                  >
-                    <Settings className="h-4 w-4" />
-                  </Button>
-                </CardTitle>
-                <CardDescription>
-                  {org.description || 'No description'}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="text-sm text-muted-foreground">
-                  {org.members?.length || 0} members
-                </div>
-              </CardContent>
-            </Card>
+              <Card key={org.id} className="flex flex-col">
+                <CardHeader className="flex-1">
+                  <CardTitle className="flex items-center justify-between">
+                    {org.name}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleEditOrganization(org)}
+                      className="h-8 w-8 p-0"
+                    >
+                      <Settings className="h-4 w-4" />
+                    </Button>
+                  </CardTitle>
+                  <CardDescription>
+                    {org.description || 'No description'}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-sm text-muted-foreground">
+                    {org.members?.length || 0} members
+                  </div>
+                </CardContent>
+              </Card>
             ))}
           </div>
         )}
 
-            <CreateOrganizationDialog
-              open={isCreateDialogOpen}
-              onOpenChange={setIsCreateDialogOpen}
-            />
+        <CreateOrganizationDialog
+          open={isCreateDialogOpen}
+          onOpenChange={setIsCreateDialogOpen}
+        />
 
-            {editingOrganization && (
-              <EditOrganizationDialog
-                open={isEditDialogOpen}
-                onOpenChange={setIsEditDialogOpen}
-                organization={editingOrganization}
-              />
-            )}
-          </div>
-        </div>
-      </main>
+        {editingOrganization && (
+          <EditOrganizationDialog
+            open={isEditDialogOpen}
+            onOpenChange={setIsEditDialogOpen}
+            organization={editingOrganization}
+          />
+        )}
+      </div>
     </>
   )
 } 

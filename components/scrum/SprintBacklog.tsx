@@ -31,22 +31,12 @@ import {
   TrendingDown
 } from 'lucide-react'
 import {
-  DndContext,
-  DragEndEvent,
-  DragOverlay,
-  DragStartEvent,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  closestCenter,
-} from '@dnd-kit/core'
-import {
-  SortableContext,
-  useSortable,
-  verticalListSortingStrategy,
-} from '@dnd-kit/sortable'
-import { CSS } from '@dnd-kit/utilities'
-import { useDroppable } from '@dnd-kit/core'
+  DragDropContext,
+  Droppable,
+  Draggable,
+  DropResult,
+  DragStart,
+} from '@hello-pangea/dnd'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -111,22 +101,8 @@ interface SprintBacklogProps {
   onBackToBacklog?: () => void // Make optional since AppHeader handles this
 }
 
-// Sortable Task Component
-function SortableTask({ task, onTaskClick }: { task: Task; onTaskClick: (task: Task) => void }) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: task.id })
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-  }
+// Draggable Task Component
+function DraggableTask({ task, index, onTaskClick }: { task: Task; index: number; onTaskClick: (task: Task) => void }) {
 
   const getTaskTypeIcon = (type?: string) => {
     switch (type) {
@@ -150,14 +126,19 @@ function SortableTask({ task, onTaskClick }: { task: Task; onTaskClick: (task: T
   }
 
   return (
-    <div 
-      ref={setNodeRef} 
-      style={style} 
-      {...attributes} 
-      {...listeners}
-      className={`border-l-4 rounded-lg p-3 shadow-sm hover:shadow-md transition-all cursor-grab active:cursor-grabbing ${getPriorityBorderColor(task.priority)}`}
-      onDoubleClick={() => !isDragging && onTaskClick(task)}
-    >
+    <Draggable draggableId={task.id} index={index}>
+      {(provided, snapshot) => (
+        <div 
+          ref={provided.innerRef}
+          {...provided.draggableProps}
+          {...provided.dragHandleProps}
+          className={`border-l-4 rounded-lg p-3 shadow-sm hover:shadow-md transition-all cursor-grab active:cursor-grabbing ${getPriorityBorderColor(task.priority)}`}
+          style={{
+            ...provided.draggableProps.style,
+            opacity: snapshot.isDragging ? 0.5 : 1,
+          }}
+          onDoubleClick={() => !snapshot.isDragging && onTaskClick(task)}
+        >
       <div className="flex items-start gap-3">
         <div className="flex-shrink-0 text-sm">
           {getTaskTypeIcon(task.taskType)}
@@ -197,13 +178,14 @@ function SortableTask({ task, onTaskClick }: { task: Task; onTaskClick: (task: T
         </div>
       </div>
     </div>
+      )}
+    </Draggable>
   )
 }
 
 // Sprint Column Component
 function SprintColumnComponent({ 
   column, 
-  onAddColumn,
   onEditColumn,
   onDeleteColumn,
   onSetWipLimit,
@@ -225,10 +207,6 @@ function SprintColumnComponent({
   labels: any[]
 }) {
   const [showInlineForm, setShowInlineForm] = useState(false)
-  
-  const { setNodeRef, isOver } = useDroppable({
-    id: column.id,
-  })
 
   const isLimitExceeded = column.wipLimit && column.tasks.length > column.wipLimit
   const columnColor = column.name === 'To Do' ? 'bg-gray-100' : 
@@ -236,12 +214,15 @@ function SprintColumnComponent({
                      column.name === 'Done' ? 'bg-green-100' : 'bg-blue-100'
 
   return (
-    <Card 
-      ref={setNodeRef}
-      className={`min-h-[500px] transition-colors ${isLimitExceeded ? 'border-red-300' : ''} ${
-        isOver ? 'ring-2 ring-blue-400 bg-blue-50/50' : ''
-      }`}
-    >
+    <Droppable droppableId={column.id}>
+      {(provided, snapshot) => (
+        <Card 
+          ref={provided.innerRef}
+          {...provided.droppableProps}
+          className={`min-h-[500px] transition-colors ${isLimitExceeded ? 'border-red-300' : ''} ${
+            snapshot.isDraggingOver ? 'ring-2 ring-blue-400 bg-blue-50/50' : ''
+          }`}
+        >
       <CardHeader className="pb-3">
         <CardTitle className="text-lg font-semibold flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -306,11 +287,9 @@ function SprintColumnComponent({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
-        <SortableContext items={column.tasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
-          {column.tasks.map((task) => (
-            <SortableTask key={task.id} task={task} onTaskClick={setSelectedTask} />
-          ))}
-        </SortableContext>
+        {column.tasks.map((task, index) => (
+          <DraggableTask key={task.id} task={task} index={index} onTaskClick={setSelectedTask} />
+        ))}
         {column.tasks.length === 0 && !showInlineForm && (
           <div className="text-center text-sm text-muted-foreground py-8 border-2 border-dashed border-gray-200 rounded-lg">
             Drop tasks here
@@ -344,8 +323,11 @@ function SprintColumnComponent({
             Add Item
           </Button>
         )}
+        {provided.placeholder}
       </CardContent>
     </Card>
+      )}
+    </Droppable>
   )
 }
 
@@ -461,13 +443,7 @@ export default function SprintBacklog({ sprint, onBackToBacklog }: SprintBacklog
   }, [sprint.id])
 
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8,
-      },
-    })
-  )
+
 
   const allTasks = columns.flatMap(col => col.tasks)
   const totalTasks = allTasks.length
@@ -489,26 +465,26 @@ export default function SprintBacklog({ sprint, onBackToBacklog }: SprintBacklog
   const daysElapsed = Math.ceil((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
   const daysRemaining = Math.max(0, totalDays - daysElapsed)
 
-  const handleDragStart = (event: DragStartEvent) => {
-    const task = allTasks.find(t => t.id === event.active.id)
+  const handleDragStart = (start: DragStart) => {
+    const task = allTasks.find(t => t.id === start.draggableId)
     setActiveTask(task || null)
   }
 
-  const handleDragEnd = async (event: DragEndEvent) => {
-    const { active, over } = event
+  const handleDragEnd = async (result: DropResult) => {
+    const { destination, source, draggableId } = result
     setActiveTask(null)
 
-    if (!over) return
+    if (!destination) return
 
-    const taskId = active.id as string
-    const targetColumnId = over.id as string
+    const taskId = draggableId
+    const targetColumnId = destination.droppableId
 
     // Find the task being moved
     const taskToMove = allTasks.find(task => task.id === taskId)
     if (!taskToMove) return
 
     // Check if task is already in the target column
-    if (taskToMove.sprintColumnId === targetColumnId) return
+    if (source.droppableId === targetColumnId) return
 
     // Optimistically update UI
     setColumns(prev => {
@@ -738,7 +714,7 @@ export default function SprintBacklog({ sprint, onBackToBacklog }: SprintBacklog
       }
       
       toast.success('Column reordered successfully')
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error(error.message || 'Failed to reorder column')
     }
   }
@@ -804,9 +780,7 @@ export default function SprintBacklog({ sprint, onBackToBacklog }: SprintBacklog
   }
 
   return (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={closestCenter}
+    <DragDropContext
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
@@ -1217,13 +1191,7 @@ export default function SprintBacklog({ sprint, onBackToBacklog }: SprintBacklog
         </AlertDialog>
       </div>
       
-      <DragOverlay>
-        {activeTask ? (
-          <div className="opacity-90 rotate-2 scale-105">
-            <SortableTask task={activeTask} onTaskClick={() => {}} />
-          </div>
-        ) : null}
-      </DragOverlay>
+      {/* Drag overlay can be implemented if needed */}
 
       {/* Task Modal */}
       {selectedTask && (
@@ -1236,6 +1204,6 @@ export default function SprintBacklog({ sprint, onBackToBacklog }: SprintBacklog
           }}
         />
       )}
-    </DndContext>
+    </DragDropContext>
   )
 }

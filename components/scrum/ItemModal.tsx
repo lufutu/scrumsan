@@ -43,7 +43,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/animate-u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { EnhancedAvatar } from '@/components/ui/enhanced-avatar';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import {
@@ -877,12 +877,14 @@ export function ItemModal({
                     <Card className="border-slate-200">
                       <CardContent className="p-4">
                         <div className="flex gap-3">
-                          <Avatar className="h-8 w-8">
-                            <AvatarImage src={user?.user_metadata?.avatar_url} />
-                            <AvatarFallback className="text-xs bg-emerald-500 text-white">
-                              {user?.email?.charAt(0).toUpperCase()}
-                            </AvatarFallback>
-                          </Avatar>
+                          <EnhancedAvatar
+                            src={user?.user_metadata?.avatar_url}
+                            fallbackSeed={user?.email || user?.user_metadata?.full_name || 'user'}
+                            fallbackSeeds={[user?.user_metadata?.full_name || '']}
+                            size="md"
+                            className="h-8 w-8"
+                            alt={user?.user_metadata?.full_name || user?.email || 'User'}
+                          />
                           <div className="flex-1 space-y-3">
                             <Textarea
                               value={newComment}
@@ -908,12 +910,13 @@ export function ItemModal({
                       <Card key={comment.id} className="border-slate-200">
                         <CardContent className="p-4">
                           <div className="flex gap-3">
-                            <Avatar className="h-8 w-8">
-                              <AvatarImage src={comment.user.avatarUrl || ''} />
-                              <AvatarFallback className="text-xs bg-slate-500 text-white">
-                                {comment.user.fullName?.charAt(0) || 'U'}
-                              </AvatarFallback>
-                            </Avatar>
+                            <EnhancedAvatar
+                              src={comment.user.avatarUrl}
+                              fallbackSeed={comment.user.fullName || 'user'}
+                              size="md"
+                              className="h-8 w-8"
+                              alt={comment.user.fullName || 'User'}
+                            />
                             <div className="flex-1">
                               <div className="flex items-center gap-2 mb-2">
                                 <span className="font-medium text-slate-900">
@@ -1110,12 +1113,14 @@ export function ItemModal({
                         >
                           <div className="flex items-center gap-2 mr-3">
                             {task.taskAssignees.slice(0, 3).map((assignee, index) => (
-                              <Avatar key={assignee.user.id} className={cn("h-6 w-6", index > 0 && "-ml-2")}>
-                                <AvatarImage src={assignee.user.avatarUrl || ''} />
-                                <AvatarFallback className="bg-emerald-500 text-white text-xs">
-                                  {assignee.user.fullName?.charAt(0) || 'U'}
-                                </AvatarFallback>
-                              </Avatar>
+                              <EnhancedAvatar
+                                key={assignee.user.id}
+                                src={assignee.user.avatarUrl}
+                                fallbackSeed={assignee.user.fullName || 'user'}
+                                size="sm"
+                                className={cn("h-6 w-6", index > 0 && "-ml-2")}
+                                alt={assignee.user.fullName || 'User'}
+                              />
                             ))}
                             {task.taskAssignees.length > 3 && (
                               <div className="h-6 w-6 rounded-full bg-slate-200 flex items-center justify-center text-xs text-slate-600 -ml-2">
@@ -1181,12 +1186,14 @@ export function ItemModal({
                                     className="flex items-center gap-3 p-3 cursor-pointer"
                                   >
                                     <div className="relative">
-                                      <Avatar className="h-8 w-8">
-                                        <AvatarImage src={user.user_metadata?.avatar_url} />
-                                        <AvatarFallback className="bg-emerald-500 text-white text-sm">
-                                          {user.user_metadata?.full_name?.charAt(0) || user.email?.charAt(0) || 'U'}
-                                        </AvatarFallback>
-                                      </Avatar>
+                                      <EnhancedAvatar
+                                        src={user.user_metadata?.avatar_url}
+                                        fallbackSeed={user.email || user.user_metadata?.full_name || 'user'}
+                                        fallbackSeeds={[user.user_metadata?.full_name || '']}
+                                        size="md"
+                                        className="h-8 w-8"
+                                        alt={user.user_metadata?.full_name || user.email || 'User'}
+                                      />
                                       {task?.taskAssignees?.some(ta => ta.user.id === user.id) && (
                                         <div className="absolute -bottom-1 -right-1 h-4 w-4 bg-emerald-500 rounded-full flex items-center justify-center">
                                           <CheckSquare className="h-2.5 w-2.5 text-white" />
@@ -1212,12 +1219,13 @@ export function ItemModal({
                                     className="flex items-center gap-3 p-3 cursor-pointer"
                                   >
                                     <div className="relative">
-                                      <Avatar className="h-8 w-8">
-                                        <AvatarImage src={member.avatarUrl || ''} />
-                                        <AvatarFallback className="bg-emerald-500 text-white text-sm">
-                                          {member.fullName?.charAt(0) || 'U'}
-                                        </AvatarFallback>
-                                      </Avatar>
+                                      <EnhancedAvatar
+                                        src={member.avatarUrl}
+                                        fallbackSeed={member.fullName || 'user'}
+                                        size="md"
+                                        className="h-8 w-8"
+                                        alt={member.fullName || 'User'}
+                                      />
                                       {task?.taskAssignees?.some(ta => ta.user.id === member.id) && (
                                         <div className="absolute -bottom-1 -right-1 h-4 w-4 bg-emerald-500 rounded-full flex items-center justify-center">
                                           <CheckSquare className="h-2.5 w-2.5 text-white" />
@@ -1418,12 +1426,13 @@ export function ItemModal({
                       <Card key={entry.id} className="border-slate-200">
                         <CardContent className="p-4">
                           <div className="flex items-start gap-3">
-                            <Avatar className="h-8 w-8">
-                              <AvatarImage src={entry.user.avatarUrl || ''} />
-                              <AvatarFallback className="text-xs bg-blue-500 text-white">
-                                {entry.user.fullName?.charAt(0) || 'U'}
-                              </AvatarFallback>
-                            </Avatar>
+                            <EnhancedAvatar
+                              src={entry.user.avatarUrl}
+                              fallbackSeed={entry.user.fullName || 'user'}
+                              size="md"
+                              className="h-8 w-8"
+                              alt={entry.user.fullName || 'User'}
+                            />
                             <div className="flex-1">
                               <div className="flex items-center gap-2 mb-1">
                                 <span className="font-medium text-slate-900">

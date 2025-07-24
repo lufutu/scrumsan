@@ -1,5 +1,6 @@
 import { Metadata } from 'next'
 import Link from 'next/link'
+import { Suspense } from 'react'
 import { LoginForm } from '@/components/auth/login-form'
 
 export const metadata: Metadata = {
@@ -20,7 +21,9 @@ export default function LoginPage() {
             </Link>
           </p>
         </div>
-        <LoginForm />
+        <Suspense fallback={<div>Loading...</div>}>
+          <LoginForm />
+        </Suspense>
       </div>
     </div>
   )

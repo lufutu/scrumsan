@@ -23,7 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { EnhancedAvatar } from '@/components/ui/enhanced-avatar'
 import {
   Dialog,
   DialogContent,

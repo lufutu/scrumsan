@@ -4,7 +4,7 @@
 This guide outlines the migration from scattered interface definitions to centralized types in `/types/shared.ts`.
 
 ## ✅ Completed Components
-- `ProductBacklogRedesigned.tsx` - Updated to use `Sprint`, `Task`, `ProductBacklogProps`
+- `ProductBacklog.tsx` - Updated to use `Sprint`, `Task`, `ProductBacklogProps`
 - `TaskCardModern.tsx` - Updated to use `TaskCardProps`
 - `EnhancedScrumBoard.tsx` - Updated to use `Task`, `Sprint`, `BoardColumn`
 - `project-board.tsx` - Updated to use `BoardColumn`, `ProjectBoardProps`

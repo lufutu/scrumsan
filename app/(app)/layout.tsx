@@ -32,7 +32,7 @@ export default function AppLayout({
   return (
     <SidebarProvider>
       <AppSidebar />
-      <SidebarInset>
+      <SidebarInset className="overflow-auto">
         {children}
       </SidebarInset>
     </SidebarProvider>

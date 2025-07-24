@@ -1,9 +1,15 @@
 "use client"
 
 import { useState, useEffect } from 'react'
-import ProductBacklogRedesigned from './ProductBacklogRedesigned'
+import ProductBacklog from './ProductBacklog'
 import SprintBacklog from './SprintBacklog'
 import { BoardData } from '@/hooks/useBoardData'
+
+interface ProductBacklogState {
+  showFinishedSprints: boolean
+  onToggleFinishedSprints: () => void
+  onCreateSprint: () => void
+}
 
 interface ScrumProps {
   boardId: string
@@ -13,6 +19,7 @@ interface ScrumProps {
   boardColor?: string | null
   boardData?: BoardData | null
   onDataChange?: () => void
+  onProductBacklogStateChange?: (state: ProductBacklogState) => void
 }
 
 interface Sprint {
@@ -24,13 +31,13 @@ interface Sprint {
   endDate?: string
 }
 
-export default function Scrum({ boardId, projectId, organizationId, initialTaskId, boardColor, boardData, onDataChange }: ScrumProps) {
+export default function Scrum({ boardId, projectId, organizationId, initialTaskId, boardColor, boardData, onDataChange, onProductBacklogStateChange }: ScrumProps) {
   const [currentView, setCurrentView] = useState<'product-backlog' | 'sprint-backlog'>('product-backlog')
   const [selectedSprintId, setSelectedSprintId] = useState<string | null>(null)
-  
+
   // Use provided board data instead of fetching
   const activeSprint = boardData?.activeSprint
-  
+
   // Check URL params for sprint view
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search)
@@ -55,9 +62,9 @@ export default function Scrum({ boardId, projectId, organizationId, initialTaskI
   }
 
   return (
-    <div className="h-full">
+    <>
       {currentView === 'product-backlog' ? (
-        <ProductBacklogRedesigned
+        <ProductBacklog
           boardId={boardId}
           organizationId={organizationId}
           projectId={projectId}
@@ -65,10 +72,11 @@ export default function Scrum({ boardId, projectId, organizationId, initialTaskI
           boardColor={boardColor}
           boardData={boardData}
           onDataChange={onDataChange}
+          onStateChange={onProductBacklogStateChange}
         />
       ) : selectedSprintId && activeSprint ? (
         <SprintBacklog
-          sprint={{ 
+          sprint={{
             id: selectedSprintId,
             name: activeSprint.name || '',
             goal: activeSprint.goal || '',
@@ -79,6 +87,6 @@ export default function Scrum({ boardId, projectId, organizationId, initialTaskI
           onBackToBacklog={handleBackToProductBacklog}
         />
       ) : null}
-    </div>
+    </>
   )
 }

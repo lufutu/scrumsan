@@ -74,7 +74,7 @@ export function AppHeader({
           label = 'Tasks';
           break;
         case 'members':
-          label = 'Members';
+          label = 'Team Management';
           break;
         case 'settings':
           label = 'Settings';

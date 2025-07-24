@@ -3,7 +3,10 @@ import { useCallback } from 'react'
 import { toast } from 'sonner'
 
 const fetcher = (url: string) => fetch(url).then(res => {
-  if (!res.ok) throw new Error('Failed to fetch')
+  if (!res.ok) {
+    console.error('Fetch failed:', res.status, res.statusText, url)
+    throw new Error('Failed to fetch')
+  }
   return res.json()
 })
 
@@ -76,7 +79,8 @@ export function useProjects(organizationId?: string) {
       toast.success('Project created successfully')
       return await response.json()
     } catch (error: any) {
-      toast.error(error.message)
+      console.error('Failed to create project:', error)
+      toast.error(error.message || 'Failed to create project')
       throw error
     }
   }, [mutate])

@@ -9,7 +9,7 @@ import Link from 'next/link'
 import { useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/animate-ui/radix/tabs'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { EnhancedAvatar } from '@/components/ui/enhanced-avatar'
 import {
   Dialog,
   DialogContent,
@@ -20,6 +20,8 @@ import {
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+
 
 const fetcher = (url: string) => fetch(url).then(res => {
   if (!res.ok) throw new Error('Failed to fetch')
@@ -87,7 +89,7 @@ export default function LabelDetailPage() {
   const boardId = params?.boardId as string
   const labelId = params?.labelId as string
   const initialTab = searchParams?.get('tab') || 'items'
-  
+
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [editLabel, setEditLabel] = useState({
     name: '',
@@ -185,7 +187,7 @@ export default function LabelDetailPage() {
               Back to Labels
             </Link>
           </Button>
-          
+
           <div className="flex items-center gap-3">
             <div
               className="w-4 h-4 rounded-full"
@@ -297,8 +299,8 @@ export default function LabelDetailPage() {
                           <div>
                             <h4 className="font-medium">{task.title}</h4>
                             <div className="flex items-center gap-2 mt-1">
-                              <Badge 
-                                variant="outline" 
+                              <Badge
+                                variant="outline"
                                 className={getTaskTypeColor(task.taskType)}
                               >
                                 {task.taskType || 'Task'}
@@ -310,7 +312,7 @@ export default function LabelDetailPage() {
                           </div>
                         </div>
                       </div>
-                      
+
                       <div className="flex items-center gap-3">
                         {task.storyPoints && (
                           <div className="flex items-center gap-1">
@@ -318,7 +320,7 @@ export default function LabelDetailPage() {
                             <span className="text-sm">{task.storyPoints}</span>
                           </div>
                         )}
-                        
+
                         {task.assignee && (
                           <Avatar className="w-6 h-6">
                             <AvatarImage src={task.assignee.avatarUrl || undefined} />
@@ -347,7 +349,7 @@ export default function LabelDetailPage() {
                   <div className="flex justify-between">
                     <span>Completion Rate</span>
                     <span className="font-medium">
-                      {label.statistics.totalTasks > 0 
+                      {label.statistics.totalTasks > 0
                         ? Math.round((label.statistics.completedTasks / label.statistics.totalTasks) * 100)
                         : 0
                       }%
@@ -357,10 +359,10 @@ export default function LabelDetailPage() {
                     <div
                       className="bg-green-600 h-2 rounded-full"
                       style={{
-                        width: `${label.statistics.totalTasks > 0 
+                        width: `${label.statistics.totalTasks > 0
                           ? (label.statistics.completedTasks / label.statistics.totalTasks) * 100
                           : 0
-                        }%`
+                          }%`
                       }}
                     />
                   </div>
@@ -404,14 +406,14 @@ export default function LabelDetailPage() {
                 <label className="text-sm font-medium">Name</label>
                 <p className="text-lg">{label.name}</p>
               </div>
-              
+
               <div>
                 <label className="text-sm font-medium">Description</label>
                 <p className="text-muted-foreground">
                   {label.description || 'No description provided'}
                 </p>
               </div>
-              
+
               <div>
                 <label className="text-sm font-medium">Color</label>
                 <div className="flex items-center gap-2">
@@ -422,7 +424,7 @@ export default function LabelDetailPage() {
                   <span className="font-mono text-sm">{label.color || '#3B82F6'}</span>
                 </div>
               </div>
-              
+
               <div>
                 <label className="text-sm font-medium">Created</label>
                 <p className="text-muted-foreground">

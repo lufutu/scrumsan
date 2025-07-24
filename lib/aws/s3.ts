@@ -4,8 +4,8 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 // Create S3 client lazily to ensure environment variables are loaded
 function createS3Client() {
   const region = process.env.AWS_REGION
-  const accessKeyId = process.env.AWS_ACCESS_KEY
-  const secretAccessKey = process.env.AWS_SECRET_KEY
+  const accessKeyId = process.env.AWS_ACCESS_KEY_ID
+  const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY
   
   if (!region || !accessKeyId || !secretAccessKey) {
     throw new Error(`Missing AWS credentials: region=${!!region}, accessKeyId=${!!accessKeyId}, secretAccessKey=${!!secretAccessKey}`)
@@ -199,6 +199,43 @@ export async function uploadTaskAttachmentToS3(
 ): Promise<{ filename: string; url: string; key: string }> {
   const folder = `tasks/${taskId}/attachments`
   const result = await uploadFileToS3(file, folder)
+  
+  return {
+    filename: result.path.split('/').pop()!,
+    url: result.url,
+    key: result.key
+  }
+}
+
+/**
+ * Upload user avatar to S3
+ * @param userId - The user ID
+ * @param file - The avatar file
+ */
+export async function uploadAvatarToS3(
+  userId: string,
+  file: File
+): Promise<{ filename: string; url: string; key: string }> {
+  // Validate file type
+  const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif']
+  if (!allowedTypes.includes(file.type)) {
+    throw new Error(`Invalid file type. Allowed types: ${allowedTypes.join(', ')}`)
+  }
+  
+  // Validate file size (5MB max)
+  const maxSizeInBytes = 5 * 1024 * 1024 // 5MB
+  if (file.size > maxSizeInBytes) {
+    throw new Error(`File size exceeds 5MB limit. Current size: ${(file.size / 1024 / 1024).toFixed(2)}MB`)
+  }
+  
+  const folder = `avatars/${userId}`
+  
+  // Generate a custom filename with timestamp to avoid conflicts
+  const timestamp = Date.now()
+  const fileExt = file.name.split('.').pop()?.toLowerCase() || 'jpg'
+  const customFileName = `avatar-${timestamp}.${fileExt}`
+  
+  const result = await uploadFileToS3(file, folder, customFileName)
   
   return {
     filename: result.path.split('/').pop()!,

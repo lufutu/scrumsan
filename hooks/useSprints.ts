@@ -4,7 +4,10 @@ import { toast } from 'sonner'
 import { Sprint } from '@/types/shared'
 
 const fetcher = (url: string) => fetch(url).then(res => {
-  if (!res.ok) throw new Error('Failed to fetch')
+  if (!res.ok) {
+    console.error('Fetch failed:', res.status, res.statusText, url)
+    throw new Error('Failed to fetch')
+  }
   return res.json()
 })
 
@@ -45,7 +48,8 @@ export function useSprints(boardId?: string, projectId?: string, organizationId?
       toast.success('Sprint created successfully')
       return await response.json()
     } catch (error: any) {
-      toast.error(error.message)
+      console.error('Failed to create sprint:', error)
+      toast.error(error.message || 'Failed to create sprint')
       throw error
     }
   }, [mutate])
@@ -66,7 +70,8 @@ export function useSprints(boardId?: string, projectId?: string, organizationId?
       await mutate()
       toast.success('Sprint updated successfully')
     } catch (error: any) {
-      toast.error(error.message)
+      console.error('Failed to update sprint:', error)
+      toast.error(error.message || 'Failed to update sprint')
       throw error
     }
   }, [mutate])
@@ -85,7 +90,8 @@ export function useSprints(boardId?: string, projectId?: string, organizationId?
       await mutate()
       toast.success('Sprint deleted successfully')
     } catch (error: any) {
-      toast.error(error.message)
+      console.error('Failed to delete sprint:', error)
+      toast.error(error.message || 'Failed to delete sprint')
       throw error
     }
   }, [mutate])
@@ -101,11 +107,27 @@ export function useSprints(boardId?: string, projectId?: string, organizationId?
   }, [updateSprint])
 
   const finishSprint = useCallback(async (sprintId: string) => {
-    return updateSprint(sprintId, {
-      status: 'completed',
-      endDate: new Date().toISOString().split('T')[0]
-    })
-  }, [updateSprint])
+    try {
+      const response = await fetch(`/api/sprints/${sprintId}/finish`, {
+        method: 'POST',
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to finish sprint')
+      }
+
+      const result = await response.json()
+      await mutate()
+      
+      // Return the result so the caller can handle the response
+      return result
+    } catch (error: any) {
+      console.error('Failed to finish sprint:', error)
+      toast.error(error.message || 'Failed to finish sprint')
+      throw error
+    }
+  }, [mutate])
 
   return {
     sprints: data,

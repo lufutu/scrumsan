@@ -225,6 +225,116 @@ export const organizationCreateSchema = z.object({
 export const organizationUpdateSchema = createUpdateSchema(organizationCreateSchema.shape)
 
 /**
+ * Permission set schemas
+ */
+export const permissionConfigSchema = z.object({
+  teamMembers: z.object({
+    viewAll: z.boolean().default(false),
+    manageAll: z.boolean().default(false),
+  }).default({}),
+  projects: z.object({
+    viewAll: z.boolean().default(false),
+    manageAll: z.boolean().default(false),
+    viewAssigned: z.boolean().default(true),
+    manageAssigned: z.boolean().default(false),
+  }).default({}),
+  invoicing: z.object({
+    viewAll: z.boolean().default(false),
+    manageAll: z.boolean().default(false),
+    viewAssigned: z.boolean().default(false),
+    manageAssigned: z.boolean().default(false),
+  }).default({}),
+  clients: z.object({
+    viewAll: z.boolean().default(false),
+    manageAll: z.boolean().default(false),
+    viewAssigned: z.boolean().default(false),
+    manageAssigned: z.boolean().default(false),
+  }).default({}),
+  worklogs: z.object({
+    manageAll: z.boolean().default(false),
+  }).default({}),
+})
+
+export const permissionSetCreateSchema = z.object({
+  name: z.string().min(1, 'Name is required').max(255, 'Name too long'),
+  permissions: permissionConfigSchema,
+})
+
+export const permissionSetUpdateSchema = createUpdateSchema(permissionSetCreateSchema.shape)
+
+/**
+ * Member profile schemas
+ */
+export const visibilitySchema = z.record(z.enum(['admin', 'member'])).default({})
+
+export const memberProfileCreateSchema = z.object({
+  secondaryEmail: commonFields.email.optional().nullable(),
+  address: z.string().max(500, 'Address too long').optional().nullable(),
+  phone: z.string().max(50, 'Phone number too long').optional().nullable(),
+  linkedin: z.string().max(255, 'LinkedIn URL too long').optional().nullable(),
+  skype: z.string().max(100, 'Skype username too long').optional().nullable(),
+  twitter: z.string().max(100, 'Twitter handle too long').optional().nullable(),
+  birthday: z.string().datetime().optional().nullable(),
+  maritalStatus: z.string().max(50, 'Marital status too long').optional().nullable(),
+  family: z.string().max(1000, 'Family information too long').optional().nullable(),
+  other: z.string().max(2000, 'Other information too long').optional().nullable(),
+  visibility: visibilitySchema.optional(),
+})
+
+export const memberProfileUpdateSchema = createUpdateSchema(memberProfileCreateSchema.shape)
+
+/**
+ * Avatar upload validation schema
+ */
+export const avatarUploadSchema = z.object({
+  file: z.instanceof(File, { message: 'File is required' })
+    .refine((file) => {
+      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif']
+      return allowedTypes.includes(file.type)
+    }, 'Invalid file type. Allowed types: JPEG, JPG, PNG, WebP, GIF')
+    .refine((file) => {
+      const maxSizeInBytes = 5 * 1024 * 1024 // 5MB
+      return file.size <= maxSizeInBytes
+    }, 'File size exceeds 5MB limit'),
+})
+
+/**
+ * Profile update with avatar schema
+ */
+export const profileWithAvatarUpdateSchema = z.object({
+  // Profile fields
+  ...memberProfileCreateSchema.shape,
+  // Avatar fields
+  avatarAction: z.enum(['keep', 'upload', 'delete']).optional(),
+  avatarFile: z.instanceof(File).optional(),
+}).refine((data) => {
+  // If avatarAction is 'upload', avatarFile must be provided
+  if (data.avatarAction === 'upload' && !data.avatarFile) {
+    return false
+  }
+  return true
+}, {
+  message: 'Avatar file is required when uploading',
+  path: ['avatarFile'],
+})
+
+/**
+ * Project engagement schemas
+ */
+export const engagementCreateSchema = z.object({
+  projectId: commonFields.uuid,
+  role: z.string().max(255).optional().nullable(),
+  hoursPerWeek: z.number().int().min(1).max(168),
+  startDate: z.string().datetime(),
+  endDate: z.string().datetime().optional().nullable(),
+})
+
+export const engagementUpdateSchema = createUpdateSchema({
+  ...engagementCreateSchema.shape,
+  isActive: z.boolean().optional(),
+})
+
+/**
  * Helper to validate UUID parameters
  */
 export function validateUUID(id: string, fieldName = 'ID'): { valid: boolean; error?: string } {
@@ -235,6 +345,74 @@ export function validateUUID(id: string, fieldName = 'ID'): { valid: boolean; er
     return { valid: false, error: `Invalid ${fieldName} format` }
   }
 }
+
+/**
+ * Time-off entry schemas
+ */
+export const timeOffTypeSchema = z.enum([
+  'vacation',
+  'parental_leave', 
+  'sick_leave',
+  'paid_time_off',
+  'unpaid_time_off',
+  'other'
+])
+
+export const timeOffStatusSchema = z.enum(['pending', 'approved', 'rejected'])
+
+export const timeOffCreateSchema = z.object({
+  type: timeOffTypeSchema,
+  startDate: z.string().datetime(),
+  endDate: z.string().datetime(),
+  description: z.string().max(1000, 'Description too long').optional().nullable(),
+}).refine(
+  (data) => new Date(data.startDate) <= new Date(data.endDate),
+  {
+    message: 'Start date must be before or equal to end date',
+    path: ['endDate'],
+  }
+)
+
+export const timeOffUpdateSchema = z.object({
+  type: timeOffTypeSchema.optional(),
+  startDate: z.string().datetime().optional(),
+  endDate: z.string().datetime().optional(),
+  description: z.string().max(1000, 'Description too long').optional().nullable(),
+  status: timeOffStatusSchema.optional(),
+  approvedBy: commonFields.uuid.optional().nullable(),
+}).refine(
+  (data) => {
+    if (data.startDate && data.endDate) {
+      return new Date(data.startDate) <= new Date(data.endDate)
+    }
+    return true
+  },
+  {
+    message: 'Start date must be before or equal to end date',
+    path: ['endDate'],
+  }
+)
+
+/**
+ * Timeline event schemas
+ */
+export const timelineEventCreateSchema = z.object({
+  eventName: z.string().min(1, 'Event name is required').max(255, 'Event name too long'),
+  eventDate: z.string().datetime(),
+  description: z.string().max(1000, 'Description too long').optional().nullable(),
+})
+
+export const timelineEventUpdateSchema = createUpdateSchema(timelineEventCreateSchema.shape)
+
+/**
+ * Custom role schemas
+ */
+export const customRoleCreateSchema = z.object({
+  name: z.string().min(1, 'Role name is required').max(255, 'Role name too long'),
+  color: z.string().regex(/^#[0-9A-F]{6}$/i, 'Invalid color format (must be hex format like #3B82F6)').default('#3B82F6'),
+})
+
+export const customRoleUpdateSchema = createUpdateSchema(customRoleCreateSchema.shape)
 
 /**
  * Helper to validate and parse query parameters

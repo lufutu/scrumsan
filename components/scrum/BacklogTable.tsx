@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { EnhancedAvatar } from '@/components/ui/enhanced-avatar'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
   Select,
@@ -202,12 +202,13 @@ export default function BacklogTable({
                   <TableCell>
                     {task.assignee ? (
                       <div className="flex items-center gap-2">
-                        <Avatar className="h-6 w-6">
-                          <AvatarImage src={task.assignee.avatarUrl || ''} />
-                          <AvatarFallback>
-                            {task.assignee.fullName?.charAt(0) || 'U'}
-                          </AvatarFallback>
-                        </Avatar>
+                        <EnhancedAvatar
+                          src={task.assignee.avatarUrl}
+                          fallbackSeed={task.assignee.fullName || 'user'}
+                          size="sm"
+                          className="h-6 w-6"
+                          alt={task.assignee.fullName || 'User'}
+                        />
                         <span className="text-sm">{task.assignee.fullName}</span>
                       </div>
                     ) : (

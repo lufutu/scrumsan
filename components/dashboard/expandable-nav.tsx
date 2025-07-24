@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useOrganization } from '@/providers/organization-provider'
-import { ChevronRight, Building2, FolderOpen, Kanban, Calendar, Plus, Zap } from 'lucide-react'
+import { ChevronRight, Building2, FolderOpen, Kanban, Calendar, Plus, Zap, Users } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
@@ -372,6 +372,22 @@ export function ExpandableNav({ className }: ExpandableNavProps) {
                           </SidebarMenuSubButton>
                         </SidebarMenuSubItem>
                       ))}
+
+                      {/* Team Management */}
+                      <SidebarMenuSubItem>
+                        <SidebarMenuSubButton
+                          asChild
+                          className={cn(
+                            pathname === `/organizations/${org.id}/members` && 
+                            "bg-sidebar-accent text-sidebar-accent-foreground"
+                          )}
+                        >
+                          <Link href={`/organizations/${org.id}/members`} className="flex items-center gap-2">
+                            <Users className="h-4 w-4" />
+                            <span>Team Management</span>
+                          </Link>
+                        </SidebarMenuSubButton>
+                      </SidebarMenuSubItem>
 
                       {/* Add Project to Organization */}
                       <SidebarMenuSubItem>

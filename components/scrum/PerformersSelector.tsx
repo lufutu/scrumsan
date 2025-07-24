@@ -18,7 +18,7 @@ import {
 } from '@/components/animate-ui/radix/popover'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { EnhancedAvatar } from '@/components/ui/enhanced-avatar'
 import { Separator } from '@/components/ui/separator'
 
 interface User {
@@ -171,12 +171,14 @@ export default function PerformersSelector({
                 variant="outline"
                 className="flex items-center gap-2 pr-1"
               >
-                <Avatar className="w-4 h-4">
-                  <AvatarImage src={assignee.avatarUrl || undefined} />
-                  <AvatarFallback className="text-xs">
-                    {getInitials(assignee.fullName)}
-                  </AvatarFallback>
-                </Avatar>
+                <EnhancedAvatar
+                  src={assignee.avatarUrl}
+                  fallbackSeed={assignee.email || assignee.fullName || 'user'}
+                  fallbackSeeds={[assignee.fullName || '']}
+                  size="sm"
+                  className="w-4 h-4"
+                  alt={assignee.fullName || assignee.email || 'User'}
+                />
                 <span className="text-xs">{assignee.fullName || assignee.email || 'Unknown User'}</span>
                 <button
                   onClick={() => handleRemoveAssignee(assignee.id)}
@@ -238,12 +240,14 @@ export default function PerformersSelector({
                             isSelected ? 'bg-blue-50 border border-blue-200' : ''
                           }`}
                         >
-                          <Avatar className="w-6 h-6">
-                            <AvatarImage src={user.avatarUrl || undefined} />
-                            <AvatarFallback className="text-xs">
-                              {getInitials(user.fullName)}
-                            </AvatarFallback>
-                          </Avatar>
+                          <EnhancedAvatar
+                            src={user.avatarUrl}
+                            fallbackSeed={user.email || user.fullName || 'user'}
+                            fallbackSeeds={[user.fullName || '']}
+                            size="sm"
+                            className="w-6 h-6"
+                            alt={user.fullName || user.email || 'User'}
+                          />
                           <div className="flex-1 min-w-0">
                             <div className="font-medium text-sm">{user.fullName || 'Unknown'}</div>
                             <div className="text-xs text-gray-500 truncate">{user.email || 'No email'}</div>
@@ -284,12 +288,14 @@ export default function PerformersSelector({
                 variant="outline"
                 className="flex items-center gap-2 pr-1 border-green-200 text-green-800"
               >
-                <Avatar className="w-4 h-4">
-                  <AvatarImage src={reviewer.avatarUrl || undefined} />
-                  <AvatarFallback className="text-xs">
-                    {getInitials(reviewer.fullName)}
-                  </AvatarFallback>
-                </Avatar>
+                <EnhancedAvatar
+                  src={reviewer.avatarUrl}
+                  fallbackSeed={reviewer.email || reviewer.fullName || 'user'}
+                  fallbackSeeds={[reviewer.fullName || '']}
+                  size="sm"
+                  className="w-4 h-4"
+                  alt={reviewer.fullName || reviewer.email || 'User'}
+                />
                 <span className="text-xs">{reviewer.fullName || reviewer.email || 'Unknown User'}</span>
                 <button
                   onClick={() => handleRemoveReviewer(reviewer.id)}
@@ -351,12 +357,14 @@ export default function PerformersSelector({
                             isSelected ? 'bg-green-50 border border-green-200' : ''
                           }`}
                         >
-                          <Avatar className="w-6 h-6">
-                            <AvatarImage src={user.avatarUrl || undefined} />
-                            <AvatarFallback className="text-xs">
-                              {getInitials(user.fullName)}
-                            </AvatarFallback>
-                          </Avatar>
+                          <EnhancedAvatar
+                            src={user.avatarUrl}
+                            fallbackSeed={user.email || user.fullName || 'user'}
+                            fallbackSeeds={[user.fullName || '']}
+                            size="sm"
+                            className="w-6 h-6"
+                            alt={user.fullName || user.email || 'User'}
+                          />
                           <div className="flex-1 min-w-0">
                             <div className="font-medium text-sm">{user.fullName || 'Unknown'}</div>
                             <div className="text-xs text-gray-500 truncate">{user.email || 'No email'}</div>

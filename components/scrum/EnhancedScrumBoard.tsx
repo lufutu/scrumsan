@@ -31,16 +31,13 @@ import {
 import { TaskCardModern } from '@/components/scrum/TaskCardModern'
 import { ItemModal } from '@/components/scrum/ItemModal'
 import { ComprehensiveInlineForm } from '@/components/scrum/ComprehensiveInlineForm'
-import { 
-  DndContext, 
-  DragEndEvent, 
-  DragOverlay, 
-  DragStartEvent, 
-  useDroppable,
-  useSensor,
-  useSensors,
-  PointerSensor
-} from '@dnd-kit/core'
+import {
+  DragDropContext,
+  Droppable,
+  Draggable,
+  DropResult,
+  DragStart,
+} from '@hello-pangea/dnd'
 import { cn } from '@/lib/utils'
 
 import { Task, Sprint, BoardColumn } from '@/types/shared';
@@ -60,18 +57,22 @@ const DroppableArea = ({
   children: React.ReactNode
   className?: string 
 }) => {
-  const { setNodeRef, isOver } = useDroppable({ id })
-  
   return (
-    <div 
-      ref={setNodeRef} 
-      className={cn(
-        className,
-        isOver && "bg-blue-50 border-blue-300"
+    <Droppable droppableId={id}>
+      {(provided, snapshot) => (
+        <div 
+          ref={provided.innerRef}
+          {...provided.droppableProps}
+          className={cn(
+            className,
+            snapshot.isDraggingOver && "bg-blue-50 border-blue-300"
+          )}
+        >
+          {children}
+          {provided.placeholder}
+        </div>
       )}
-    >
-      {children}
-    </div>
+    </Droppable>
   )
 }
 
@@ -106,14 +107,7 @@ export default function EnhancedScrumBoard({
     startDate: new Date().toISOString().split('T')[0]
   })
 
-  // DnD sensors
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8,
-      },
-    })
-  )
+
 
   // Fetch data
   const fetchData = useCallback(async () => {
@@ -122,7 +116,7 @@ export default function EnhancedScrumBoard({
       fetchSprints(),
       fetchSprintColumns()
     ])
-  }, [projectId, boardId])
+  }, [fetchBacklogTasks, fetchSprints, fetchSprintColumns])
 
   const fetchBacklogTasks = async () => {
     try {
@@ -245,24 +239,23 @@ export default function EnhancedScrumBoard({
   }
 
   // Drag and drop handlers
-  const handleDragStart = (event: DragStartEvent) => {
-    const { active } = event
-    setActiveId(active.id as string)
+  const handleDragStart = (start: DragStart) => {
+    setActiveId(start.draggableId)
     
     // Find the dragged task
-    const task = backlogTasks.find(t => t.id === active.id) ||
-                sprintColumns.flatMap(col => col.tasks).find(t => t.id === active.id)
+    const task = backlogTasks.find(t => t.id === start.draggableId) ||
+                sprintColumns.flatMap(col => col.tasks).find(t => t.id === start.draggableId)
     setDraggedTask(task || null)
   }
 
-  const handleDragEnd = async (event: DragEndEvent) => {
-    const { active, over } = event
+  const handleDragEnd = async (result: DropResult) => {
+    const { destination, draggableId } = result
     setActiveId(null)
     setDraggedTask(null)
 
-    if (!over || !draggedTask) return
+    if (!destination || !draggedTask) return
 
-    const overId = over.id as string
+    const overId = destination.droppableId
 
     try {
       // If dropping on backlog
@@ -295,7 +288,7 @@ export default function EnhancedScrumBoard({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            taskId: draggedTask.id,
+            taskId: draggableId,
             targetColumnId: overId
           })
         })
@@ -365,7 +358,7 @@ export default function EnhancedScrumBoard({
   const stats = getSprintStats()
 
   return (
-    <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+    <DragDropContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <div className="h-full flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
@@ -527,12 +520,19 @@ export default function EnhancedScrumBoard({
                     />
                     
                     {/* Backlog Tasks */}
-                    {filteredBacklogTasks.map(task => (
-                      <div
-                        key={task.id}
-                        className="p-3 bg-white border rounded-lg hover:shadow-sm cursor-move"
-                        draggable
-                      >
+                    {filteredBacklogTasks.map((task, index) => (
+                      <Draggable key={task.id} draggableId={task.id} index={index}>
+                        {(provided, snapshot) => (
+                          <div
+                            ref={provided.innerRef}
+                            {...provided.draggableProps}
+                            {...provided.dragHandleProps}
+                            className="p-3 bg-white border rounded-lg hover:shadow-sm cursor-move"
+                            style={{
+                              ...provided.draggableProps.style,
+                              opacity: snapshot.isDragging ? 0.5 : 1,
+                            }}
+                          >
                         <TaskCardModern
                           id={task.id}
                           title={task.title}
@@ -556,7 +556,9 @@ export default function EnhancedScrumBoard({
                             // Trigger refetch if needed
                           }}
                         />
-                      </div>
+                          </div>
+                        )}
+                      </Draggable>
                     ))}
                     
                     {filteredBacklogTasks.length === 0 && (
@@ -588,12 +590,19 @@ export default function EnhancedScrumBoard({
                       <DroppableArea id={column.id} className="h-full">
                         <div className="space-y-3">
                           {/* Column Tasks */}
-                          {column.tasks.map(task => (
-                            <div
-                              key={task.id}
-                              className="cursor-move"
-                              draggable
-                            >
+                          {column.tasks.map((task, index) => (
+                            <Draggable key={task.id} draggableId={task.id} index={index}>
+                              {(provided, snapshot) => (
+                                <div
+                                  ref={provided.innerRef}
+                                  {...provided.draggableProps}
+                                  {...provided.dragHandleProps}
+                                  className="cursor-move"
+                                  style={{
+                                    ...provided.draggableProps.style,
+                                    opacity: snapshot.isDragging ? 0.5 : 1,
+                                  }}
+                                >
                               <TaskCardModern
                                 id={task.id}
                                 title={task.title}
@@ -617,7 +626,9 @@ export default function EnhancedScrumBoard({
                                   // Trigger refetch if needed
                                 }}
                               />
-                            </div>
+                                </div>
+                              )}
+                            </Draggable>
                           ))}
                           
                           {/* Add Task in Column */}
@@ -658,26 +669,6 @@ export default function EnhancedScrumBoard({
           </div>
         </div>
 
-        {/* Drag Overlay */}
-        <DragOverlay>
-          {draggedTask && (
-            <div className="opacity-50">
-              <TaskCardModern
-                id={draggedTask.id}
-                title={draggedTask.title}
-                description={draggedTask.description}
-                taskType={draggedTask.taskType as any}
-                storyPoints={draggedTask.storyPoints || 0}
-                assignee={draggedTask.assignee ? {
-                  name: draggedTask.assignee.fullName,
-                  initials: draggedTask.assignee.fullName.split(' ').map(n => n[0]).join(''),
-                  avatar: draggedTask.assignee.avatarUrl
-                } : undefined}
-                labels={[]}
-              />
-            </div>
-          )}
-        </DragOverlay>
       </div>
 
       {/* Task Modal */}
@@ -691,6 +682,6 @@ export default function EnhancedScrumBoard({
           }}
         />
       )}
-    </DndContext>
+    </DragDropContext>
   )
 }

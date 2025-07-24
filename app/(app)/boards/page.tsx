@@ -3,6 +3,8 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useActiveOrg } from '@/hooks/useActiveOrg'
 import { useToast } from '@/hooks/use-toast'
+import { useSupabase } from '@/providers/supabase-provider'
+import { useOrganization } from '@/providers/organization-provider'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -33,6 +35,8 @@ export default function BoardsPage() {
   const activeOrg = useActiveOrg()
   const { toast } = useToast()
   const router = useRouter()
+  const { user } = useSupabase()
+  const { currentMember } = useOrganization()
   const [boards, setBoards] = useState<Board[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -45,13 +49,13 @@ export default function BoardsPage() {
       setError(null)
 
       const response = await fetch(`/api/boards?organizationId=${activeOrg.id}`)
-      
+
       if (!response.ok) {
         throw new Error('Failed to fetch boards')
       }
-      
+
       const data = await response.json()
-      
+
       // Transform the data to match the expected format
       const transformedBoards = data.map((board: { boardType?: string; createdAt?: string; _count?: { tasks?: number; columns?: number } }) => ({
         ...board,
@@ -84,7 +88,7 @@ export default function BoardsPage() {
   const handleBoardCreated = async (newBoard?: { id?: string }) => {
     // Refresh the boards list
     await fetchBoardsCallback()
-    
+
     // Redirect to the new board
     if (newBoard?.id) {
       router.push(`/boards/${newBoard.id}`)
@@ -106,21 +110,17 @@ export default function BoardsPage() {
   if (!activeOrg) {
     return (
       <>
-        <AppHeader 
+        <AppHeader
           title="Boards"
           breadcrumbs={[
             { label: 'Home', href: '/' },
             { label: 'Boards', icon: <Kanban className="w-4 h-4" />, isCurrentPage: true }
           ]}
         />
-        <main className="flex-1 overflow-auto">
-          <div className="container px-4 py-6">
-            <OrganizationEmptyState
-              onCreateOrg={() => router.push('/organizations')}
-              className="min-h-[60vh]"
-            />
-          </div>
-        </main>
+        <OrganizationEmptyState
+          onCreateOrg={() => router.push('/organizations')}
+          className="min-h-[60vh]"
+        />
       </>
     )
   }
@@ -128,7 +128,7 @@ export default function BoardsPage() {
   if (isLoading) {
     return (
       <>
-        <AppHeader 
+        <AppHeader
           title="Boards"
           breadcrumbs={[
             { label: 'Home', href: '/' },
@@ -136,35 +136,31 @@ export default function BoardsPage() {
           ]}
           actions={<Skeleton className="h-10 w-32" />}
         />
-        <main className="flex-1 overflow-auto">
-          <div className="container px-4 py-6">
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {[...Array(6)].map((_, i) => (
-                  <Card key={i} className="animate-pulse">
-                    <CardHeader>
-                      <Skeleton className="h-6 w-3/4" />
-                      <Skeleton className="h-4 w-1/2" />
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex gap-4">
-                        <Skeleton className="h-4 w-20" />
-                        <Skeleton className="h-4 w-20" />
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </div>
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[...Array(6)].map((_, i) => (
+              <Card key={i} className="animate-pulse">
+                <CardHeader>
+                  <Skeleton className="h-6 w-3/4" />
+                  <Skeleton className="h-4 w-1/2" />
+                </CardHeader>
+                <CardContent>
+                  <div className="flex gap-4">
+                    <Skeleton className="h-4 w-20" />
+                    <Skeleton className="h-4 w-20" />
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
           </div>
-        </main>
+        </div>
       </>
     )
   }
 
   return (
     <>
-      <AppHeader 
+      <AppHeader
         title="Boards"
         breadcrumbs={[
           { label: 'Home', href: '/' },
@@ -179,9 +175,7 @@ export default function BoardsPage() {
           </BoardCreationWizard>
         }
       />
-      <main className="flex-1 overflow-auto">
-        <div className="container px-4 py-6">
-          <div className="space-y-6">
+      <div className="px-4 py-6 space-y-6">
 
         {error && (
           <Card className="mb-6 border-red-200 bg-red-50">
@@ -191,7 +185,7 @@ export default function BoardsPage() {
           </Card>
         )}
 
-          {!isLoading && boards.length === 0 ? (
+        {!isLoading && boards.length === 0 ? (
           <BoardEmptyState
             onCreateBoard={() => {
               // Find the create board trigger element
@@ -211,7 +205,7 @@ export default function BoardsPage() {
 
               return (
                 <Card key={board.id} className="hover:shadow-lg transition-all relative group">
-                  <div 
+                  <div
                     className="absolute top-4 right-4 z-10 opacity-0 group-hover:opacity-100 transition-opacity"
                     onClick={(e) => e.stopPropagation()}
                   >
@@ -227,44 +221,48 @@ export default function BoardsPage() {
                             Open Board
                           </Link>
                         </DropdownMenuItem>
-                        <BoardEditForm 
-                          board={{
-                            id: board.id,
-                            name: board.name,
-                            description: board.description,
-                            boardType: board.board_type,
-                            color: board.color
-                          }} 
-                          onSuccess={fetchBoardsCallback}
-                        >
-                          <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                            Edit Board
-                          </DropdownMenuItem>
-                        </BoardEditForm>
-                        <DropdownMenuSeparator />
-                        <BoardDeleteDialog 
-                          board={{
-                            id: board.id,
-                            name: board.name,
-                            _count: {
-                              tasks: taskCount,
-                              sprints: 0 // We don't have this data in the list view
-                            }
-                          }}
-                          onSuccess={fetchBoardsCallback}
-                          redirectTo={null}
-                        >
-                          <DropdownMenuItem 
-                            onSelect={(e) => e.preventDefault()}
-                            className="text-red-600"
+                        {(user?.id === board.created_by || ['owner', 'admin'].includes(currentMember?.role || '')) && (
+                          <BoardEditForm
+                            board={{
+                              id: board.id,
+                              name: board.name,
+                              description: board.description,
+                              boardType: board.board_type,
+                              color: board.color
+                            }}
+                            onSuccess={fetchBoardsCallback}
                           >
-                            Delete Board
-                          </DropdownMenuItem>
-                        </BoardDeleteDialog>
+                            <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                              Edit Board
+                            </DropdownMenuItem>
+                          </BoardEditForm>
+                        )}
+                        <DropdownMenuSeparator />
+                        {(user?.id === board.created_by || ['owner', 'admin'].includes(currentMember?.role || '')) && (
+                          <BoardDeleteDialog
+                            board={{
+                              id: board.id,
+                              name: board.name,
+                              _count: {
+                                tasks: taskCount,
+                                sprints: 0 // We don't have this data in the list view
+                              }
+                            }}
+                            onSuccess={fetchBoardsCallback}
+                            redirectTo={null}
+                          >
+                            <DropdownMenuItem
+                              onSelect={(e) => e.preventDefault()}
+                              className="text-red-600"
+                            >
+                              Delete Board
+                            </DropdownMenuItem>
+                          </BoardDeleteDialog>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
-                  
+
                   <Link href={`/boards/${board.id}`} className="block">
                     <CardHeader>
                       <div className="flex items-start justify-between">
@@ -282,7 +280,7 @@ export default function BoardsPage() {
                         </CardDescription>
                       )}
                     </CardHeader>
-                    
+
                     <CardContent>
                       <div className="flex items-center gap-6 text-sm text-muted-foreground">
                         <div className="flex items-center gap-1">
@@ -301,9 +299,7 @@ export default function BoardsPage() {
             })}
           </div>
         )}
-          </div>
-        </div>
-      </main>
+      </div>
     </>
   )
 } 

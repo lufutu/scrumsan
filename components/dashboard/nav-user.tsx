@@ -7,13 +7,9 @@ import {
     ChevronsUpDown,
     BadgeCheck,
     Sparkles,
+    User,
 } from "lucide-react"
 
-import {
-    Avatar,
-    AvatarFallback,
-    AvatarImage,
-} from "@/components/ui/avatar"
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -29,16 +25,19 @@ import {
     SidebarMenuItem,
     useSidebar,
 } from "@/components/animate-ui/radix/sidebar"
+import { EnhancedAvatar } from "@/components/ui/enhanced-avatar"
 import { supabase } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 export function NavUser({
     user,
+    onProfileClick,
 }: {
     user: {
         name: string
         email: string
         avatar: string
     }
+    onProfileClick?: () => void
 }) {
     const { isMobile } = useSidebar()
     const router = useRouter()
@@ -53,10 +52,13 @@ export function NavUser({
                             className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
                             tooltip={user.name}
                         >
-                            <Avatar className="h-8 w-8 rounded-lg">
-                                <AvatarImage src={user.avatar} alt={user.name} />
-                                <AvatarFallback className="rounded-lg">CN</AvatarFallback>
-                            </Avatar>
+                            <EnhancedAvatar
+                                src={user.avatar}
+                                fallbackSeed={user.email || user.name}
+                                size="md"
+                                className="h-8 w-8 rounded-lg"
+                                alt={user.name}
+                            />
                             <div className="grid flex-1 text-left text-sm leading-tight">
                                 <span className="truncate font-medium">{user.name}</span>
                                 <span className="truncate text-xs text-muted-foreground">
@@ -73,11 +75,17 @@ export function NavUser({
                         sideOffset={4}
                     >
                         <DropdownMenuLabel className="p-0 font-normal">
-                            <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
-                                <Avatar className="h-8 w-8 rounded-lg">
-                                    <AvatarImage src={user.avatar} alt={user.name} />
-                                    <AvatarFallback className="rounded-lg">CN</AvatarFallback>
-                                </Avatar>
+                            <div 
+                                className="flex items-center gap-2 px-1 py-1.5 text-left text-sm cursor-pointer hover:bg-accent rounded-md transition-colors"
+                                onClick={onProfileClick}
+                            >
+                                <EnhancedAvatar
+                                    src={user.avatar}
+                                    fallbackSeed={user.email || user.name}
+                                    size="md"
+                                    className="h-8 w-8 rounded-lg"
+                                    alt={user.name}
+                                />
                                 <div className="grid flex-1 text-left text-sm leading-tight">
                                     <span className="truncate font-medium">{user.name}</span>
                                     <span className="truncate text-xs text-muted-foreground">
@@ -95,6 +103,10 @@ export function NavUser({
                         </DropdownMenuGroup>
                         <DropdownMenuSeparator />
                         <DropdownMenuGroup>
+                            <DropdownMenuItem onClick={onProfileClick}>
+                                <User />
+                                Profile
+                            </DropdownMenuItem>
                             <DropdownMenuItem>
                                 <BadgeCheck />
                                 Account

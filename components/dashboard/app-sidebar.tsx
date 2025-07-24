@@ -4,16 +4,16 @@ import * as React from "react"
 import {
     Home,
     Kanban,
-    LayoutDashboard,
     Plus,
     Settings,
     Search,
     HelpCircle,
     Building2,
-    ChevronRight,
+    User,
 } from "lucide-react"
 import { usePathname } from "next/navigation"
 import Link from "next/link"
+import Image from "next/image"
 
 import { NavMain } from "@/components/dashboard/nav-main"
 import { NavSecondary } from "@/components/dashboard/nav-secondary"
@@ -31,14 +31,25 @@ import {
 } from "@/components/animate-ui/radix/sidebar"
 import { OrgSwitcher } from "@/components/dashboard/org-switcher"
 import { CreateOrganizationDialog } from "@/components/organizations/create-organization-dialog"
+import { ProfileEditorDialog } from "@/components/profile/profile-editor-dialog"
 import { useOrganization } from "@/providers/organization-provider"
 import { useSupabase } from "@/providers/supabase-provider"
+import { usePermissions } from "@/hooks/usePermissions"
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     const { organizations, activeOrg, isLoading } = useOrganization()
     const { user } = useSupabase()
+    const { canPerformAction } = usePermissions()
     const pathname = usePathname()
     const [isCreateDialogOpen, setIsCreateDialogOpen] = React.useState(false)
+    const [isProfileDialogOpen, setIsProfileDialogOpen] = React.useState(false)
+
+    // Handle profile dialog opening with permission check
+    const handleProfileClick = React.useCallback(() => {
+        // Users can always edit their own profile
+        // Admins can edit other users' profiles (future functionality)
+        setIsProfileDialogOpen(true)
+    }, [])
 
     const navMain = [
         {
@@ -68,6 +79,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             icon: Search,
         },
         {
+            title: "Profile",
+            icon: User,
+            onClick: handleProfileClick,
+        },
+        {
             title: "Settings",
             url: "/settings", 
             icon: Settings,
@@ -95,8 +111,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                             className="data-[slot=sidebar-menu-button]:!p-1.5"
                         >
                             <Link href="/">
-                                <LayoutDashboard className="h-5 w-5" />
-                                <span className="text-base font-semibold">ScrumSan</span>
+                                <Image className="size-6" src="/logo.png" alt="ScrumSan" width={64} height={64} />
+                                <span className="text-green-700 text-lg font-semibold">ScrumSan</span>
                             </Link>
                         </SidebarMenuButton>
                     </SidebarMenuItem>
@@ -136,13 +152,19 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             </SidebarContent>
             
             <SidebarFooter>
-                <NavUser user={userData} />
+                <NavUser user={userData} onProfileClick={handleProfileClick} />
             </SidebarFooter>
             <SidebarRail />
 
             <CreateOrganizationDialog
                 open={isCreateDialogOpen}
                 onOpenChange={setIsCreateDialogOpen}
+            />
+
+            <ProfileEditorDialog
+                isOpen={isProfileDialogOpen}
+                onClose={() => setIsProfileDialogOpen(false)}
+                initialTab="profile"
             />
         </Sidebar>
     )

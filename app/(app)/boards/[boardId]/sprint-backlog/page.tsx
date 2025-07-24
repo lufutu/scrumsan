@@ -128,21 +128,17 @@ export default function SprintBacklogPage() {
         breadcrumbs={breadcrumbs}
         actions={headerActions}
       />
-      <main className="flex-1 overflow-auto">
-        <div className="h-full flex flex-col">
-          <div className="flex-1 px-6">
-            <SprintBacklogView
-              sprint={sprint}
-              boardId={boardId}
-              organizationId={board?.organizationId}
-              onRefresh={() => {
-                fetchSprintAndBoard()
-              }}
-              onBackToBacklog={handleBackToBacklog}
-            />
-          </div>
-        </div>
-      </main>
+      <div className='container px-4 py-6'>
+        <SprintBacklogView
+          sprint={sprint}
+          boardId={boardId}
+          organizationId={board?.organizationId}
+          onRefresh={() => {
+            fetchSprintAndBoard()
+          }}
+          onBackToBacklog={handleBackToBacklog}
+        />
+      </div>
     </>
   )
 }

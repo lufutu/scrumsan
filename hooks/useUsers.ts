@@ -45,7 +45,9 @@ export const useUsers = ({ projectId, organizationId, autoFetch = true }: UseUse
       const response = await fetch(url)
       
       if (!response.ok) {
-        throw new Error(`Failed to fetch users: ${response.statusText}`)
+        const message = `Failed to fetch users: ${response.statusText}`
+        console.error('Failed to fetch users:', response.status, response.statusText)
+        throw new Error(message)
       }
 
       const data = await response.json()

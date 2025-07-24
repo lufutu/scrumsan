@@ -115,6 +115,26 @@ function DialogContent({
   const isVertical = from === 'top' || from === 'bottom';
   const rotateAxis = isVertical ? 'rotateX' : 'rotateY';
 
+  // Separate props for DialogPrimitive.Content from motion props
+  const {
+    onInteractOutside,
+    onEscapeKeyDown,
+    onOpenAutoFocus,
+    onCloseAutoFocus,
+    onPointerDownOutside,
+    onFocusOutside,
+    ...motionProps
+  } = props;
+
+  const contentProps = {
+    onInteractOutside,
+    onEscapeKeyDown,
+    onOpenAutoFocus,
+    onCloseAutoFocus,
+    onPointerDownOutside,
+    onFocusOutside,
+  };
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -128,7 +148,7 @@ function DialogContent({
               transition={{ duration: 0.2, ease: 'easeInOut' }}
             />
           </DialogOverlay>
-          <DialogPrimitive.Content asChild forceMount {...props}>
+          <DialogPrimitive.Content asChild forceMount {...contentProps}>
             <motion.div
               key="dialog-content"
               data-slot="dialog-content"
@@ -152,7 +172,7 @@ function DialogContent({
                 'fixed left-[50%] top-[50%] z-50 grid w-[calc(100%-2rem)] max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg rounded-xl',
                 className,
               )}
-              {...props}
+              {...motionProps}
             >
               {children}
               <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">

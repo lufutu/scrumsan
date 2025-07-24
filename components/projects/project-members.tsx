@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { EnhancedAvatar } from '@/components/ui/enhanced-avatar'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { UserPlus, Users, Crown, Settings, Trash2, Loader2 } from 'lucide-react'
@@ -360,12 +360,13 @@ export default function ProjectMembers({ projectId }: ProjectMembersProps) {
               
               return (
                 <div key={member.id} className="flex items-center gap-3 p-3 border rounded-lg">
-                  <Avatar className="h-10 w-10">
-                    <AvatarImage src={member.users?.avatar_url || ''} />
-                    <AvatarFallback>
-                      {member.users?.full_name?.charAt(0) || '?'}
-                    </AvatarFallback>
-                  </Avatar>
+                  <EnhancedAvatar
+                    src={member.users?.avatar_url}
+                    fallbackSeed={member.users?.full_name || 'user'}
+                    size="lg"
+                    className="h-10 w-10"
+                    alt={member.users?.full_name || 'User'}
+                  />
                   
                   <div className="flex-1">
                     <div className="font-medium">

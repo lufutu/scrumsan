@@ -38,6 +38,11 @@ model User {
   createdChecklistItems TaskChecklistItem[]
   completedChecklistItems TaskChecklistItem[] @relation("ChecklistItemCompletedBy")
   worklogEntries      TaskWorklog[]
+  approvedTimeOff     TimeOffEntry[]       @relation("TimeOffApprover")
+  createdTimelineEvents TimelineEvent[]    @relation("TimelineEventCreator")
+  auditLogs           AuditLog[]
+  sentInvitations     TeamInvitation[]     @relation("InvitationInviter")
+  acceptedInvitations TeamInvitation[]     @relation("InvitationAccepter")
 
   @@map("users")
 }
@@ -55,27 +60,66 @@ model Organization {
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   // Relationships
-  members     OrganizationMember[]
-  projects    Project[]
-  boards      Board[]
+  members        OrganizationMember[]
+  projects       Project[]
+  boards         Board[]
+  permissionSets PermissionSet[]
+  customRoles    CustomRole[]
+  auditLogs      AuditLog[]
+  invitations    TeamInvitation[]
 
   @@map("organizations")
 }
 
 // Organization membership
 model OrganizationMember {
-  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  organizationId String   @map("organization_id") @db.Uuid
-  userId         String   @map("user_id") @db.Uuid
-  role           String // 'owner', 'admin', 'member'
-  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+  id                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId      String   @map("organization_id") @db.Uuid
+  userId              String   @map("user_id") @db.Uuid
+  role                String // 'owner', 'admin', 'member'
+  permissionSetId     String?  @map("permission_set_id") @db.Uuid
+  jobTitle            String?  @map("job_title")
+  workingHoursPerWeek Int?     @default(40) @map("working_hours_per_week")
+  joinDate            DateTime? @map("join_date") @db.Date
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   // Relationships
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization    Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user            User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permissionSet   PermissionSet?      @relation(fields: [permissionSetId], references: [id])
+  engagements     ProjectEngagement[]
+  timeOffEntries  TimeOffEntry[]
+  profileData     MemberProfile?
+  timelineEvents  TimelineEvent[]
 
   @@unique([organizationId, userId])
   @@map("organization_members")
+}
+
+// Team invitations for pending members
+model TeamInvitation {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  email          String
+  role           String    // 'admin', 'member'
+  permissionSetId String?  @map("permission_set_id") @db.Uuid
+  jobTitle       String?   @map("job_title")
+  workingHoursPerWeek Int? @default(40) @map("working_hours_per_week")
+  invitedBy      String    @map("invited_by") @db.Uuid
+  token          String    @unique // Unique token for invitation acceptance
+  expiresAt      DateTime  @map("expires_at") @db.Timestamptz
+  acceptedAt     DateTime? @map("accepted_at") @db.Timestamptz
+  acceptedBy     String?   @map("accepted_by") @db.Uuid // User ID who accepted
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relationships
+  organization  Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  inviter       User           @relation("InvitationInviter", fields: [invitedBy], references: [id])
+  permissionSet PermissionSet? @relation(fields: [permissionSetId], references: [id])
+  accepter      User?          @relation("InvitationAccepter", fields: [acceptedBy], references: [id])
+
+  @@unique([organizationId, email], name: "organizationId_email") // Prevent duplicate invitations
+  @@map("team_invitations")
 }
 
 // Projects - Management/Overview entities for team coordination
@@ -95,10 +139,11 @@ model Project {
   createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
 
   // Relationships
-  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  creator      User?              @relation("ProjectCreator", fields: [createdBy], references: [id])
+  organization Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  creator      User?                @relation("ProjectCreator", fields: [createdBy], references: [id])
   members      ProjectMember[]
-  boardLinks   ProjectBoard[]     // Many-to-many with boards
+  boardLinks   ProjectBoard[]       // Many-to-many with boards
+  engagements  ProjectEngagement[]  // Team management engagements
 
   @@map("projects")
 }
@@ -486,5 +531,140 @@ model TaskCustomFieldValue {
 
   @@unique([taskId, customFieldId])
   @@map("task_custom_field_values")
+}
+
+// Custom Permission Sets
+model PermissionSet {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  name           String
+  permissions    Json     // Structured permissions object
+  isDefault      Boolean  @default(false) @map("is_default")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relationships
+  organization Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  members      OrganizationMember[]
+  invitations  TeamInvitation[]
+
+  @@map("permission_sets")
+}
+
+// Project Engagements (enhanced from existing ProjectMember)
+model ProjectEngagement {
+  id                   String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationMemberId String    @map("organization_member_id") @db.Uuid
+  projectId            String    @map("project_id") @db.Uuid
+  role                 String?   // Project-specific role
+  hoursPerWeek         Int       @map("hours_per_week")
+  startDate            DateTime  @map("start_date") @db.Date
+  endDate              DateTime? @map("end_date") @db.Date
+  isActive             Boolean   @default(true) @map("is_active")
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relationships
+  organizationMember OrganizationMember @relation(fields: [organizationMemberId], references: [id], onDelete: Cascade)
+  project            Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("project_engagements")
+}
+
+// Time Off Management
+model TimeOffEntry {
+  id                   String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationMemberId String    @map("organization_member_id") @db.Uuid
+  type                 String    // 'vacation', 'parental_leave', 'sick_leave', 'paid_time_off', 'unpaid_time_off', 'other'
+  startDate            DateTime  @map("start_date") @db.Date
+  endDate              DateTime  @map("end_date") @db.Date
+  description          String?
+  approvedBy           String?   @map("approved_by") @db.Uuid
+  status               String    @default("pending") // 'pending', 'approved', 'rejected'
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relationships
+  organizationMember OrganizationMember @relation(fields: [organizationMemberId], references: [id], onDelete: Cascade)
+  approver           User?              @relation("TimeOffApprover", fields: [approvedBy], references: [id])
+
+  @@map("time_off_entries")
+}
+
+// Extended Member Profiles
+model MemberProfile {
+  id                   String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationMemberId String    @unique @map("organization_member_id") @db.Uuid
+  secondaryEmail       String?   @map("secondary_email")
+  address              String?
+  phone                String?
+  linkedin             String?
+  skype                String?
+  twitter              String?
+  birthday             DateTime? @db.Date
+  maritalStatus        String?   @map("marital_status")
+  family               String?
+  other                String?
+  visibility           Json      @default("{}") // Controls who can see what fields
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt            DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relationships
+  organizationMember OrganizationMember @relation(fields: [organizationMemberId], references: [id], onDelete: Cascade)
+
+  @@map("member_profiles")
+}
+
+// Timeline Events
+model TimelineEvent {
+  id                   String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationMemberId String   @map("organization_member_id") @db.Uuid
+  eventName            String   @map("event_name")
+  eventDate            DateTime @map("event_date") @db.Date
+  description          String?
+  createdBy            String   @map("created_by") @db.Uuid
+  createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relationships
+  organizationMember OrganizationMember @relation(fields: [organizationMemberId], references: [id], onDelete: Cascade)
+  creator            User               @relation("TimelineEventCreator", fields: [createdBy], references: [id])
+
+  @@map("timeline_events")
+}
+
+// Custom Roles (for job positions)
+model CustomRole {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  name           String
+  color          String   @default("#3B82F6")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relationships
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, name])
+  @@map("custom_roles")
+}
+
+// Audit Logs for security and compliance
+model AuditLog {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  action         String   // Action performed (e.g., 'create_member', 'delete_project')
+  resourceType   String   @map("resource_type") // Type of resource (e.g., 'member', 'project')
+  resourceId     String?  @map("resource_id") @db.Uuid // ID of the affected resource
+  details        String?  // JSON string with additional details
+  ipAddress      String?  @map("ip_address")
+  userAgent      String?  @map("user_agent")
+  timestamp      DateTime @default(now()) @db.Timestamptz
+
+  // Relationships
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, timestamp])
+  @@index([userId, timestamp])
+  @@index([resourceType, timestamp])
+  @@map("audit_logs")
 }
 

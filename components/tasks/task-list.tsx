@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { EnhancedAvatar } from '@/components/ui/enhanced-avatar'
 import { Search, Filter, Calendar, User, AlertCircle } from 'lucide-react'
 import TaskCreationDialog from '@/components/common/TaskCreationDialog'
 import { Tables } from '@/types/database'
@@ -230,12 +230,13 @@ export default function TaskList({ projectId }: TaskListProps) {
                   <div className="flex items-center gap-2">
                     {task.assignee ? (
                       <div className="flex items-center gap-2">
-                        <Avatar className="h-6 w-6">
-                          <AvatarImage src={task.assignee.avatar_url || ''} />
-                          <AvatarFallback className="text-xs">
-                            {task.assignee.full_name?.charAt(0) || '?'}
-                          </AvatarFallback>
-                        </Avatar>
+                        <EnhancedAvatar
+                          src={task.assignee.avatar_url}
+                          fallbackSeed={task.assignee.full_name || 'user'}
+                          size="sm"
+                          className="h-6 w-6"
+                          alt={task.assignee.full_name || 'Unknown'}
+                        />
                         <span className="text-sm text-muted-foreground">
                           {task.assignee.full_name || 'Unknown'}
                         </span>

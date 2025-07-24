@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Check, Search, UserPlus, X } from 'lucide-react';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { EnhancedAvatar } from '@/components/ui/enhanced-avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/animate-ui/radix/popover';
@@ -198,12 +198,14 @@ export function TaskAssigneeSelector({
                       className="flex items-center gap-3 p-3 cursor-pointer"
                     >
                       <div className="relative">
-                        <Avatar className="h-8 w-8">
-                          <AvatarImage src={user.user_metadata?.avatar_url} />
-                          <AvatarFallback className="bg-emerald-500 text-white text-sm">
-                            {user.user_metadata?.full_name?.charAt(0) || user.email?.charAt(0) || 'U'}
-                          </AvatarFallback>
-                        </Avatar>
+                        <EnhancedAvatar
+                          src={user.user_metadata?.avatar_url}
+                          fallbackSeed={user.email || user.user_metadata?.full_name || 'user'}
+                          fallbackSeeds={[user.user_metadata?.full_name || '']}
+                          size="md"
+                          className="h-8 w-8"
+                          alt={user.user_metadata?.full_name || user.email || 'User'}
+                        />
                         {currentAssignees.some(a => a.id === user.id) && (
                           <div className="absolute -bottom-1 -right-1 h-4 w-4 bg-emerald-500 rounded-full flex items-center justify-center">
                             <Check className="h-2.5 w-2.5 text-white" />
@@ -234,12 +236,13 @@ export function TaskAssigneeSelector({
                         className="flex items-center gap-3 p-3 cursor-pointer"
                       >
                         <div className="relative">
-                          <Avatar className="h-8 w-8">
-                            <AvatarImage src={member.avatarUrl || ''} />
-                            <AvatarFallback className="bg-emerald-500 text-white text-sm">
-                              {member.fullName?.charAt(0) || 'U'}
-                            </AvatarFallback>
-                          </Avatar>
+                          <EnhancedAvatar
+                            src={member.avatarUrl}
+                            fallbackSeed={member.fullName || member.email || 'user'}
+                            size="md"
+                            className="h-8 w-8"
+                            alt={member.fullName || 'User'}
+                          />
                           {currentAssignees.some(a => a.id === member.id) && (
                             <div className="absolute -bottom-1 -right-1 h-4 w-4 bg-emerald-500 rounded-full flex items-center justify-center">
                               <Check className="h-2.5 w-2.5 text-white" />

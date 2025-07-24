@@ -23,6 +23,7 @@ export function useTeamMembers(projectId: string) {
         // Fetch team members for this project using Prisma API
         const membersResponse = await fetch(`/api/projects/${projectId}/members`)
         if (!membersResponse.ok) {
+          console.error('Failed to fetch team members:', membersResponse.status, membersResponse.statusText)
           throw new Error('Failed to fetch team members')
         }
         
@@ -41,6 +42,7 @@ export function useTeamMembers(projectId: string) {
         // Fetch completed sprints for velocity calculation
         const sprintsResponse = await fetch(`/api/projects/${projectId}/sprints`)
         if (!sprintsResponse.ok) {
+          console.error('Failed to fetch sprints:', sprintsResponse.status, sprintsResponse.statusText)
           throw new Error('Failed to fetch sprints')
         }
 

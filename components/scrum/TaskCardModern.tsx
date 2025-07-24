@@ -18,7 +18,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { EnhancedAvatar } from '@/components/ui/enhanced-avatar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/animate-ui/radix/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Separator } from '@/components/ui/separator';
@@ -479,27 +479,25 @@ export function TaskCardModern({
               {currentAssignees.length > 0 ? (
                 <div className="cursor-pointer flex -space-x-2">
                   {currentAssignees.slice(0, 3).map((assigneeItem) => (
-                    <Avatar key={assigneeItem.id} className="h-8 w-8 border-2 border-green-500 hover:border-green-600 transition-colors">
-                      <AvatarImage src={assigneeItem.avatar || ''} />
-                      <AvatarFallback className="text-xs bg-blue-500 text-white">
-                        {assigneeItem.initials}
-                      </AvatarFallback>
-                    </Avatar>
+                    <EnhancedAvatar
+                      key={assigneeItem.id}
+                      src={assigneeItem.avatar}
+                      fallbackSeed={assigneeItem.name}
+                      size="md"
+                      className="h-8 w-8 border-2 border-green-500 hover:border-green-600 transition-colors"
+                      alt={assigneeItem.name}
+                    />
                   ))}
                   {currentAssignees.length > 3 && (
-                    <Avatar className="h-8 w-8 border-2 border-green-500 hover:border-green-600 transition-colors">
-                      <AvatarFallback className="text-xs bg-gray-500 text-white">
-                        +{currentAssignees.length - 3}
-                      </AvatarFallback>
-                    </Avatar>
+                    <div className="h-8 w-8 border-2 border-green-500 hover:border-green-600 transition-colors rounded-full bg-gray-500 text-white flex items-center justify-center text-xs">
+                      +{currentAssignees.length - 3}
+                    </div>
                   )}
                 </div>
               ) : (
-                <Avatar className="h-8 w-8 border-2 border-green-500 cursor-pointer bg-gray-100 hover:bg-green-200 transition-colors">
-                  <AvatarFallback className="text-lg bg-green-100 text-green-600 hover:bg-green-200">
-                    <UserPlus className="h-4 w-4" />
-                  </AvatarFallback>
-                </Avatar>
+                <div className="h-8 w-8 border-2 border-green-500 cursor-pointer bg-green-100 hover:bg-green-200 transition-colors rounded-full flex items-center justify-center text-green-600">
+                  <UserPlus className="h-4 w-4" />
+                </div>
               )}
             </PopoverTrigger>
             <PopoverContent className="w-80 p-0" align="start">
@@ -551,12 +549,14 @@ export function TaskCardModern({
                             className="flex items-center gap-3 p-3 cursor-pointer"
                           >
                             <div className="relative">
-                              <Avatar className="h-8 w-8">
-                                <AvatarImage src={user.user_metadata?.avatar_url} />
-                                <AvatarFallback className="bg-emerald-500 text-white text-sm">
-                                  {user.user_metadata?.full_name?.charAt(0) || user.email?.charAt(0) || 'U'}
-                                </AvatarFallback>
-                              </Avatar>
+                              <EnhancedAvatar
+                                src={user.user_metadata?.avatar_url}
+                                fallbackSeed={user.email || user.user_metadata?.full_name || 'user'}
+                                fallbackSeeds={[user.user_metadata?.full_name || '']}
+                                size="md"
+                                className="h-8 w-8"
+                                alt={user.user_metadata?.full_name || user.email || 'User'}
+                              />
                               {currentAssignees.some(a => a.id === user.id) && (
                                 <div className="absolute -bottom-1 -right-1 h-4 w-4 bg-emerald-500 rounded-full flex items-center justify-center">
                                   <Check className="h-2.5 w-2.5 text-white" />
@@ -587,12 +587,13 @@ export function TaskCardModern({
                               className="flex items-center gap-3 p-3 cursor-pointer"
                             >
                               <div className="relative">
-                                <Avatar className="h-8 w-8">
-                                  <AvatarImage src={member.avatarUrl || ''} />
-                                  <AvatarFallback className="bg-emerald-500 text-white text-sm">
-                                    {member.fullName?.charAt(0) || 'U'}
-                                  </AvatarFallback>
-                                </Avatar>
+                                <EnhancedAvatar
+                                  src={member.avatarUrl}
+                                  fallbackSeed={member.fullName || member.email || 'user'}
+                                  size="md"
+                                  className="h-8 w-8"
+                                  alt={member.fullName || 'User'}
+                                />
                                 {currentAssignees.some(a => a.id === member.id) && (
                                   <div className="absolute -bottom-1 -right-1 h-4 w-4 bg-emerald-500 rounded-full flex items-center justify-center">
                                     <Check className="h-2.5 w-2.5 text-white" />
@@ -858,12 +859,14 @@ export function TaskCardModern({
                       <div className="space-y-3">
                         {comments.map((comment) => (
                           <div key={comment.id} className="flex gap-2">
-                            <Avatar className="h-6 w-6 mt-0.5">
-                              <AvatarImage src={comment.user.avatarUrl || ''} />
-                              <AvatarFallback className="text-xs bg-green-500 text-white">
-                                {comment.user.fullName?.charAt(0) || comment.user.email.charAt(0)}
-                              </AvatarFallback>
-                            </Avatar>
+                            <EnhancedAvatar
+                              src={comment.user.avatarUrl}
+                              fallbackSeed={comment.user.email}
+                              fallbackSeeds={[comment.user.fullName || '']}
+                              size="sm"
+                              className="h-6 w-6 mt-0.5"
+                              alt={comment.user.fullName || comment.user.email}
+                            />
                             <div className="flex-1 min-w-0">
                               <div className="bg-gray-50 rounded-lg px-3 py-2">
                                 <div className="text-xs font-medium text-gray-900 mb-1">

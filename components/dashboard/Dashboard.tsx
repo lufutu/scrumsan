@@ -1,35 +1,33 @@
 "use client"
 
 import { useEffect, useState } from 'react'
-import { useSupabase } from '@/providers/supabase-provider'
 import { useActiveOrg } from '@/hooks/useActiveOrg'
 import { useToast } from '@/hooks/use-toast'
+import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { 
-  Plus, 
-  TrendingUp, 
-  Calendar, 
-  Activity, 
-  Clock, 
-  CheckCircle2, 
+import { OrganizationEmptyState } from '@/components/ui/empty-state'
+
+import {
+  TrendingUp,
+  Calendar,
+  Activity,
+  CheckCircle2,
   Users,
   FolderOpen,
   Kanban,
-  BarChart3,
   ArrowRight
 } from 'lucide-react'
 import Link from 'next/link'
 import ProjectForm from '@/components/projects/project-form'
 import { Tables } from '@/types/database'
 
+
 // Progress component
 const Progress = ({ value, className }: { value: number; className?: string }) => (
   <div className={`w-full bg-muted rounded-full h-2 ${className}`}>
-    <div 
-      className="bg-primary h-2 rounded-full transition-all" 
+    <div
+      className="bg-primary h-2 rounded-full transition-all"
       style={{ width: `${Math.min(100, Math.max(0, value))}%` }}
     />
   </div>
@@ -61,7 +59,7 @@ const getRelativeTime = (date: Date): string => {
   const minutes = Math.floor(seconds / 60)
   const hours = Math.floor(minutes / 60)
   const days = Math.floor(hours / 24)
-  
+
   if (days > 0) return `${days} day${days > 1 ? 's' : ''} ago`
   if (hours > 0) return `${hours} hour${hours > 1 ? 's' : ''} ago`
   if (minutes > 0) return `${minutes} minute${minutes > 1 ? 's' : ''} ago`
@@ -69,9 +67,9 @@ const getRelativeTime = (date: Date): string => {
 }
 
 export default function Dashboard() {
-  const { supabase, user } = useSupabase()
   const activeOrg = useActiveOrg()
   const { toast } = useToast()
+  const router = useRouter()
   const [projects, setProjects] = useState<Project[]>([])
   const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([])
   const [stats, setStats] = useState({
@@ -101,7 +99,7 @@ export default function Dashboard() {
       if (!projectsResponse.ok) {
         throw new Error('Failed to fetch projects')
       }
-      
+
       const projectsData = await projectsResponse.json()
 
       if (!projectsData || projectsData.length === 0) {
@@ -112,7 +110,7 @@ export default function Dashboard() {
           totalTasks: 0,
           completedTasks: 0
         })
-        
+
         // Set welcome activity for new organizations
         setRecentActivity([
           {
@@ -124,7 +122,7 @@ export default function Dashboard() {
             user: { name: 'System' }
           }
         ])
-        
+
         setIsLoading(false)
         return
       }
@@ -202,7 +200,7 @@ export default function Dashboard() {
               if (sprintsResponse.ok) {
                 const sprints = await sprintsResponse.json()
                 // Count sprints that are active
-                activeSprints += sprints.filter((sprint: any) => 
+                activeSprints += sprints.filter((sprint: any) =>
                   sprint.status === 'active' && !sprint.isDeleted && !sprint.isFinished
                 ).length
               }
@@ -229,7 +227,7 @@ export default function Dashboard() {
 
       // Get recent activity - for now, we'll show basic project activity
       const recentActivityItems: RecentActivity[] = []
-      
+
       // Add recently created projects to activity
       projectsData.slice(0, 3).forEach((project: any, index: number) => {
         if (project.createdAt) {
@@ -239,8 +237,8 @@ export default function Dashboard() {
             title: 'Project created',
             description: project.name,
             time: getRelativeTime(new Date(project.createdAt)),
-            user: project.creator ? { 
-              name: project.creator.fullName || project.creator.email || 'Unknown' 
+            user: project.creator ? {
+              name: project.creator.fullName || project.creator.email || 'Unknown'
             } : undefined
           })
         }
@@ -295,17 +293,9 @@ export default function Dashboard() {
 
   if (!activeOrg) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="text-center">
-          <h1 className="text-3xl font-bold mb-4">Welcome to ScrumSan</h1>
-          <p className="text-muted-foreground mb-6">
-            You need to select or create an organization to get started.
-          </p>
-          <Button asChild>
-            <Link href="/organizations">Manage Organizations</Link>
-          </Button>
-        </div>
-      </div>
+      <OrganizationEmptyState
+      onCreateOrg={() => router.push('/organizations')}
+      className="min-h-[60vh]"/>
     )
   }
 
@@ -316,7 +306,7 @@ export default function Dashboard() {
           <div className="h-8 bg-muted rounded w-64 mb-4"></div>
           <div className="h-4 bg-muted rounded w-96 mb-8"></div>
         </div>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {[...Array(4)].map((_, i) => (
             <Card key={i} className="animate-pulse">
@@ -341,7 +331,7 @@ export default function Dashboard() {
             Here's what's happening with {activeOrg.name} today.
           </p>
         </div>
-        
+
         <div className="flex gap-2">
           <ProjectForm onSuccess={fetchDashboardData} />
           <Button asChild variant="outline">
@@ -366,7 +356,7 @@ export default function Dashboard() {
             </div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -378,7 +368,7 @@ export default function Dashboard() {
             </div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -390,7 +380,7 @@ export default function Dashboard() {
             </div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -443,7 +433,7 @@ export default function Dashboard() {
                           <span>{project.sprintCount || 0} sprints</span>
                         </div>
                       </div>
-                      
+
                       <div className="flex gap-2">
                         <Button asChild size="sm" variant="outline">
                           <Link href={`/projects/${project.id}/board`}>

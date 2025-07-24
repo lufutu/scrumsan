@@ -37,7 +37,7 @@ export default function ProjectSprintsPage({ params }: { params: Promise<{ proje
           </TabsList>
         </div>
         
-        <div className="flex-1 overflow-auto">
+        <div className="flex-1">
           <TabsContent value="dashboard" className="h-full m-0">
             <SprintDashboard projectId={projectId} />
           </TabsContent>
