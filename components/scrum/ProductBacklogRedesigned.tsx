@@ -49,6 +49,7 @@ import { useRouter } from 'next/navigation'
 import { BoardData } from '@/hooks/useBoardData'
 import { Sprint, Task, ProductBacklogProps as ProductBacklogRedesignedProps } from '@/types/shared'
 
+
 const fetcher = (url: string) => fetch(url).then(res => res.json())
 
 // Draggable Task Component
@@ -80,33 +81,33 @@ function DraggableTask({
             opacity: snapshot.isDragging ? 0.8 : 1,
           }}
         >
-      <TaskCardModern
-        id={task.id}
-        itemCode={task.id}
-        title={task.title}
-        description={task.description || ''}
-        taskType={task.taskType as any}
-        storyPoints={task.storyPoints || 0}
-        priority={task.priority as any}
-        assignees={task.taskAssignees?.map((ta: any) => ({
-          id: ta.user.id,
-          name: ta.user.fullName || ta.user.email || 'Unknown User',
-          avatar: ta.user.avatarUrl || undefined,
-          initials: ta.user.fullName?.split(' ').map((n: string) => n[0]).join('') || 'U'
-        })) || []}
-        labels={task.taskLabels ? task.taskLabels.map(tl => ({
-          id: tl.label.id,
-          name: tl.label.name,
-          color: tl.label.color || '#6B7280'
-        })) : []}
-        organizationId={task.board?.organizationId}
-        boardId={boardId}
-        onClick={!snapshot.isDragging ? () => onTaskClick?.(task) : undefined}
-        onAssigneesChange={() => {
-          onTaskUpdate?.() // Invalidate cache when labels or assignees are changed
-        }}
-        onUpdate={onTaskUpdate}
-      />
+          <TaskCardModern
+            id={task.id}
+            itemCode={task.id}
+            title={task.title}
+            description={task.description || ''}
+            taskType={task.taskType as any}
+            storyPoints={task.storyPoints || 0}
+            priority={task.priority as any}
+            assignees={task.taskAssignees?.map((ta: any) => ({
+              id: ta.user.id,
+              name: ta.user.fullName || ta.user.email || 'Unknown User',
+              avatar: ta.user.avatarUrl || undefined,
+              initials: ta.user.fullName?.split(' ').map((n: string) => n[0]).join('') || 'U'
+            })) || []}
+            labels={task.taskLabels ? task.taskLabels.map(tl => ({
+              id: tl.label.id,
+              name: tl.label.name,
+              color: tl.label.color || '#6B7280'
+            })) : []}
+            organizationId={task.board?.organizationId}
+            boardId={boardId}
+            onClick={!snapshot.isDragging ? () => onTaskClick?.(task) : undefined}
+            onAssigneesChange={() => {
+              onTaskUpdate?.() // Invalidate cache when labels or assignees are changed
+            }}
+            onUpdate={onTaskUpdate}
+          />
         </div>
       )}
     </Draggable>
@@ -179,128 +180,129 @@ function DroppableSprintColumn({
             className="p-4 border-b border-gray-200"
             style={boardColor ? { backgroundColor: `${boardColor}20` } : undefined}
           >
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2">
-            <h3 className="font-semibold text-lg">{sprint.name}</h3>
-            <Badge className={cn("text-xs", status.color)}>
-              {status.label}
-            </Badge>
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <h3 className="font-semibold text-lg">{sprint.name}</h3>
+                <Badge className={cn("text-xs", status.color)}>
+                  {status.label}
+                </Badge>
+              </div>
+              {!sprint.isBacklog && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm">
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    {sprint.status === 'planning' && (
+                      <>
+                        <DropdownMenuItem onClick={() => onSprintAction('start', sprint.id)}>
+                          <Play className="h-4 w-4 mr-2" />
+                          Start Sprint
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => onSprintAction('edit', sprint.id)}>
+                          <Edit className="h-4 w-4 mr-2" />
+                          Edit Sprint
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                      </>
+                    )}
+                    {sprint.status === 'active' && (
+                      <>
+                        <DropdownMenuItem asChild>
+                          <Link href={`/boards/${sprint.boardId}/sprint-backlog?sprintId=${sprint.id}`}>
+                            <Calendar className="h-4 w-4 mr-2" />
+                            View Sprint Backlog
+                          </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => onSprintAction('finish', sprint.id)}>
+                          <Check className="h-4 w-4 mr-2" />
+                          Finish Sprint
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                      </>
+                    )}
+                    <DropdownMenuItem
+                      onClick={() => onSprintAction('delete', sprint.id)}
+                      className="text-red-600"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete Sprint
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+            </div>
+            <div className="flex items-center justify-between text-sm text-gray-600">
+              <span>{tasks.length} items</span>
+              <span>{totalPoints} points</span>
+            </div>
+            {sprint.goal && (
+              <p className="text-sm text-gray-600 mt-2 line-clamp-2">{sprint.goal}</p>
+            )}
           </div>
-          {!sprint.isBacklog && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm">
-                  <MoreVertical className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {sprint.status === 'planning' && (
-                  <>
-                    <DropdownMenuItem onClick={() => onSprintAction('start', sprint.id)}>
-                      <Play className="h-4 w-4 mr-2" />
-                      Start Sprint
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => onSprintAction('edit', sprint.id)}>
-                      <Edit className="h-4 w-4 mr-2" />
-                      Edit Sprint
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                  </>
-                )}
-                {sprint.status === 'active' && (
-                  <>
-                    <DropdownMenuItem asChild>
-                      <Link href={`/boards/${sprint.boardId}/sprint-backlog?sprintId=${sprint.id}`}>
-                        <Calendar className="h-4 w-4 mr-2" />
-                        View Sprint Backlog
-                      </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => onSprintAction('finish', sprint.id)}>
-                      <Check className="h-4 w-4 mr-2" />
-                      Finish Sprint
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                  </>
-                )}
-                <DropdownMenuItem
-                  onClick={() => onSprintAction('delete', sprint.id)}
-                  className="text-red-600"
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Delete Sprint
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-        </div>
-        <div className="flex items-center justify-between text-sm text-gray-600">
-          <span>{tasks.length} items</span>
-          <span>{totalPoints} points</span>
-        </div>
-        {sprint.goal && (
-          <p className="text-sm text-gray-600 mt-2 line-clamp-2">{sprint.goal}</p>
-        )}
-      </div>
 
           {/* Add Task Button */}
           {!showAddForm && (
-        <div className="px-4 py-3 border-b border-gray-200">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full"
-            onClick={() => setShowAddForm(true)}
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Add item
-          </Button>
-        </div>
+            <div className="px-4 py-3 border-b border-gray-200">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full"
+                onClick={() => setShowAddForm(true)}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add item
+              </Button>
+            </div>
           )}
 
           {/* Inline Form */}
           {showAddForm && (
-        <div className="px-4 py-3 border-b border-gray-200">
-          <ComprehensiveInlineForm
-            onAdd={async (data) => {
-              if (onAddTask) {
-                await onAddTask(sprint.id, data)
-                setShowAddForm(false)
-              }
-            }}
-            onCancel={() => setShowAddForm(false)}
-            placeholder="What needs to be done?"
-            users={users}
-            labels={labels}
-          />
-        </div>
+            <div className="px-4 py-3 border-b border-gray-200">
+              <ComprehensiveInlineForm
+                onAdd={async (data) => {
+                  if (onAddTask) {
+                    await onAddTask(sprint.id, data)
+                    setShowAddForm(false)
+                  }
+                }}
+                onCancel={() => setShowAddForm(false)}
+                placeholder="What needs to be done?"
+                users={users}
+                labels={labels}
+              />
+            </div>
           )}
 
           {/* Sprint Tasks */}
           <div
             className="p-4 space-y-3 max-h-[600px] overflow-y-auto"
           >
-        <div>
-          {tasks.length === 0 ? (
-            <div className="text-center py-8 text-gray-400">
-              <p className="text-sm">No items in this sprint</p>
-              <p className="text-xs mt-1">Drag items here to add them</p>
-            </div>
-          ) : (
             <div>
-              {tasks.map((task, index) => (
-                <DraggableTask
-                  key={task.id || index}
-                  task={task}
-                  index={index}
-                  onTaskClick={onTaskClick}
-                  labels={labels}
-                  boardId={boardId}
-                  onTaskUpdate={onTaskUpdate}
-                />
-              ))}
+              {tasks.length === 0 ? (
+                <div className="text-center py-8 text-gray-400">
+                  <p className="text-sm">No items in this sprint</p>
+                  <p className="text-xs mt-1">Drag items here to add them</p>
+                </div>
+              ) : (
+                <div>
+                  {tasks.map((task, index) => (
+                    <DraggableTask
+                      key={task.id || index}
+                      task={task}
+                      index={index}
+                      onTaskClick={onTaskClick}
+                      labels={labels}
+                      boardId={boardId}
+                      onTaskUpdate={onTaskUpdate}
+                    />
+                  ))}
+                </div>
+              )}
+              {provided.placeholder}
             </div>
-            )}
-            {provided.placeholder}
           </div>
         </div>
       )}
@@ -342,7 +344,7 @@ export default function ProductBacklogRedesigned({
   const sprintsLoading = !boardData
   const tasksLoading = !boardData
   const sprintsError: any = null
-  const tasksError: any = null
+  const tasksError: unknown = null
 
   // Mutation functions - trigger parent data refresh
   const mutateSprints = useCallback(() => {
@@ -577,26 +579,6 @@ export default function ProductBacklogRedesigned({
     }
   }
 
-  const handleReorderSprint = async (sprintId: string, newPosition: number) => {
-    try {
-      const response = await fetch(`/api/sprints/${sprintId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ position: newPosition })
-      })
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Failed to reorder sprint')
-      }
-
-      mutateSprints()
-      toast.success('Sprint reordered successfully')
-    } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : 'Failed to reorder sprint')
-    }
-  }
-
   const handleAddTask = async (sprintId: string, data: {
     title: string;
     taskType: string;
@@ -737,24 +719,24 @@ export default function ProductBacklogRedesigned({
       <div className="flex-1 overflow-x-auto">
         <DragDropContext onDragEnd={handleDragEnd}>
           <div className="flex gap-4 p-6 min-h-full">
-              {visibleSprints.map((sprint: Sprint) => (
-                <DroppableSprintColumn
-                  key={sprint.id}
-                  sprint={sprint}
-                  tasks={getTasksForSprint(sprint.id)}
-                  onTaskClick={setSelectedTask}
-                  onSprintAction={handleSprintAction}
-                  onAddTask={handleAddTask}
-                  labels={labels || []}
-                  users={users || []}
-                  boardColor={boardColor}
-                  isActiveSprint={sprint.id === activeSprint?.id}
-                  boardId={boardId}
-                  onTaskUpdate={mutateTasks}
-                  isDragOver={false}
-                  draggedTask={null}
-                />
-              ))}
+            {visibleSprints.map((sprint: Sprint) => (
+              <DroppableSprintColumn
+                key={sprint.id}
+                sprint={sprint}
+                tasks={getTasksForSprint(sprint.id)}
+                onTaskClick={setSelectedTask}
+                onSprintAction={handleSprintAction}
+                onAddTask={handleAddTask}
+                labels={labels || []}
+                users={users || []}
+                boardColor={boardColor}
+                isActiveSprint={sprint.id === activeSprint?.id}
+                boardId={boardId}
+                onTaskUpdate={mutateTasks}
+                isDragOver={false}
+                draggedTask={null}
+              />
+            ))}
           </div>
         </DragDropContext>
       </div>
