@@ -329,7 +329,7 @@ function DroppableSprintColumn({
                 <p className="text-xs mt-1">Drag items here to add them</p>
               </motion.div>
             ) : (
-              <>
+              <div>
                 {/* Show dragged task preview when dragging over this sprint */}
                 {isDragOver && draggedTask && (
                   <motion.div
@@ -375,7 +375,7 @@ function DroppableSprintColumn({
                     onTaskUpdate={onTaskUpdate}
                   />
                 ))}
-              </>
+              </div>
             )}
           </AnimatePresence>
         </SortableContext>
