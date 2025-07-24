@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/animate-ui/radix/progress'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/animate-ui/radix/tabs'
 import { Input } from '@/components/ui/input'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/animate-ui/radix/dialog'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import {

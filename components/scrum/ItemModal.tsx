@@ -31,7 +31,7 @@ import {
   AlertCircle,
   Loader2
 } from 'lucide-react';
-import { Dialog, DialogContent, DialogTitle, VisuallyHidden } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle, VisuallyHidden } from '@/components/animate-ui/radix/dialog';
 import { cn } from '@/lib/utils';
 import { getItemTypeColor, ITEM_TYPES, PRIORITIES, STORY_POINTS } from '@/lib/constants';
 import { Button } from '@/components/ui/button';

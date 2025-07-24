@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/animate-ui/radix/dialog'
 import { 
   Calendar, 
   Clock, 
