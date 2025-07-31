@@ -213,6 +213,10 @@ export function ItemModal({
   const [newWorklogDescription, setNewWorklogDescription] = useState('');
   const [newWorklogHours, setNewWorklogHours] = useState('');
   const [imageLoadErrors, setImageLoadErrors] = useState<Set<string>>(new Set());
+  
+  // Column data for dropdown
+  const [boardColumns, setBoardColumns] = useState<{ id: string; name: string }[]>([]);
+  const [sprintColumns, setSprintColumns] = useState<{ id: string; name: string; isDone: boolean }[]>([]);
 
   useEffect(() => {
     if (taskId && isOpen) {
@@ -223,6 +227,14 @@ export function ItemModal({
       fetchWorklog();
     }
   }, [taskId, isOpen]);
+
+  // Fetch columns when task board is loaded
+  useEffect(() => {
+    if (task?.board?.id) {
+      fetchBoardColumns();
+      fetchSprintColumns();
+    }
+  }, [task?.board?.id]);
 
   const fetchTask = async () => {
     if (!taskId) return;
@@ -246,6 +258,49 @@ export function ItemModal({
       toast.error("Failed to load task details");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const fetchBoardColumns = async () => {
+    if (!task?.board?.id) return;
+    
+    try {
+      const response = await fetch(`/api/boards/${task.board.id}/columns`);
+      if (response.ok) {
+        const data = await response.json();
+        // Extract just the column info we need
+        const columns = data.map((col: any) => ({
+          id: col.id,
+          name: col.name
+        }));
+        setBoardColumns(columns || []);
+      }
+    } catch (error) {
+      console.error('Error fetching board columns:', error);
+    }
+  };
+
+  const fetchSprintColumns = async () => {
+    if (!task?.board?.id) return;
+    
+    try {
+      const response = await fetch(`/api/boards/${task.board.id}/sprint-columns`);
+      if (response.ok) {
+        const sprintGroupsData = await response.json();
+        // Flatten all columns from all sprints
+        const allSprintColumns = sprintGroupsData.flatMap((group: any) => 
+          group.columns.map((col: any) => ({
+            id: col.id,
+            name: `${group.sprintName}: ${col.name}`,
+            isDone: col.isDone,
+            sprintId: group.sprintId,
+            sprintName: group.sprintName
+          }))
+        );
+        setSprintColumns(allSprintColumns || []);
+      }
+    } catch (error) {
+      console.error('Error fetching sprint columns:', error);
     }
   };
 
@@ -743,18 +798,46 @@ export function ItemModal({
         {/* Status Bar */}
         <div className="flex items-center gap-4 px-8 py-4 border-b bg-white">
           <div className="flex items-center gap-3">
-            <Label className="text-sm font-medium text-slate-600">Sprint:</Label>
+            <Label className="text-sm font-medium text-slate-600">Column:</Label>
             <Select 
-              value={task?.sprint_id || 'backlog'}
-              onValueChange={(value) => updateTask({ sprint_id: value === 'backlog' ? null : value })}
+              value={task?.sprintColumnId || task?.columnId || 'no-column'}
+              onValueChange={(value) => {
+                if (value === 'no-column') {
+                  updateTask({ columnId: null, sprintColumnId: null });
+                } else {
+                  // Determine if this is a sprint column or board column
+                  const isSprintColumn = sprintColumns.some(col => col.id === value);
+                  if (isSprintColumn) {
+                    updateTask({ sprintColumnId: value, columnId: null });
+                  } else {
+                    updateTask({ columnId: value, sprintColumnId: null });
+                  }
+                }
+              }}
             >
               <SelectTrigger className="w-36 h-8 bg-emerald-500 text-white border-0 hover:bg-emerald-600">
-                <SelectValue placeholder="Backlog" />
+                <SelectValue placeholder="No Column" />
               </SelectTrigger>
               <SelectContent onCloseAutoFocus={(e) => e.preventDefault()}>
-                <SelectItem value="backlog">Product Backlog</SelectItem>
-                <SelectItem value="sprint1">Sprint 1</SelectItem>
-                <SelectItem value="sprint2">Sprint 2</SelectItem>
+                <SelectItem value="no-column">No Column</SelectItem>
+                {boardColumns.length > 0 && (
+                  <>
+                    {boardColumns.map((column) => (
+                      <SelectItem key={column.id} value={column.id}>
+                        {column.name}
+                      </SelectItem>
+                    ))}
+                  </>
+                )}
+                {sprintColumns.length > 0 && (
+                  <>
+                    {sprintColumns.map((column) => (
+                      <SelectItem key={column.id} value={column.id}>
+                        {column.name} {column.isDone ? '(Done)' : ''}
+                      </SelectItem>
+                    ))}
+                  </>
+                )}
               </SelectContent>
             </Select>
           </div>
