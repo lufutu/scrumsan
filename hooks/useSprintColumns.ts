@@ -32,19 +32,10 @@ const fetcher = (url: string) => fetch(url).then(res => {
 })
 
 export function useSprintColumns(sprintId: string) {
-  const apiUrl = sprintId ? `/api/sprints/${sprintId}/columns` : null
-  console.log('🔍 useSprintColumns called with:', { sprintId, apiUrl })
-  
   const { data: columns, error, mutate: mutateColumns } = useSWR<SprintColumn[]>(
-    apiUrl,
+    sprintId ? `/api/sprints/${sprintId}/columns` : null,
     fetcher
   )
-  
-  console.log('🔍 useSprintColumns SWR result:', { 
-    columns: columns?.length, 
-    error: error?.message,
-    hasData: !!columns 
-  })
 
   const createColumn = async (data: CreateSprintColumnData) => {
     const response = await fetch(`/api/sprints/${sprintId}/columns`, {

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -163,24 +163,7 @@ const DraggableTask = ({ task, index, onTaskClick, boardId, onTaskUpdate, ...pro
   )
 }
 
-const DraggableSprintColumn = ({
-  column,
-  index,
-  columnTasks,
-  onTaskClick,
-  onRefresh,
-  organizationId,
-  boardId,
-  handleRenameColumn,
-  handleMarkColumnAsDone,
-  handleSetColumnLimit,
-  handleExportColumn,
-  handleDeleteColumn,
-  handleAddTask,
-  sprint,
-  users,
-  labels
-}: {
+interface DraggableSprintColumnProps {
   column: SprintColumn
   index: number
   columnTasks: unknown[]
@@ -197,6 +180,25 @@ const DraggableSprintColumn = ({
   sprint: Sprint
   users: User[]
   labels: Label[]
+}
+
+const DraggableSprintColumn: React.FC<DraggableSprintColumnProps> = ({
+  column,
+  index,
+  columnTasks,
+  onTaskClick,
+  onRefresh,
+  organizationId,
+  boardId,
+  handleRenameColumn,
+  handleMarkColumnAsDone,
+  handleSetColumnLimit,
+  handleExportColumn,
+  handleDeleteColumn,
+  handleAddTask,
+  sprint,
+  users,
+  labels
 }) => {
   const [showInlineForm, setShowInlineForm] = useState(false)
   const isLimitExceeded = column.wipLimit && columnTasks.length > column.wipLimit
@@ -416,7 +418,6 @@ export default function SprintBacklogView({
   const [labels, setLabels] = useState<Label[]>([])
 
   // Use sprint columns hook
-  console.log('🔍 Sprint ID for useSprintColumns:', sprint.id)
   const {
     columns: originalColumns,
     isLoading: columnsLoading,
@@ -427,12 +428,6 @@ export default function SprintBacklogView({
     initializeDefaultColumns,
     mutate: mutateColumns
   } = useSprintColumns(sprint.id)
-  
-  console.log('🔍 Sprint columns hook result:', { 
-    columnsLength: originalColumns?.length, 
-    isLoading: columnsLoading,
-    columns: originalColumns 
-  })
 
   // Use the columns from the hook (SWR will handle optimistic updates)
   const columns = originalColumns
