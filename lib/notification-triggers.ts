@@ -1,4 +1,5 @@
 import { NotificationService } from './notification-service'
+import { prisma } from './prisma'
 
 /**
  * Notification triggers for task-related actions
@@ -6,10 +7,27 @@ import { NotificationService } from './notification-service'
 export class TaskNotificationTriggers {
   
   /**
+   * Helper function to get task with boardId
+   */
+  private static async getTaskWithBoard(taskId: string) {
+    return await prisma.task.findUnique({
+      where: { id: taskId },
+      select: {
+        id: true,
+        title: true,
+        boardId: true
+      }
+    })
+  }
+  
+  /**
    * Trigger notifications when a task is created
    */
   static async onTaskCreated(taskId: string, createdBy: string, organizationId: string) {
     try {
+      const task = await this.getTaskWithBoard(taskId)
+      if (!task || !task.boardId) return
+      
       const recipients = await NotificationService.getItemNotificationRecipients(taskId, createdBy)
       
       if (recipients.length === 0) return
@@ -19,7 +37,7 @@ export class TaskNotificationTriggers {
         type: NotificationService.TYPES.ITEM_CREATED,
         title: 'New Task Created',
         content: 'A new task has been created that you might be interested in',
-        link: `/tasks/${taskId}`,
+        link: `/boards/${task.boardId}?task=${taskId}`,
         entityType: 'task',
         entityId: taskId,
         triggeredBy: createdBy
@@ -34,6 +52,9 @@ export class TaskNotificationTriggers {
    */
   static async onTaskAssigned(taskId: string, assigneeId: string, assignedBy: string, organizationId: string, taskTitle: string) {
     try {
+      const task = await this.getTaskWithBoard(taskId)
+      if (!task || !task.boardId) return
+      
       // Notify the assignee
       await NotificationService.createNotification({
         userId: assigneeId,
@@ -41,7 +62,7 @@ export class TaskNotificationTriggers {
         type: NotificationService.TYPES.ITEM_ASSIGNED,
         title: 'Task Assigned to You',
         content: `You have been assigned to task: ${taskTitle}`,
-        link: `/tasks/${taskId}`,
+        link: `/boards/${task.boardId}?task=${taskId}`,
         entityType: 'task',
         entityId: taskId,
         triggeredBy: assignedBy
@@ -57,7 +78,7 @@ export class TaskNotificationTriggers {
           type: NotificationService.TYPES.ITEM_UPDATED,
           title: 'Task Assignment Updated',
           content: `Task "${taskTitle}" has been assigned to a team member`,
-          link: `/tasks/${taskId}`,
+          link: `/boards/${task.boardId}?task=${taskId}`,
           entityType: 'task',
           entityId: taskId,
           triggeredBy: assignedBy
@@ -171,6 +192,8 @@ export class TaskNotificationTriggers {
    */
   static async onTaskChecklistAdded(taskId: string, checklistTitle: string, addedBy: string, organizationId: string, taskTitle: string) {
     try {
+      const task = await this.getTaskWithBoard(taskId)
+      if (!task || !task.boardId) return
       const recipients = await NotificationService.getItemNotificationRecipients(taskId, addedBy)
       
       if (recipients.length === 0) return
@@ -195,6 +218,8 @@ export class TaskNotificationTriggers {
    */
   static async onTaskFileAdded(taskId: string, fileName: string, addedBy: string, organizationId: string, taskTitle: string) {
     try {
+      const task = await this.getTaskWithBoard(taskId)
+      if (!task || !task.boardId) return
       const recipients = await NotificationService.getItemNotificationRecipients(taskId, addedBy)
       
       if (recipients.length === 0) return
@@ -219,6 +244,8 @@ export class TaskNotificationTriggers {
    */
   static async onTaskDueDateChanged(taskId: string, newDueDate: Date | null, changedBy: string, organizationId: string, taskTitle: string) {
     try {
+      const task = await this.getTaskWithBoard(taskId)
+      if (!task || !task.boardId) return
       const recipients = await NotificationService.getItemNotificationRecipients(taskId, changedBy)
       
       if (recipients.length === 0) return
