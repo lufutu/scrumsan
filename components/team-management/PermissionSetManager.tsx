@@ -57,6 +57,9 @@ export function PermissionSetManager({ organizationId }: PermissionSetManagerPro
 
   const { members } = useTeamMembers(organizationId)
 
+  // Ensure members is always treated as an array
+  const membersArray = Array.isArray(members) ? members : []
+
   const handleCreatePermissionSet = useCallback(() => {
     setShowCreateDialog(true)
   }, [])
@@ -94,7 +97,10 @@ export function PermissionSetManager({ organizationId }: PermissionSetManagerPro
     )
   }
 
-  if (!permissionSets || permissionSets.length === 0) {
+  // Ensure permissionSets is always treated as an array
+  const permissionSetsArray = Array.isArray(permissionSets) ? permissionSets : []
+
+  if (permissionSetsArray.length === 0) {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
@@ -153,11 +159,11 @@ export function PermissionSetManager({ organizationId }: PermissionSetManagerPro
       </div>
 
       <div className="grid gap-4">
-        {permissionSets.map((permissionSet) => (
+        {permissionSetsArray.map((permissionSet) => (
           <PermissionSetCard
             key={permissionSet.id}
             permissionSet={permissionSet}
-            members={members}
+            members={membersArray}
             onEdit={() => handleEditPermissionSet(permissionSet)}
             onDelete={() => handleDeletePermissionSet(permissionSet)}
           />
@@ -183,8 +189,8 @@ export function PermissionSetManager({ organizationId }: PermissionSetManagerPro
         open={showDeleteDialog}
         onOpenChange={setShowDeleteDialog}
         permissionSet={selectedPermissionSet}
-        permissionSets={permissionSets}
-        members={members}
+        permissionSets={permissionSetsArray}
+        members={membersArray}
         onSuccess={handleCloseDialogs}
         deletePermissionSet={deletePermissionSet}
       />
