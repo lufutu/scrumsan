@@ -103,6 +103,10 @@ interface Label {
 
 
 const DraggableTask = ({ task, index, onTaskClick, boardId, onTaskUpdate, ...props }: any) => {
+  console.log("🎯 DRAG TASK full object:", task)
+  console.log("🎯 DRAG TASK _count:", task._count)
+  console.log("🎯 DRAG TASK comments count:", task._count?.comments)
+  console.log("🎯 DRAG TASK taskLabels:", task.taskLabels)
   return (
     <Draggable draggableId={task.id} index={index}>
       {(provided, snapshot) => {
