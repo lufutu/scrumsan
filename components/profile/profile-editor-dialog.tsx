@@ -144,7 +144,6 @@ export function ProfileEditorDialog({
   // Get active organization and current user
   const activeOrg = useActiveOrg()
   const { user } = useSupabase()
-  const { currentMember } = useOrganization()
   
   // Set current user when available
   useEffect(() => {
@@ -157,11 +156,14 @@ export function ProfileEditorDialog({
   const targetUserId = userId || currentUser?.id
   const isOwnProfile = !userId || userId === currentUser?.id
 
-  // Use provided member ID or current member ID for own profile
-  const effectiveMemberId = memberId || currentMember?.id || ''
+  // Use provided member ID or empty string for own profile (will be determined by API)
+  const effectiveMemberId = memberId || ''
   const effectiveOrgId = organizationId || activeOrg?.id || ''
 
-  // Use profile editor state management
+  // Use profile editor state management only if we have organization context
+  // For basic user profile editing, we'll handle it manually
+  const shouldUseProfileEditor = !isOwnProfile && effectiveOrgId && effectiveMemberId
+  
   const {
     state: editorState,
     profile,
@@ -172,7 +174,7 @@ export function ProfileEditorDialog({
     resetForm,
     uploadAvatar,
     removeAvatar
-  } = useProfileEditor(
+  } = shouldUseProfileEditor ? useProfileEditor(
     effectiveOrgId,
     effectiveMemberId,
     targetUserId || '',
@@ -180,7 +182,23 @@ export function ProfileEditorDialog({
       enableOptimisticUpdates: true,
       autoSave: false
     }
-  )
+  ) : {
+    state: {
+      formData: {} as ProfileFormData,
+      formErrors: {} as FormErrors,
+      hasUnsavedChanges: false,
+      isSaving: false,
+      isValidating: false
+    },
+    profile: null,
+    isLoading: false,
+    updateField: () => {},
+    validateForm: () => true,
+    saveProfile: async () => {},
+    resetForm: () => {},
+    uploadAvatar: async () => ({ url: '' }),
+    removeAvatar: async () => {}
+  }
 
   // Use avatar state management
   const {
@@ -327,8 +345,89 @@ export function ProfileEditorDialog({
 
   if (!isOpen) return null
 
-  // Don't render dialog content until we have the required data for own profile
-  if (isOwnProfile && (!currentMember?.id || !effectiveOrgId)) {
+  // For own profile without organization context, show a simple basic profile editor
+  if (isOwnProfile && !effectiveOrgId && currentUser) {
+    return (
+      <Dialog open={isOpen} onOpenChange={handleClose}>
+        <DialogContent className="w-full max-w-[95vw] sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-3">
+              <EnhancedAvatar
+                src={currentUser?.user_metadata?.avatar_url}
+                fallbackSeed={currentUser?.email || currentUser?.user_metadata?.full_name || 'User'}
+                size="lg"
+              />
+              <div className="flex-1">
+                <h2 className="text-xl font-semibold">Basic Profile</h2>
+                <p className="text-sm text-muted-foreground">
+                  {currentUser?.user_metadata?.full_name || currentUser?.email}
+                </p>
+              </div>
+            </DialogTitle>
+            <DialogDescription>
+              Basic profile information. For detailed profile management, please select an organization first.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-6 mt-6">
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Full Name</Label>
+                <Input
+                  value={currentUser?.user_metadata?.full_name || ''}
+                  disabled
+                  className="bg-muted"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Full name is managed through your authentication provider.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Email</Label>
+                <Input
+                  value={currentUser?.email || ''}
+                  disabled
+                  className="bg-muted"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Email is managed through your authentication provider.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Profile Picture</Label>
+                <div className="flex items-center gap-4">
+                  <EnhancedAvatar
+                    src={currentUser?.user_metadata?.avatar_url}
+                    fallbackSeed={currentUser?.email || currentUser?.user_metadata?.full_name || 'User'}
+                    size="xl"
+                  />
+                  <div className="text-sm text-muted-foreground">
+                    Profile pictures are managed through your authentication provider.
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-blue-50 p-4 rounded-lg">
+              <h4 className="font-medium text-blue-900 mb-2">Need more profile options?</h4>
+              <p className="text-sm text-blue-700 mb-3">
+                To access detailed profile management, avatar uploads, and personal information fields, 
+                please select an organization from the sidebar.
+              </p>
+              <Button variant="outline" size="sm" onClick={onClose}>
+                Got it
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    )
+  }
+
+  // Don't render dialog content until we have the required data
+  if (isOwnProfile && !currentUser) {
     return (
       <Dialog open={isOpen} onOpenChange={handleClose}>
         <DialogContent className="w-full max-w-[400px]">
@@ -336,6 +435,26 @@ export function ProfileEditorDialog({
             <DialogTitle>Profile Editor</DialogTitle>
             <DialogDescription>
               Loading your profile information...
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex items-center justify-center p-8">
+            <Loader2 className="h-6 w-6 animate-spin mr-2" />
+            <span>Loading profile...</span>
+          </div>
+        </DialogContent>
+      </Dialog>
+    )
+  }
+  
+  // For admin edit, require all parameters
+  if (!isOwnProfile && (!effectiveMemberId || !effectiveOrgId)) {
+    return (
+      <Dialog open={isOpen} onOpenChange={handleClose}>
+        <DialogContent className="w-full max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Profile Editor</DialogTitle>
+            <DialogDescription>
+              Loading profile information...
             </DialogDescription>
           </DialogHeader>
           <div className="flex items-center justify-center p-8">
