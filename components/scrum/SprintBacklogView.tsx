@@ -438,7 +438,9 @@ export default function SprintBacklogView({
         const response = await fetch(`/api/boards/${boardId}/members`)
         if (response.ok) {
           const data = await response.json()
-          setUsers(data)
+          // Transform BoardMember objects to User objects
+          const users = data.map((member: any) => member.user)
+          setUsers(users)
         }
       } catch (error) {
         console.error('Error fetching users:', error)
@@ -486,7 +488,12 @@ export default function SprintBacklogView({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ...taskData,
+          title: taskData.title,
+          taskType: taskData.taskType,
+          assignees: taskData.assignees || [],
+          labels: taskData.labels || [],
+          storyPoints: taskData.storyPoints,
+          priority: taskData.priority,
           boardId,
           sprintColumnId: columnId,
           sprintId: sprint.id
