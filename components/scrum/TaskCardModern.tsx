@@ -1058,8 +1058,7 @@ export function TaskCardModern({
                           <Input
                             type="date"
                             defaultValue={(() => {
-                              const value = dueDate ? new Date(dueDate).toISOString().split('T')[0] : ''
-                              console.log('🔍 Date input defaultValue:', { dueDate, value, taskId: id })
+                              const value = dueDate ? new Date(dueDate).toISOString().split('T')[0] : ''                              
                               return value
                             })()}
                             onChange={(e) => {

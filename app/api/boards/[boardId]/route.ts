@@ -59,7 +59,16 @@ export async function GET(
           include: {
             tasks: {
               orderBy: { createdAt: 'asc' },
-              include: {
+              select: {
+                id: true,
+                title: true,
+                description: true,
+                taskType: true,
+                priority: true,
+                storyPoints: true,
+                dueDate: true,
+                createdAt: true,
+                updatedAt: true,
                 taskAssignees: {
                   select: {
                     user: {
@@ -67,6 +76,17 @@ export async function GET(
                         id: true,
                         fullName: true,
                         avatarUrl: true
+                      }
+                    }
+                  }
+                },
+                taskLabels: {
+                  select: {
+                    label: {
+                      select: {
+                        id: true,
+                        name: true,
+                        color: true
                       }
                     }
                   }

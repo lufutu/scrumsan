@@ -60,6 +60,7 @@ export default function StandaloneBoardView({ board, onUpdate }: StandaloneBoard
   const [selectedTask, setSelectedTask] = useState<any | null>(null)
   const { users } = useUsers({ organizationId: board.organizationId })
   const { labels } = useLabels(board.id)
+  console.log("board", board, labels)
 
   // Scrum boards are now supported as standalone boards
 
