@@ -262,18 +262,26 @@ export function ItemModal({
   };
 
   const fetchBoardColumns = async () => {
-    if (!task?.board?.id) return;
+    if (!task?.board?.id) {
+      console.log('🔍 ItemModal: No board ID available for task:', task);
+      return;
+    }
     
+    console.log('🔍 ItemModal: Fetching board columns for board:', task.board.id);
     try {
       const response = await fetch(`/api/boards/${task.board.id}/columns`);
       if (response.ok) {
         const data = await response.json();
+        console.log('🔍 ItemModal: Board columns response:', data);
         // Extract just the column info we need
         const columns = data.map((col: any) => ({
           id: col.id,
           name: col.name
         }));
+        console.log('🔍 ItemModal: Setting board columns:', columns);
         setBoardColumns(columns || []);
+      } else {
+        console.error('🔍 ItemModal: Board columns API failed:', response.status, response.statusText);
       }
     } catch (error) {
       console.error('Error fetching board columns:', error);
@@ -281,12 +289,17 @@ export function ItemModal({
   };
 
   const fetchSprintColumns = async () => {
-    if (!task?.board?.id) return;
+    if (!task?.board?.id) {
+      console.log('🔍 ItemModal: No board ID for sprint columns');
+      return;
+    }
     
+    console.log('🔍 ItemModal: Fetching sprint columns for board:', task.board.id);
     try {
       const response = await fetch(`/api/boards/${task.board.id}/sprint-columns`);
       if (response.ok) {
         const sprintGroupsData = await response.json();
+        console.log('🔍 ItemModal: Sprint columns response:', sprintGroupsData);
         // Flatten all columns from all sprints
         const allSprintColumns = sprintGroupsData.flatMap((group: any) => 
           group.columns.map((col: any) => ({
@@ -297,7 +310,10 @@ export function ItemModal({
             sprintName: group.sprintName
           }))
         );
+        console.log('🔍 ItemModal: Setting sprint columns:', allSprintColumns);
         setSprintColumns(allSprintColumns || []);
+      } else {
+        console.error('🔍 ItemModal: Sprint columns API failed:', response.status, response.statusText);
       }
     } catch (error) {
       console.error('Error fetching sprint columns:', error);
@@ -820,6 +836,7 @@ export function ItemModal({
               </SelectTrigger>
               <SelectContent onCloseAutoFocus={(e) => e.preventDefault()}>
                 <SelectItem value="no-column">No Column</SelectItem>
+                {console.log('🔍 ItemModal: Rendering columns - Board:', boardColumns.length, 'Sprint:', sprintColumns.length)}
                 {boardColumns.length > 0 && (
                   <>
                     {boardColumns.map((column) => (

@@ -23,7 +23,6 @@ export async function GET(
       where: { id: boardId },
       select: {
         id: true,
-        projectId: true,
         organizationId: true
       }
     })
@@ -35,28 +34,15 @@ export async function GET(
       )
     }
     
-    // Check user access
-    let hasAccess = false
+    // Check user access through organization membership
+    const orgMember = await prisma.organizationMember.findFirst({
+      where: {
+        organizationId: board.organizationId,
+        userId: user.id
+      }
+    })
     
-    if (board.projectId) {
-      const projectMember = await prisma.projectMember.findFirst({
-        where: {
-          projectId: board.projectId,
-          userId: user.id
-        }
-      })
-      hasAccess = !!projectMember
-    } else if (board.organizationId) {
-      const orgMember = await prisma.organizationMember.findFirst({
-        where: {
-          organizationId: board.organizationId,
-          userId: user.id
-        }
-      })
-      hasAccess = !!orgMember
-    }
-    
-    if (!hasAccess) {
+    if (!orgMember) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 403 }
@@ -132,7 +118,6 @@ export async function POST(
       where: { id: boardId },
       select: {
         id: true,
-        projectId: true,
         organizationId: true
       }
     })
@@ -144,28 +129,15 @@ export async function POST(
       )
     }
     
-    // Check user access
-    let hasAccess = false
+    // Check user access through organization membership
+    const orgMember = await prisma.organizationMember.findFirst({
+      where: {
+        organizationId: board.organizationId,
+        userId: user.id
+      }
+    })
     
-    if (board.projectId) {
-      const projectMember = await prisma.projectMember.findFirst({
-        where: {
-          projectId: board.projectId,
-          userId: user.id
-        }
-      })
-      hasAccess = !!projectMember
-    } else if (board.organizationId) {
-      const orgMember = await prisma.organizationMember.findFirst({
-        where: {
-          organizationId: board.organizationId,
-          userId: user.id
-        }
-      })
-      hasAccess = !!orgMember
-    }
-    
-    if (!hasAccess) {
+    if (!orgMember) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 403 }
