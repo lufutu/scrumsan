@@ -97,6 +97,8 @@ export function TaskActivities({ taskId, className }: TaskActivitiesProps) {
         return <MessageSquare className="h-4 w-4" />
       case 'checklist_created':
         return <CheckSquare className="h-4 w-4" />
+      case 'checklist_item_added':
+        return <CheckSquare className="h-4 w-4" />
       default:
         return <Activity className="h-4 w-4" />
     }

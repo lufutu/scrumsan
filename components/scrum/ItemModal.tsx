@@ -401,7 +401,7 @@ export function ItemModal({
       const response = await fetch(`/api/tasks/${taskId}/checklists/${checklistId}/items`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text })
+        body: JSON.stringify({ content: text })
       });
 
       if (!response.ok) {

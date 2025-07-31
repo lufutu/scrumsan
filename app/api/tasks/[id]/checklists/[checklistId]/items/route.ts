@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth-utils'
 import { z } from 'zod'
+import { ActivityService } from '@/lib/activity-service'
 
 const checklistItemSchema = z.object({
   content: z.string().min(1).max(500)
@@ -75,6 +76,19 @@ export async function POST(
         createdBy: user.id
       }
     })
+
+    // Track checklist item creation activity
+    try {
+      await ActivityService.createActivity({
+        taskId,
+        userId: user.id,
+        activityType: 'checklist_item_added',
+        description: `added checklist item "${validatedData.content}"`
+      })
+    } catch (activityError) {
+      // Don't fail item creation if activity tracking fails
+      console.error('Error tracking checklist item activity:', activityError)
+    }
 
     return NextResponse.json(item)
   } catch (error: unknown) {
