@@ -35,6 +35,7 @@ import { ProfileEditorDialog } from "@/components/profile/profile-editor-dialog"
 import { useOrganization } from "@/providers/organization-provider"
 import { useSupabase } from "@/providers/supabase-provider"
 import { usePermissions } from "@/hooks/usePermissions"
+import NotificationBell from "@/components/notifications/notification-bell"
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     const { organizations, activeOrg, isLoading } = useOrganization()
@@ -106,15 +107,18 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             <SidebarHeader>
                 <SidebarMenu>
                     <SidebarMenuItem>
-                        <SidebarMenuButton
-                            asChild
-                            className="data-[slot=sidebar-menu-button]:!p-1.5"
-                        >
-                            <Link href="/">
-                                <Image className="size-6" src="/logo.png" alt="ScrumSan" width={64} height={64} />
-                                <span className="text-green-700 text-lg font-semibold">ScrumSan</span>
-                            </Link>
-                        </SidebarMenuButton>
+                        <div className="flex items-center justify-between w-full">
+                            <SidebarMenuButton
+                                asChild
+                                className="data-[slot=sidebar-menu-button]:!p-1.5 flex-1"
+                            >
+                                <Link href="/">
+                                    <Image className="size-6" src="/logo.png" alt="ScrumSan" width={64} height={64} />
+                                    <span className="text-green-700 text-lg font-semibold">ScrumSan</span>
+                                </Link>
+                            </SidebarMenuButton>
+                            {user && <NotificationBell />}
+                        </div>
                     </SidebarMenuItem>
                 </SidebarMenu>
             </SidebarHeader>

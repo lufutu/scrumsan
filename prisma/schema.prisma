@@ -43,6 +43,10 @@ model User {
   auditLogs           AuditLog[]
   sentInvitations     TeamInvitation[]     @relation("InvitationInviter")
   acceptedInvitations TeamInvitation[]     @relation("InvitationAccepter")
+  notifications       Notification[]       @relation("UserNotifications")
+  triggeredNotifications Notification[]    @relation("NotificationTriggeredBy")
+  taskFollows         TaskFollower[]       @relation("UserTaskFollows")
+  boardMemberships    BoardMember[]        @relation("UserBoardMemberships")
 
   @@map("users")
 }
@@ -67,6 +71,7 @@ model Organization {
   customRoles    CustomRole[]
   auditLogs      AuditLog[]
   invitations    TeamInvitation[]
+  notifications  Notification[]
 
   @@map("organizations")
 }
@@ -204,6 +209,7 @@ model Board {
   sprints      Sprint[]
   labels       Label[]
   customFields CustomField[]
+  members      BoardMember[]  @relation("BoardMembers")
 
   @@map("boards")
 }
@@ -272,6 +278,7 @@ model Task {
   customFieldValues TaskCustomFieldValue[]
   checklists        TaskChecklist[]
   worklogEntries    TaskWorklog[]
+  followers         TaskFollower[]  @relation("TaskFollowers")
 
   @@map("tasks")
 }
@@ -666,5 +673,64 @@ model AuditLog {
   @@index([userId, timestamp])
   @@index([resourceType, timestamp])
   @@map("audit_logs")
+}
+
+// Notifications
+model Notification {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId           String    @map("user_id") @db.Uuid
+  organizationId   String?   @map("organization_id") @db.Uuid
+  type             String    // 'item_assigned', 'item_mentioned', 'item_comment', 'board_update', etc.
+  title            String
+  content          String
+  link             String?   // Deep link to the relevant item/board
+  entityType       String?   @map("entity_type") // 'task', 'board', 'comment', etc.
+  entityId         String?   @map("entity_id") @db.Uuid
+  triggeredBy      String?   @map("triggered_by") @db.Uuid // User who triggered the notification
+  metadata         Json?     // Additional context data
+  isRead           Boolean   @default(false) @map("is_read")
+  readAt           DateTime? @map("read_at") @db.Timestamptz
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  
+  // Relationships
+  user         User          @relation("UserNotifications", fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  triggeredByUser User?      @relation("NotificationTriggeredBy", fields: [triggeredBy], references: [id], onDelete: SetNull)
+  
+  @@index([userId, isRead, createdAt])
+  @@index([organizationId, createdAt])
+  @@index([entityType, entityId])
+  @@map("notifications")
+}
+
+// Task followers for notification management
+model TaskFollower {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  taskId    String   @map("task_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  
+  // Relationships
+  task Task @relation("TaskFollowers", fields: [taskId], references: [id], onDelete: Cascade)
+  user User @relation("UserTaskFollows", fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([taskId, userId])
+  @@map("task_followers")
+}
+
+// Board members for board-level notifications
+model BoardMember {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  boardId   String   @map("board_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  role      String   @default("member") // 'admin', 'member'
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  
+  // Relationships
+  board Board @relation("BoardMembers", fields: [boardId], references: [id], onDelete: Cascade)
+  user  User  @relation("UserBoardMemberships", fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([boardId, userId])
+  @@map("board_members")
 }
 
