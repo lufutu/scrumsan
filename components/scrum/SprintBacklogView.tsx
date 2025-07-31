@@ -150,7 +150,9 @@ const DraggableTask = ({ task, index, onTaskClick, boardId, onTaskUpdate, ...pro
                 boardId={boardId}
                 onClick={!isDragging ? () => onTaskClick?.(task) : undefined}
                 onAssigneesChange={() => {
-                  onTaskUpdate?.() // Invalidate cache when labels or assignees are changed
+                  // Note: onAssigneesChange is called for any task data changes (assignees, labels, comments, etc.)
+                  onTaskUpdate?.() // Invalidate parent cache 
+                  mutateColumns() // Invalidate sprint columns cache to update counts/labels display
                 }}
               />
             </div>
