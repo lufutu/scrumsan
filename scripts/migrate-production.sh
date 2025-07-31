@@ -63,25 +63,54 @@ fi
 
 # No need to create temporary env file since we're using PRODUCTION_DATABASE_URL
 
-# Show pending migrations
+# Check if database is empty (no _prisma_migrations table)
 echo ""
-echo -e "${YELLOW}Checking migration status...${NC}"
-DATABASE_URL="$PRODUCTION_DATABASE_URL" bunx prisma migrate status
+echo -e "${YELLOW}Checking if database is empty...${NC}"
+HAS_MIGRATIONS_TABLE=$(DATABASE_URL="$PRODUCTION_DATABASE_URL" bunx prisma db execute --stdin <<< "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = '_prisma_migrations';" 2>/dev/null | grep -E '^[0-9]+$' || echo "0")
 
-echo ""
-echo -e "${YELLOW}The above shows the current migration status.${NC}"
-read -p "Do you want to proceed with applying migrations? (type 'yes' to proceed): " proceed
-
-if [ "$proceed" != "yes" ]; then
-    echo -e "${RED}Migration cancelled.${NC}"
-    rm .env.production
-    exit 1
+if [ "$HAS_MIGRATIONS_TABLE" = "0" ]; then
+    echo -e "${YELLOW}Empty database detected. Need to create schema first.${NC}"
+    echo ""
+    echo -e "${YELLOW}Options for empty database:${NC}"
+    echo "1. Push schema (recommended for empty database)"
+    echo "2. Deploy migrations (will create migration history)"
+    echo ""
+    read -p "Choose option (1 or 2): " db_option
+    
+    if [ "$db_option" = "1" ]; then
+        echo ""
+        echo -e "${GREEN}Pushing schema to empty production database...${NC}"
+        DATABASE_URL="$PRODUCTION_DATABASE_URL" bunx prisma db push --accept-data-loss
+        echo -e "${GREEN}Schema pushed successfully!${NC}"
+    elif [ "$db_option" = "2" ]; then
+        echo ""
+        echo -e "${GREEN}Deploying migrations to production...${NC}"
+        DATABASE_URL="$PRODUCTION_DATABASE_URL" bunx prisma migrate deploy
+    else
+        echo -e "${RED}Invalid option. Migration cancelled.${NC}"
+        exit 1
+    fi
+else
+    # Database has existing schema, show migration status
+    echo -e "${GREEN}Existing database detected with migration history.${NC}"
+    echo ""
+    echo -e "${YELLOW}Checking migration status...${NC}"
+    DATABASE_URL="$PRODUCTION_DATABASE_URL" bunx prisma migrate status
+    
+    echo ""
+    echo -e "${YELLOW}The above shows the current migration status.${NC}"
+    read -p "Do you want to proceed with applying migrations? (type 'yes' to proceed): " proceed
+    
+    if [ "$proceed" != "yes" ]; then
+        echo -e "${RED}Migration cancelled.${NC}"
+        exit 1
+    fi
+    
+    # Run migrations
+    echo ""
+    echo -e "${GREEN}Applying migrations to production...${NC}"
+    DATABASE_URL="$PRODUCTION_DATABASE_URL" bunx prisma migrate deploy
 fi
-
-# Run migrations
-echo ""
-echo -e "${GREEN}Applying migrations to production...${NC}"
-DATABASE_URL="$PRODUCTION_DATABASE_URL" bunx prisma migrate deploy
 
 # Generate Prisma Client
 echo ""

@@ -37,6 +37,18 @@ pg_dump "$PRODUCTION_DATABASE_URL" > backup_$(date +%Y%m%d_%H%M%S).sql
 - Notify users of potential downtime
 - Prepare rollback plan
 
+## 🗄️ Empty Database vs Existing Database
+
+### If Your Production Database is Empty:
+- **Use `prisma db push`** - This creates the schema directly without migration history
+- **Faster and simpler** for initial setup
+- **No migration history** is created (which is fine for new databases)
+
+### If Your Production Database Has Existing Data:
+- **Use `prisma migrate deploy`** - This applies migrations with proper history tracking  
+- **Safer for existing data** as it follows the exact migration steps
+- **Maintains migration history** for future changes
+
 ## 🚀 Migration Steps
 
 ### Option 1: Using the Migration Script (Recommended)
@@ -53,11 +65,29 @@ source .env.production
 
 The script will:
 1. Ask for multiple confirmations
-2. Show pending migrations
-3. Apply migrations safely
-4. Generate Prisma client
+2. **Detect if database is empty** and offer appropriate options
+3. For empty databases: Push schema directly (recommended)
+4. For existing databases: Show migration status and apply migrations
+5. Generate Prisma client
 
 ### Option 2: Manual Migration
+
+#### For Empty Database (Recommended):
+```bash
+# 1. Set production database URL
+export DATABASE_URL="$PRODUCTION_DATABASE_URL"
+
+# 2. Push schema to empty database (no migration history needed)
+bunx prisma db push --accept-data-loss
+
+# 3. Generate Prisma Client
+bunx prisma generate
+
+# 4. Unset the DATABASE_URL to avoid accidents
+unset DATABASE_URL
+```
+
+#### For Existing Database with Migration History:
 ```bash
 # 1. Set production database URL
 export DATABASE_URL="$PRODUCTION_DATABASE_URL"
@@ -168,6 +198,15 @@ bunx prisma migrate resolve --applied "MIGRATION_NAME"
 ```bash
 # Reset to baseline (DANGEROUS - only with backup)
 bunx prisma migrate reset --skip-generate --skip-seed
+```
+
+### Issue 4: Empty Database Not Detected
+```bash
+# If the script doesn't detect your empty database, manually check:
+psql "$PRODUCTION_DATABASE_URL" -c "\dt"
+
+# If you see "No relations found", it's empty. Use db push:
+DATABASE_URL="$PRODUCTION_DATABASE_URL" bunx prisma db push --accept-data-loss
 ```
 
 ## 🔐 Security Notes
