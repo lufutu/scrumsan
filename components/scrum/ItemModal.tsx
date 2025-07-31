@@ -67,6 +67,8 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Calendar } from '@/components/ui/calendar';
 import { Search } from 'lucide-react';
 import { format } from 'date-fns';
+import { TaskFollowers } from '@/components/tasks/task-followers';
+import { TaskActivities } from '@/components/tasks/task-activities';
 
 type Task = Tables<'tasks'> & {
   taskAssignees?: {
@@ -1095,6 +1097,7 @@ export function ItemModal({
             <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full">
               <TabsList className="w-full justify-start h-10 p-1 bg-slate-100 rounded-none border-b">
                 <TabsTrigger value="properties" className="flex-1 text-sm">Properties</TabsTrigger>
+                <TabsTrigger value="activities" className="flex-1 text-sm">Activities</TabsTrigger>
                 <TabsTrigger value="activity" className="flex-1 text-sm">Worklog</TabsTrigger>
                 <TabsTrigger value="relations" className="flex-1 text-sm">Relations</TabsTrigger>
               </TabsList>
@@ -1381,6 +1384,14 @@ export function ItemModal({
                   onTaskUpdate={fetchTask}
                 />
               </div>
+              </TabsContent>
+
+              {/* Activities Tab */}
+              <TabsContent value="activities" className="p-6">
+                <TaskActivities 
+                  taskId={task?.id || ''} 
+                  className=""
+                />
               </TabsContent>
 
               {/* Activity Tab */}

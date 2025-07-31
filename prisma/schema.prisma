@@ -47,6 +47,7 @@ model User {
   triggeredNotifications Notification[]    @relation("NotificationTriggeredBy")
   taskFollows         TaskFollower[]       @relation("UserTaskFollows")
   boardMemberships    BoardMember[]        @relation("UserBoardMemberships")
+  taskActivities      TaskActivity[]       @relation("UserTaskActivities")
 
   @@map("users")
 }
@@ -279,6 +280,7 @@ model Task {
   checklists        TaskChecklist[]
   worklogEntries    TaskWorklog[]
   followers         TaskFollower[]  @relation("TaskFollowers")
+  activities        TaskActivity[]  @relation("TaskActivities")
 
   @@map("tasks")
 }
@@ -732,5 +734,26 @@ model BoardMember {
   
   @@unique([boardId, userId])
   @@map("board_members")
+}
+
+// Task activities for tracking all changes to items
+model TaskActivity {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  taskId         String   @map("task_id") @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  activityType   String   @map("activity_type") // 'created', 'assigned', 'priority_changed', 'label_added', etc.
+  description    String   // Human-readable description of what happened
+  oldValue       String?  @map("old_value") // Previous value (for changes)
+  newValue       String?  @map("new_value") // New value (for changes)
+  metadata       Json?    // Additional context data (e.g., label colors, assignee names)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+  
+  // Relationships
+  task Task @relation("TaskActivities", fields: [taskId], references: [id], onDelete: Cascade)
+  user User @relation("UserTaskActivities", fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([taskId, createdAt])
+  @@index([userId, createdAt])
+  @@map("task_activities")
 }
 
