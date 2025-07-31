@@ -129,7 +129,8 @@ export async function GET(req: NextRequest) {
         board: {
           select: {
             id: true,
-            name: true
+            name: true,
+            organizationId: true
           }
         },
         column: {
@@ -336,7 +337,8 @@ export async function POST(req: NextRequest) {
         board: {
           select: {
             id: true,
-            name: true
+            name: true,
+            organizationId: true
           }
         },
         column: {

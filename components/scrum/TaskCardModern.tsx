@@ -59,6 +59,7 @@ export function TaskCardModern({
   onClick,
   onAssigneesChange
 }: TaskCardModernProps) {
+
   // Get boardId from task data or props
   const taskBoardId = (boardId || (typeof window !== 'undefined' && window.location.pathname.includes('/boards/')
     ? window.location.pathname.split('/boards/')[1]?.split('/')[0]
@@ -1056,7 +1057,11 @@ export function TaskCardModern({
                           <Label className="text-sm font-medium">Due Date</Label>
                           <Input
                             type="date"
-                            defaultValue={dueDate ? new Date(dueDate).toISOString().split('T')[0] : ''}
+                            defaultValue={(() => {
+                              const value = dueDate ? new Date(dueDate).toISOString().split('T')[0] : ''
+                              console.log('🔍 Date input defaultValue:', { dueDate, value, taskId: id })
+                              return value
+                            })()}
                             onChange={(e) => {
                               e.stopPropagation();
                               // Handle due date change

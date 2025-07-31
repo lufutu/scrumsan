@@ -116,7 +116,28 @@ export async function GET(req: NextRequest) {
         }
       },
       tasks: {
-        include: {
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          taskType: true,
+          priority: true,
+          storyPoints: true,
+          dueDate: true,
+          createdAt: true,
+          updatedAt: true,
+          position: true,
+          boardId: true,
+          sprintId: true,
+          columnId: true,
+          sprintColumnId: true,
+          board: {
+            select: {
+              id: true,
+              name: true,
+              organizationId: true
+            }
+          },
           taskAssignees: {
             select: {
               user: {

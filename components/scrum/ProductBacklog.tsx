@@ -117,14 +117,18 @@ export default function ProductBacklog({
     const sprint = sprintDetails.find((s: Sprint) => s.id === sprintId) || sprints.find((s: Sprint) => s.id === sprintId)
     if (!sprint) return []
 
+    let sprintTasks: Task[] = []
+
     // For backlog sprint, return tasks with no sprintId
     if (sprint.isBacklog) {
-      return tasks.filter((task: Task) => !task.sprintId)
+      sprintTasks = tasks.filter((task: Task) => !task.sprintId)
+    } else {
+      // For regular sprints, return tasks from sprint relation
+      if (!sprint.tasks) return []
+      sprintTasks = sprint.tasks
     }
 
-    // For regular sprints, return tasks from sprint relation
-    if (!sprint.tasks) return []
-    return sprint.tasks
+    return sprintTasks
   }, [sprintDetails, sprints, tasks])
 
   const handleDragEnd = useCallback(async (result: DropResult) => {
@@ -559,6 +563,7 @@ export default function ProductBacklog({
       setIsStartSprintOpen(true) // Reopen dialog
     }
   }
+
 
   if (sprintsLoading || tasksLoading) {
     return (
