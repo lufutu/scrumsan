@@ -127,11 +127,15 @@ export function ComprehensiveInlineForm({
     const containerRect = containerRef.current.getBoundingClientRect()
     const inputRect = inputRef.current.getBoundingClientRect()
     
-    return {
+    const position = {
       top: inputRect.bottom + window.scrollY + 2, // 2px gap
       left: containerRect.left + window.scrollX,
       width: containerRect.width
     }
+    
+    // console.log('Dropdown position calculated:', position)
+    
+    return position
   }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -147,9 +151,13 @@ export function ComprehensiveInlineForm({
       if (spaceIndex === -1) {
         // No space after #, show dropdown
         setFilterQuery(afterHash.toLowerCase())
-        const position = calculateDropdownPosition()
-        setDropdownPosition(position)
-        setShowDropdown(true)
+        
+        // Small delay to ensure DOM has settled after potential drag operations
+        setTimeout(() => {
+          const position = calculateDropdownPosition()
+          setDropdownPosition(position)
+          setShowDropdown(true)
+        }, 0)
       } else {
         setShowDropdown(false)
         setDropdownPosition(null)
@@ -219,6 +227,10 @@ export function ComprehensiveInlineForm({
     initials: (user.fullName || user.email || 'Unknown User').split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2),
     avatar: user.avatarUrl
   }))
+  
+  console.log('InlineForm - users prop:', users)
+  console.log('InlineForm - labels prop:', labels)
+  console.log('InlineForm - transformedUsers:', transformedUsers)
 
   // Transform labels data to expected format
   const transformedLabels: Label[] = labels.map(label => ({
@@ -247,6 +259,10 @@ export function ComprehensiveInlineForm({
         itemType: 'points' as const 
       }))
     ]
+    
+    if (transformedUsers.length > 0 || transformedLabels.length > 0) {
+      console.log('Dropdown items - Assignees:', transformedUsers.length, 'Labels:', transformedLabels.length)
+    }
     
     if (filterQuery === '') {
       return allItems

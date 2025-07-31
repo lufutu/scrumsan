@@ -429,44 +429,36 @@ export default function SprintBacklogView({
     }
   }, [columnsLoading, originalColumns.length, initializeDefaultColumns])
 
-  // Fetch users for the board
+  // Fetch users and labels when component mounts
   useEffect(() => {
-    const fetchUsers = async () => {
+    const fetchData = async () => {
       if (!boardId) return
       
       try {
-        const response = await fetch(`/api/boards/${boardId}/members`)
-        if (response.ok) {
-          const data = await response.json()
-          // Transform BoardMember objects to User objects
-          const users = data.map((member: any) => member.user)
+        // Fetch users and labels in parallel
+        const [usersResponse, labelsResponse] = await Promise.all([
+          fetch(`/api/boards/${boardId}/members`),
+          fetch(`/api/boards/${boardId}/labels`)
+        ])
+        
+        if (usersResponse.ok) {
+          const usersData = await usersResponse.json()
+          const users = usersData.map((member: any) => member.user)
+          console.log('SprintBacklog - users loaded:', users.length, users)
           setUsers(users)
         }
-      } catch (error) {
-        console.error('Error fetching users:', error)
-      }
-    }
-    
-    fetchUsers()
-  }, [boardId])
-
-  // Fetch labels for the board
-  useEffect(() => {
-    const fetchLabels = async () => {
-      if (!boardId) return
-      
-      try {
-        const response = await fetch(`/api/boards/${boardId}/labels`)
-        if (response.ok) {
-          const data = await response.json()
-          setLabels(data)
+        
+        if (labelsResponse.ok) {
+          const labelsData = await labelsResponse.json()
+          console.log('SprintBacklog - labels loaded:', labelsData.length, labelsData)
+          setLabels(labelsData)
         }
       } catch (error) {
-        console.error('Error fetching labels:', error)
+        console.error('Error fetching board data:', error)
       }
     }
     
-    fetchLabels()
+    fetchData()
   }, [boardId])
 
   // Sync external edit dialog state
