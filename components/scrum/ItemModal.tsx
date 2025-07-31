@@ -45,7 +45,6 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { EnhancedAvatar } from '@/components/ui/enhanced-avatar';
 import { Card, CardContent } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -67,9 +66,9 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Calendar } from '@/components/ui/calendar';
 import { Search } from 'lucide-react';
 import { format } from 'date-fns';
-import { TaskFollowers } from '@/components/tasks/task-followers';
 import { TaskActivities } from '@/components/tasks/task-activities';
 import { DescriptionField, DescriptionDisplay } from '@/components/ui/description-field';
+import {Comment, Attachment, WorklogEntry, Checklist} from '@/types/shared'
 
 type Task = Tables<'tasks'> & {
   taskAssignees?: {
@@ -113,59 +112,6 @@ type Task = Tables<'tasks'> & {
   worklog_entries?: WorklogEntry[]
 }
 
-interface ChecklistItem {
-  id: string;
-  text: string;
-  completed: boolean;
-  position: number;
-}
-
-interface Checklist {
-  id: string;
-  title: string;
-  items: ChecklistItem[];
-  created_at: string;
-}
-
-interface Comment {
-  id: string;
-  content: string;
-  user: {
-    id: string;
-    full_name: string | null;
-    avatar_url: string | null;
-  };
-  created_at: string;
-  updated_at: string;
-}
-
-interface Attachment {
-  id: string;
-  name: string;
-  size: number;
-  type: string;
-  url: string | null;
-  uploadedAt: string;
-  uploadedByUser: {
-    id: string;
-    fullName: string;
-    avatarUrl?: string;
-  };
-  error?: string;
-}
-
-interface WorklogEntry {
-  id: string;
-  description: string;
-  hoursLogged: number;
-  dateLogged: string;
-  user: {
-    id: string;
-    fullName: string;
-    avatarUrl: string | null;
-  };
-  createdAt: string;
-}
 
 export function ItemModal({
   isOpen,
@@ -1659,7 +1605,7 @@ function ChecklistComponent({ checklist, onToggleItem, onAddItem }: ChecklistCom
                     ? "line-through text-slate-400" 
                     : "text-slate-700"
                 )}>
-                  {item.text}
+                  {item.content}
                 </span>
                 <Button
                   variant="ghost"

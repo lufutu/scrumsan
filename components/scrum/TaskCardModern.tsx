@@ -540,7 +540,7 @@ export function TaskCardModern({
       const response = await fetch(`/api/tasks/${id}/checklists`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: newChecklistTitle.trim() })
+        body: JSON.stringify({ name: newChecklistTitle.trim() })
       });
 
       if (!response.ok) throw new Error('Failed to create checklist');
@@ -586,7 +586,7 @@ export function TaskCardModern({
       const response = await fetch(`/api/tasks/${id}/checklists/${checklistId}/items`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: newChecklistItemText.trim() })
+        body: JSON.stringify({ content: newChecklistItemText.trim() })
       });
 
       if (!response.ok) throw new Error('Failed to add checklist item');
@@ -1267,7 +1267,7 @@ export function TaskCardModern({
                         <div key={attachment.id} className="flex items-center justify-between gap-2 p-2 bg-gray-50 rounded text-xs">
                           <div className="flex items-center gap-2 min-w-0">
                             <Paperclip className="h-3 w-3 text-gray-400 shrink-0" />
-                            <span className="truncate">{attachment.filename}</span>
+                            <span className="truncate">{attachment.filename || attachment.name}</span>
                           </div>
                           <Button
                             variant="ghost"
@@ -1383,7 +1383,7 @@ export function TaskCardModern({
                       {checklists.map((checklist) => (
                         <div key={checklist.id} className="border rounded-lg p-3 bg-gray-50">
                           <div className="flex items-center justify-between mb-2">
-                            <Label className="text-sm font-medium">{checklist.title}</Label>
+                            <Label className="text-sm font-medium">{checklist.name}</Label>
                             <Button
                               variant="ghost"
                               size="sm"
@@ -1420,7 +1420,7 @@ export function TaskCardModern({
                                     item.completed && "line-through text-gray-500"
                                   )}
                                 >
-                                  {item.text}
+                                  {item.content}
                                 </span>
                                 <Button
                                   variant="ghost"

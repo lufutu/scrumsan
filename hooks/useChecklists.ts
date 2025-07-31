@@ -1,23 +1,7 @@
 "use client"
 
 import useSWR from 'swr'
-
-interface ChecklistItem {
-  id: string
-  text: string
-  completed: boolean
-  position: number
-  createdAt: string
-  updatedAt: string
-}
-
-interface Checklist {
-  id: string
-  taskId: string
-  name: string
-  createdAt: string
-  items: ChecklistItem[]
-}
+import { Checklist, ChecklistItem} from '@/types/shared'
 
 const fetcher = (url: string) => fetch(url).then(res => {
   if (!res.ok) throw new Error('Failed to fetch')

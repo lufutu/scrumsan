@@ -282,3 +282,60 @@ export interface TaskAssigneeSelectorProps {
   }>) => void
   children: React.ReactNode
 }
+
+interface ChecklistItem {
+  id: string
+  content: string
+  completed: boolean
+  position: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface Checklist {
+  id: string
+  taskId: string
+  name: string
+  createdAt: string
+  items: ChecklistItem[]
+}
+
+export interface Comment {
+  id: string;
+  content: string;
+  user: {
+    id: string;
+    full_name: string | null;
+    avatar_url: string | null;
+  };
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Attachment {
+  id: string;
+  name: string;
+  size: number;
+  type: string;
+  url: string | null;
+  uploadedAt: string;
+  uploadedByUser: {
+    id: string;
+    fullName: string;
+    avatarUrl?: string;
+  };
+  error?: string;
+}
+
+export interface WorklogEntry {
+  id: string;
+  description: string;
+  hoursLogged: number;
+  dateLogged: string;
+  user: {
+    id: string;
+    fullName: string;
+    avatarUrl: string | null;
+  };
+  createdAt: string;
+}
