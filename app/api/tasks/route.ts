@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth-utils'
 // Real-time updates are handled automatically by Supabase
 import { z } from 'zod'
+import { TaskNotificationTriggers } from '@/lib/notification-triggers'
 
 const taskSchema = z.object({
   title: z.string().min(1),
@@ -412,6 +413,68 @@ export async function POST(req: NextRequest) {
     }
 
     // Sprint assignment is already handled by the sprintId field in the task creation above
+
+    // Trigger notifications for task creation and assignments
+    try {
+      // Get the board's organization ID for notifications
+      const taskBoard = await prisma.board.findUnique({
+        where: { id: task.boardId },
+        select: { organizationId: true }
+      })
+
+      if (taskBoard) {
+        // Notify about task creation
+        await TaskNotificationTriggers.onTaskCreated(
+          task.id,
+          user.id,
+          taskBoard.organizationId
+        )
+
+        // Notify assignees if any were added
+        if (validatedData.assignees && validatedData.assignees.length > 0) {
+          for (const assignee of validatedData.assignees) {
+            await TaskNotificationTriggers.onTaskAssigned(
+              task.id,
+              assignee.id,
+              user.id,
+              taskBoard.organizationId,
+              task.title
+            )
+          }
+        }
+
+        // Check for mentions in title or description
+        const textToCheck = `${task.title} ${task.description || ''}`
+        if (textToCheck.includes('@')) {
+          await TaskNotificationTriggers.onTaskCommented(
+            task.id,
+            textToCheck,
+            user.id,
+            taskBoard.organizationId,
+            task.title
+          )
+        }
+
+        // Notify about labels if any were added
+        if (validatedData.labels && validatedData.labels.length > 0) {
+          const labelNames = await prisma.label.findMany({
+            where: { id: { in: validatedData.labels } },
+            select: { name: true }
+          })
+          
+          await TaskNotificationTriggers.onTaskLabeled(
+            task.id,
+            labelNames.map(l => l.name),
+            user.id,
+            taskBoard.organizationId,
+            task.title
+          )
+        }
+      }
+    } catch (notificationError) {
+      // Don't fail the task creation if notifications fail
+      console.error('Error sending task creation notifications:', notificationError)
+    }
 
     // Real-time updates are automatically handled by Supabase when data changes
 

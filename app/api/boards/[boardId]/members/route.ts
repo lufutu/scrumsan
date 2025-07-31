@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth-utils'
 import { createClient } from '@/lib/supabase/server'
+import { BoardNotificationTriggers } from '@/lib/notification-triggers'
 
 export async function GET(
   request: NextRequest,
@@ -139,6 +140,19 @@ export async function POST(
       }
     })
 
+    // Trigger board member added notification
+    try {
+      await BoardNotificationTriggers.onBoardMemberAdded(
+        boardId,
+        userId,
+        user.id,
+        board.organizationId
+      )
+    } catch (notificationError) {
+      // Don't fail the member addition if notifications fail
+      console.error('Error sending board member notification:', notificationError)
+    }
+
     return NextResponse.json(member)
 
   } catch (error) {
@@ -197,6 +211,19 @@ export async function DELETE(
         userId
       }
     })
+
+    // Trigger board member removed notification
+    try {
+      await BoardNotificationTriggers.onBoardMemberRemoved(
+        boardId,
+        userId,
+        user.id,
+        board.organizationId
+      )
+    } catch (notificationError) {
+      // Don't fail the member removal if notifications fail  
+      console.error('Error sending board member removal notification:', notificationError)
+    }
 
     return NextResponse.json({ success: true })
 
