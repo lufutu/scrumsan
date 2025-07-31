@@ -344,7 +344,7 @@ const DraggableSprintColumn = ({
                       <div className="pt-2">
                         <ComprehensiveInlineForm
                           onAdd={async (data) => {
-                            await handleAddTask(column.id, data)
+                            await handleAddTask(data, column.id)
                             setShowInlineForm(false)
                           }}
                           onCancel={() => setShowInlineForm(false)}

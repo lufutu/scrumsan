@@ -128,7 +128,7 @@ export function ComprehensiveInlineForm({
     const inputRect = inputRef.current.getBoundingClientRect()
     
     return {
-      top: inputRect.bottom + window.scrollY + 4, // 4px gap
+      top: inputRect.bottom + window.scrollY + 2, // 2px gap
       left: containerRect.left + window.scrollX,
       width: containerRect.width
     }
