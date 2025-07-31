@@ -460,6 +460,28 @@ export async function PATCH(
         )
       }
 
+      // Track sprint column changes
+      if (validatedData.sprintColumnId !== undefined && validatedData.sprintColumnId !== existingTask.sprintColumnId) {
+        // Get sprint column names for better activity description
+        const [oldSprintColumn, newSprintColumn] = await Promise.all([
+          existingTask.sprintColumnId ? prisma.sprintColumn.findUnique({
+            where: { id: existingTask.sprintColumnId },
+            select: { name: true }
+          }) : null,
+          validatedData.sprintColumnId ? prisma.sprintColumn.findUnique({
+            where: { id: validatedData.sprintColumnId },
+            select: { name: true }
+          }) : null
+        ])
+
+        await TaskActivityTriggers.onStatusChanged(
+          id,
+          user.id,
+          oldSprintColumn?.name || null,
+          newSprintColumn?.name || null
+        )
+      }
+
       // Track assignee changes
       if (validatedData.assigneeIds !== undefined) {
         // Get existing assignees

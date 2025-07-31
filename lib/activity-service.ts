@@ -331,4 +331,26 @@ export class TaskActivityTriggers {
       newValue: newDate?.toISOString() || null
     })
   }
+
+  /**
+   * Record column/status change activity
+   */
+  static async onStatusChanged(
+    taskId: string,
+    userId: string,
+    oldColumnName: string | null,
+    newColumnName: string | null
+  ) {
+    const oldText = oldColumnName || 'No Column'
+    const newText = newColumnName || 'No Column'
+    
+    return ActivityService.createActivity({
+      taskId,
+      userId,
+      activityType: 'status_changed',
+      description: `moved Item from "${oldText}" to "${newText}"`,
+      oldValue: oldColumnName,
+      newValue: newColumnName
+    })
+  }
 }
