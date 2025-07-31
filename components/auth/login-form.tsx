@@ -70,6 +70,7 @@ export function LoginForm() {
           onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)}
           required
           placeholder="Enter your password"
+          autoComplete="current-password"
         />
       </div>
 

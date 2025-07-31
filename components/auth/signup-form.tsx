@@ -76,6 +76,7 @@ export function SignUpForm() {
           onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)}
           required
           placeholder="Create a password"
+          autoComplete="new-password"
         />
       </div>
 
@@ -88,6 +89,7 @@ export function SignUpForm() {
           onChange={(e: React.ChangeEvent<HTMLInputElement>) => setConfirmPassword(e.target.value)}
           required
           placeholder="Confirm your password"
+          autoComplete="new-password"
         />
       </div>
 
