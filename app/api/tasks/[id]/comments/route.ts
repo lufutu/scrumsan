@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth-utils'
 import { z } from 'zod'
+import { ActivityService } from '@/lib/activity-service'
 
 const commentSchema = z.object({
   content: z.string().min(1).max(10000)
@@ -157,6 +158,19 @@ export async function POST(
         }
       }
     })
+
+    // Track comment activity
+    try {
+      await ActivityService.createActivity({
+        taskId,
+        userId: user.id,
+        activityType: 'commented',
+        description: 'added a comment'
+      })
+    } catch (activityError) {
+      // Don't fail comment creation if activity tracking fails
+      console.error('Error tracking comment activity:', activityError)
+    }
 
     return NextResponse.json(comment)
   } catch (error: unknown) {

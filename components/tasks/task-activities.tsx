@@ -18,7 +18,9 @@ import {
   Activity,
   Clock,
   ArrowRight,
-  ChevronDown
+  ChevronDown,
+  CheckSquare,
+  MessageSquare
 } from 'lucide-react'
 
 interface TaskActivity {
@@ -91,6 +93,10 @@ export function TaskActivities({ taskId, className }: TaskActivitiesProps) {
       case 'title_changed':
       case 'description_changed':
         return <FileText className="h-4 w-4" />
+      case 'commented':
+        return <MessageSquare className="h-4 w-4" />
+      case 'checklist_created':
+        return <CheckSquare className="h-4 w-4" />
       default:
         return <Activity className="h-4 w-4" />
     }

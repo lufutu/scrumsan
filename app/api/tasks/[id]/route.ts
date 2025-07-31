@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth-utils'
 import { z } from 'zod'
+import { TaskActivityTriggers } from '@/lib/activity-service'
 
 const taskUpdateSchema = z.object({
   title: z.string().min(1).optional(),
@@ -371,6 +372,190 @@ export async function PATCH(
         }
       }
     })
+    
+    // Track activities for changes
+    try {
+      // Track title changes
+      if (validatedData.title !== undefined && validatedData.title !== existingTask.title) {
+        await TaskActivityTriggers.onTitleChanged(
+          id,
+          user.id,
+          existingTask.title || '',
+          validatedData.title
+        )
+      }
+
+      // Track description changes
+      if (validatedData.description !== undefined && validatedData.description !== existingTask.description) {
+        await TaskActivityTriggers.onDescriptionChanged(
+          id,
+          user.id,
+          !!existingTask.description,
+          !!validatedData.description
+        )
+      }
+
+      // Track priority changes
+      if (validatedData.priority !== undefined && validatedData.priority !== existingTask.priority) {
+        await TaskActivityTriggers.onPriorityChanged(
+          id,
+          user.id,
+          existingTask.priority,
+          validatedData.priority
+        )
+      }
+
+      // Track task type changes
+      if (validatedData.taskType !== undefined && validatedData.taskType !== existingTask.taskType) {
+        await TaskActivityTriggers.onTaskTypeChanged(
+          id,
+          user.id,
+          existingTask.taskType,
+          validatedData.taskType
+        )
+      }
+
+      // Track story points changes
+      if (validatedData.storyPoints !== undefined && validatedData.storyPoints !== existingTask.storyPoints) {
+        await TaskActivityTriggers.onStoryPointsChanged(
+          id,
+          user.id,
+          existingTask.storyPoints,
+          validatedData.storyPoints
+        )
+      }
+
+      // Track due date changes
+      if (validatedData.dueDate !== undefined) {
+        const newDueDate = validatedData.dueDate ? new Date(validatedData.dueDate) : null
+        if (newDueDate?.getTime() !== existingTask.dueDate?.getTime()) {
+          await TaskActivityTriggers.onDueDateChanged(
+            id,
+            user.id,
+            existingTask.dueDate,
+            newDueDate
+          )
+        }
+      }
+
+      // Track column/status changes
+      if (validatedData.columnId !== undefined && validatedData.columnId !== existingTask.columnId) {
+        // Get column names for better activity description
+        const [oldColumn, newColumn] = await Promise.all([
+          existingTask.columnId ? prisma.boardColumn.findUnique({
+            where: { id: existingTask.columnId },
+            select: { name: true }
+          }) : null,
+          validatedData.columnId ? prisma.boardColumn.findUnique({
+            where: { id: validatedData.columnId },
+            select: { name: true }
+          }) : null
+        ])
+
+        await TaskActivityTriggers.onStatusChanged(
+          id,
+          user.id,
+          oldColumn?.name || null,
+          newColumn?.name || null
+        )
+      }
+
+      // Track assignee changes
+      if (validatedData.assigneeIds !== undefined) {
+        // Get existing assignees
+        const existingAssignees = await prisma.taskAssignee.findMany({
+          where: { taskId: id },
+          select: { userId: true }
+        })
+        const existingAssigneeIds = existingAssignees.map(a => a.userId)
+
+        // Find newly added assignees
+        const addedAssignees = validatedData.assigneeIds.filter(
+          userId => !existingAssigneeIds.includes(userId)
+        )
+        
+        // Find removed assignees
+        const removedAssignees = existingAssigneeIds.filter(
+          userId => !validatedData.assigneeIds.includes(userId)
+        )
+
+        // Track added assignments
+        for (const assigneeId of addedAssignees) {
+          await TaskActivityTriggers.onTaskAssigned(
+            id,
+            assigneeId,
+            user.id,
+            task?.title || '',
+            true
+          )
+        }
+
+        // Track removed assignments
+        for (const assigneeId of removedAssignees) {
+          await TaskActivityTriggers.onTaskAssigned(
+            id,
+            assigneeId,
+            user.id,
+            task?.title || '',
+            false
+          )
+        }
+      }
+
+      // Track label changes
+      if (validatedData.labels !== undefined) {
+        // Get existing labels
+        const existingLabels = await prisma.taskLabel.findMany({
+          where: { taskId: id },
+          include: {
+            label: {
+              select: { id: true, name: true, color: true }
+            }
+          }
+        })
+        const existingLabelIds = existingLabels.map(tl => tl.label.id)
+
+        // Find newly added labels
+        const addedLabelIds = validatedData.labels.filter(
+          labelId => !existingLabelIds.includes(labelId)
+        )
+        
+        // Find removed labels
+        const removedLabels = existingLabels.filter(
+          tl => !validatedData.labels.includes(tl.label.id)
+        )
+
+        // Track added labels
+        if (addedLabelIds.length > 0) {
+          const addedLabels = await prisma.label.findMany({
+            where: { id: { in: addedLabelIds } },
+            select: { name: true, color: true }
+          })
+
+          for (const label of addedLabels) {
+            await TaskActivityTriggers.onLabelAdded(
+              id,
+              user.id,
+              label.name,
+              label.color || undefined
+            )
+          }
+        }
+
+        // Track removed labels
+        for (const labelData of removedLabels) {
+          await TaskActivityTriggers.onLabelRemoved(
+            id,
+            user.id,
+            labelData.label.name,
+            labelData.label.color || undefined
+          )
+        }
+      }
+    } catch (activityError) {
+      // Don't fail the task update if activity tracking fails
+      console.error('Error tracking task update activities:', activityError)
+    }
     
     // Add done attribute based on sprint column isDone status
     const taskWithDoneStatus = {
