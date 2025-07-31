@@ -55,16 +55,6 @@ export function TaskCardModern({
   onClick,
   onAssigneesChange
 }: TaskCardModernProps) {
-  // Debug: Log received props
-  console.log('🎯 TaskCardModern props:', { 
-    id, 
-    title, 
-    commentsCount, 
-    filesCount, 
-    labelsLength: labels.length,
-    labels: labels.map(l => ({ id: l.id, name: l.name, color: l.color }))
-  })
-  
   // Get boardId from task data or props
   const taskBoardId = (boardId || (typeof window !== 'undefined' && window.location.pathname.includes('/boards/')
     ? window.location.pathname.split('/boards/')[1]?.split('/')[0]
