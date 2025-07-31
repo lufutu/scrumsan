@@ -33,6 +33,7 @@ import { useProfileEditor } from "@/hooks/useProfileEditor"
 import { useAvatarState } from "@/hooks/useAvatarState"
 import { useActiveOrg } from "@/hooks/useActiveOrg"
 import { useSupabase } from "@/providers/supabase-provider"
+import { useOrganization } from "@/providers/organization-provider"
 import { getErrorMessage, showErrorToast } from "@/lib/error-messages"
 
 export interface ProfileEditorDialogProps {
@@ -142,6 +143,7 @@ export function ProfileEditorDialog({
   // Get active organization and current user
   const activeOrg = useActiveOrg()
   const { user } = useSupabase()
+  const { currentMember } = useOrganization()
   
   // Set current user when available
   useEffect(() => {
@@ -154,8 +156,8 @@ export function ProfileEditorDialog({
   const targetUserId = userId || currentUser?.id
   const isOwnProfile = !userId || userId === currentUser?.id
 
-  // Use provided member ID or placeholder for own profile
-  const effectiveMemberId = memberId || 'placeholder'
+  // Use provided member ID or current member ID for own profile
+  const effectiveMemberId = memberId || currentMember?.id || ''
   const effectiveOrgId = organizationId || activeOrg?.id || ''
 
   // Use profile editor state management
@@ -323,6 +325,20 @@ export function ProfileEditorDialog({
   }, [])
 
   if (!isOpen) return null
+
+  // Don't render dialog content until we have the required data for own profile
+  if (isOwnProfile && (!currentMember?.id || !effectiveOrgId)) {
+    return (
+      <Dialog open={isOpen} onOpenChange={handleClose}>
+        <DialogContent className="w-full max-w-[400px]">
+          <div className="flex items-center justify-center p-8">
+            <Loader2 className="h-6 w-6 animate-spin mr-2" />
+            <span>Loading profile...</span>
+          </div>
+        </DialogContent>
+      </Dialog>
+    )
+  }
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
