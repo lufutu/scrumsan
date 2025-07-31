@@ -63,6 +63,7 @@ import BurndownChart from './BurndownChart'
 import { Sprint, Task } from '@/types/shared'
 import { useSprintColumns } from '@/hooks/useSprintColumns'
 import { toast } from 'sonner'
+import { ComprehensiveInlineForm } from './ComprehensiveInlineForm'
 
 interface SprintColumn {
   id: string
@@ -84,6 +85,19 @@ interface SprintBacklogViewProps {
   onFinishSprint?: (sprintId: string) => void
   isEditDialogOpen?: boolean
   onEditDialogChange?: (open: boolean) => void
+}
+
+interface User {
+  id: string
+  fullName: string | null
+  email: string
+  avatarUrl: string | null
+}
+
+interface Label {
+  id: string
+  name: string
+  color: string | null
 }
 
 
@@ -158,7 +172,10 @@ const DraggableSprintColumn = ({
   handleSetColumnLimit,
   handleExportColumn,
   handleDeleteColumn,
-  sprint
+  handleAddTask,
+  sprint,
+  users,
+  labels
 }: {
   column: SprintColumn
   index: number
@@ -172,8 +189,12 @@ const DraggableSprintColumn = ({
   handleSetColumnLimit: (columnId: string, limit: number) => void
   handleExportColumn: (columnId: string, format: 'csv' | 'json') => void
   handleDeleteColumn: (columnId: string) => void
-  sprint: unknown
+  handleAddTask: (data: any, columnId: string) => Promise<void>
+  sprint: Sprint
+  users: User[]
+  labels: Label[]
 }) => {
+  const [showInlineForm, setShowInlineForm] = useState(false)
   const isLimitExceeded = column.wipLimit && columnTasks.length > column.wipLimit
 
   return (
@@ -308,7 +329,7 @@ const DraggableSprintColumn = ({
                           }`}
                       />
                     ))}
-                    {columnTasks.length === 0 && (
+                    {columnTasks.length === 0 && !showInlineForm && (
                       <div className="text-center text-sm text-muted-foreground py-12 border-2 border-dashed border-gray-200 rounded-lg bg-gray-50/30">
                         <div className="flex flex-col items-center gap-2">
                           <Square className="h-8 w-8 text-gray-300" />
@@ -316,6 +337,34 @@ const DraggableSprintColumn = ({
                           <p className="text-xs">Drag items here or add new tasks</p>
                         </div>
                       </div>
+                    )}
+                    
+                    {/* Inline Form */}
+                    {showInlineForm && (
+                      <div className="pt-2">
+                        <ComprehensiveInlineForm
+                          onAdd={async (data) => {
+                            await handleAddTask(column.id, data)
+                            setShowInlineForm(false)
+                          }}
+                          onCancel={() => setShowInlineForm(false)}
+                          placeholder="What needs to be done?"
+                          users={users}
+                          labels={labels}
+                        />
+                      </div>
+                    )}
+                    
+                    {/* Add Task Button */}
+                    {!showInlineForm && (
+                      <Button 
+                        variant="ghost" 
+                        className="w-full justify-start text-muted-foreground hover:text-foreground mt-2"
+                        onClick={() => setShowInlineForm(true)}
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Item
+                      </Button>
                     )}
                     {dropProvided.placeholder}
                   </div>
@@ -353,6 +402,10 @@ export default function SprintBacklogView({
   const [activeId, setActiveId] = useState<string | null>(null)
   const [selectedTask, setSelectedTask] = useState<unknown | null>(null)
   const [isDragging, setIsDragging] = useState(false)
+  
+  // Users and labels data for inline form
+  const [users, setUsers] = useState<User[]>([])
+  const [labels, setLabels] = useState<Label[]>([])
 
   // Use sprint columns hook
   const {
@@ -376,6 +429,44 @@ export default function SprintBacklogView({
     }
   }, [columnsLoading, originalColumns.length, initializeDefaultColumns])
 
+  // Fetch users for the board
+  useEffect(() => {
+    const fetchUsers = async () => {
+      if (!boardId) return
+      
+      try {
+        const response = await fetch(`/api/boards/${boardId}/members`)
+        if (response.ok) {
+          const data = await response.json()
+          setUsers(data)
+        }
+      } catch (error) {
+        console.error('Error fetching users:', error)
+      }
+    }
+    
+    fetchUsers()
+  }, [boardId])
+
+  // Fetch labels for the board
+  useEffect(() => {
+    const fetchLabels = async () => {
+      if (!boardId) return
+      
+      try {
+        const response = await fetch(`/api/boards/${boardId}/labels`)
+        if (response.ok) {
+          const data = await response.json()
+          setLabels(data)
+        }
+      } catch (error) {
+        console.error('Error fetching labels:', error)
+      }
+    }
+    
+    fetchLabels()
+  }, [boardId])
+
   // Sync external edit dialog state
   useEffect(() => {
     if (isEditDialogOpen !== undefined) {
@@ -387,6 +478,36 @@ export default function SprintBacklogView({
   const handleEditDialogChange = (open: boolean) => {
     setIsEditSprintOpen(open)
     onEditDialogChange?.(open)
+  }
+
+  const handleAddTask = async (taskData: any, columnId: string) => {
+    try {
+      const response = await fetch('/api/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...taskData,
+          boardId,
+          sprintColumnId: columnId,
+          sprintId: sprint.id
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to create task')
+      }
+
+      const newTask = await response.json()
+      
+      // Refresh data
+      mutateColumns()
+      onRefresh()
+      
+      toast.success('Task created successfully')
+    } catch (error) {
+      console.error('Error creating task:', error)
+      toast.error('Failed to create task')
+    }
   }
 
 
@@ -770,7 +891,10 @@ export default function SprintBacklogView({
                       handleSetColumnLimit={handleSetColumnLimit}
                       handleExportColumn={handleExportColumn}
                       handleDeleteColumn={handleDeleteColumn}
+                      handleAddTask={handleAddTask}
                       sprint={sprint}
+                      users={users}
+                      labels={labels}
                     />
                   )
                 }
@@ -784,7 +908,7 @@ export default function SprintBacklogView({
       </ScrollArea>
 
     </div>
-  ), [columns, searchTerm, activeId, handleDragStart, handleDragEnd, getTasksByColumn, onRefresh, organizationId])
+  ), [columns, searchTerm, activeId, handleDragStart, handleDragEnd, getTasksByColumn, onRefresh, organizationId, boardId, handleRenameColumn, handleMarkColumnAsDone, handleSetColumnLimit, handleExportColumn, handleDeleteColumn, handleAddTask, sprint, users, labels])
 
   return (
     <div className=""
