@@ -174,7 +174,7 @@ export function FileUploadQueue({
         return newQueue
       })
     }
-  }, [fileQueue.length, maxFiles, validateFile, multiple, autoUpload, uploadFile])
+  }, [fileQueue.length, maxFiles, validateFile, multiple, autoUpload])
 
   const uploadFile = useCallback(async (fileId: string, currentQueue?: QueuedFile[]) => {
     const queue = currentQueue || fileQueue
