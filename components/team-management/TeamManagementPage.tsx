@@ -303,7 +303,7 @@ function TeamManagementPageContent({ organizationId }: TeamManagementPageProps) 
       <main id="main-content" className="flex-1 flex flex-col h-full" role="main">
         <div className="px-4 py-6 space-y-6 mobile-spacing">
           <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-            <TabsList className={`grid w-full gap-1 h-auto p-1 ${canManagePermissions ? 'grid-cols-2 sm:grid-cols-5' : 'grid-cols-2'}`}>
+            <TabsList className="grid w-full gap-1 h-auto p-1 grid-cols-2 sm:grid-cols-5">
               <TabsTrigger
                 value="members"
                 className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3 py-2 min-h-[2.5rem]"
@@ -332,47 +332,49 @@ function TeamManagementPageContent({ organizationId }: TeamManagementPageProps) 
                   </span>
                 )}
               </TabsTrigger>
-              {canManagePermissions && (
-                <>
-                  <TabsTrigger
-                    value="permission-sets"
-                    className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3 py-2 min-h-[2.5rem]"
-                    aria-label={`Permission Sets tab (${permissionSets?.length || 0} sets)`}
-                  >
-                    <Shield className="w-3 h-3 sm:w-4 sm:h-4 shrink-0" />
-                    <span className="hidden sm:inline">Permission Sets</span>
-                    <span className="sm:hidden">Perms</span>
-                    {permissionSets && permissionSets.length > 0 && (
-                      <span className="ml-1 px-1.5 py-0.5 text-xs bg-muted-foreground/10 rounded-full shrink-0">
-                        {permissionSets.length}
-                      </span>
-                    )}
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="custom-roles"
-                    className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3 py-2 min-h-[2.5rem]"
-                    aria-label={`Custom Roles tab (${roles?.length || 0} roles)`}
-                  >
-                    <Briefcase className="w-3 h-3 sm:w-4 sm:h-4 shrink-0" />
-                    <span className="hidden sm:inline">Custom Roles</span>
-                    <span className="sm:hidden">Roles</span>
-                    {roles && roles.length > 0 && (
-                      <span className="ml-1 px-1.5 py-0.5 text-xs bg-muted-foreground/10 rounded-full shrink-0">
-                        {roles.length}
-                      </span>
-                    )}
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="admin-profiles"
-                    className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3 py-2 min-h-[2.5rem]"
-                    aria-label="Admin Profile Management"
-                  >
-                    <Settings className="w-3 h-3 sm:w-4 sm:h-4 shrink-0" />
-                    <span className="hidden sm:inline">Profile Admin</span>
-                    <span className="sm:hidden">Admin</span>
-                  </TabsTrigger>
-                </>
-              )}
+              <TabsTrigger
+                value="permission-sets"
+                className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3 py-2 min-h-[2.5rem]"
+                aria-label={`Permission Sets tab (${permissionSets?.length || 0} sets)`}
+                disabled={!canManagePermissions}
+                style={{ display: canManagePermissions ? 'flex' : 'none' }}
+              >
+                <Shield className="w-3 h-3 sm:w-4 sm:h-4 shrink-0" />
+                <span className="hidden sm:inline">Permission Sets</span>
+                <span className="sm:hidden">Perms</span>
+                {permissionSets && permissionSets.length > 0 && (
+                  <span className="ml-1 px-1.5 py-0.5 text-xs bg-muted-foreground/10 rounded-full shrink-0">
+                    {permissionSets.length}
+                  </span>
+                )}
+              </TabsTrigger>
+              <TabsTrigger
+                value="custom-roles"
+                className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3 py-2 min-h-[2.5rem]"
+                aria-label={`Custom Roles tab (${roles?.length || 0} roles)`}
+                disabled={!canManagePermissions}
+                style={{ display: canManagePermissions ? 'flex' : 'none' }}
+              >
+                <Briefcase className="w-3 h-3 sm:w-4 sm:h-4 shrink-0" />
+                <span className="hidden sm:inline">Custom Roles</span>
+                <span className="sm:hidden">Roles</span>
+                {roles && roles.length > 0 && (
+                  <span className="ml-1 px-1.5 py-0.5 text-xs bg-muted-foreground/10 rounded-full shrink-0">
+                    {roles.length}
+                  </span>
+                )}
+              </TabsTrigger>
+              <TabsTrigger
+                value="admin-profiles"
+                className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3 py-2 min-h-[2.5rem]"
+                aria-label="Admin Profile Management"
+                disabled={!canManagePermissions}
+                style={{ display: canManagePermissions ? 'flex' : 'none' }}
+              >
+                <Settings className="w-3 h-3 sm:w-4 sm:h-4 shrink-0" />
+                <span className="hidden sm:inline">Profile Admin</span>
+                <span className="sm:hidden">Admin</span>
+              </TabsTrigger>
 
             </TabsList>
 
@@ -408,65 +410,79 @@ function TeamManagementPageContent({ organizationId }: TeamManagementPageProps) 
                 </SectionErrorBoundary>
               </TabsContent>
 
-              {canManagePermissions && (
-                <>
-                  <TabsContent value="permission-sets" className="space-y-6">
-                    <SectionErrorBoundary>
-                      <PermissionSetsTabContent
-                        organizationId={organizationId}
-                      />
-                    </SectionErrorBoundary>
-                  </TabsContent>
+              <TabsContent value="permission-sets" className="space-y-6">
+                <SectionErrorBoundary>
+                  {canManagePermissions ? (
+                    <PermissionSetsTabContent
+                      organizationId={organizationId}
+                    />
+                  ) : (
+                    <div className="text-center py-8">
+                      <p className="text-muted-foreground">You don't have permission to manage permission sets.</p>
+                    </div>
+                  )}
+                </SectionErrorBoundary>
+              </TabsContent>
 
-                  <TabsContent value="custom-roles" className="space-y-6">
-                    <SectionErrorBoundary>
-                      <CustomRolesTabContent
-                        organizationId={organizationId}
-                      />
-                    </SectionErrorBoundary>
-                  </TabsContent>
+              <TabsContent value="custom-roles" className="space-y-6">
+                <SectionErrorBoundary>
+                  {canManagePermissions ? (
+                    <CustomRolesTabContent
+                      organizationId={organizationId}
+                    />
+                  ) : (
+                    <div className="text-center py-8">
+                      <p className="text-muted-foreground">You don't have permission to manage custom roles.</p>
+                    </div>
+                  )}
+                </SectionErrorBoundary>
+              </TabsContent>
 
-                  <TabsContent value="admin-profiles" className="space-y-6">
-                    <SectionErrorBoundary>
-                      <AdminProfileManager
-                        members={membersArray}
-                        organizationId={organizationId}
-                        onMemberUpdate={(memberId) => {
-                          // Refresh member data
-                          // This could trigger a refetch of team members
-                        }}
-                        onAvatarReset={async (memberId) => {
-                          // Handle individual avatar reset
-                          const response = await fetch(
-                            `/api/organizations/${organizationId}/admin/profiles/${memberId}/avatar/reset`,
-                            { method: 'POST' }
-                          )
-                          if (!response.ok) {
-                            throw new Error('Failed to reset avatar')
+              <TabsContent value="admin-profiles" className="space-y-6">
+                <SectionErrorBoundary>
+                  {canManagePermissions ? (
+                    <AdminProfileManager
+                      members={membersArray}
+                      organizationId={organizationId}
+                      onMemberUpdate={(memberId) => {
+                        // Refresh member data
+                        // This could trigger a refetch of team members
+                      }}
+                      onAvatarReset={async (memberId) => {
+                        // Handle individual avatar reset
+                        const response = await fetch(
+                          `/api/organizations/${organizationId}/admin/profiles/${memberId}/avatar/reset`,
+                          { method: 'POST' }
+                        )
+                        if (!response.ok) {
+                          throw new Error('Failed to reset avatar')
+                        }
+                      }}
+                      onBulkAvatarReset={async (memberIds) => {
+                        // Handle bulk avatar reset
+                        const response = await fetch(
+                          `/api/organizations/${organizationId}/admin/profiles`,
+                          {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              action: 'reset_avatars',
+                              memberIds,
+                            }),
                           }
-                        }}
-                        onBulkAvatarReset={async (memberIds) => {
-                          // Handle bulk avatar reset
-                          const response = await fetch(
-                            `/api/organizations/${organizationId}/admin/profiles`,
-                            {
-                              method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({
-                                action: 'reset_avatars',
-                                memberIds,
-                              }),
-                            }
-                          )
-                          if (!response.ok) {
-                            throw new Error('Failed to reset avatars')
-                          }
-                        }}
-                      />
-                    </SectionErrorBoundary>
-                  </TabsContent>
-                </>
-              )}
+                        )
+                        if (!response.ok) {
+                          throw new Error('Failed to reset avatars')
+                        }
+                      }}
+                    />
+                  ) : (
+                    <div className="text-center py-8">
+                      <p className="text-muted-foreground">You don't have permission to manage admin profiles.</p>
+                    </div>
+                  )}
+                </SectionErrorBoundary>
+              </TabsContent>
 
 
             </TabsContents>
