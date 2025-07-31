@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { GoogleOAuthButton } from '@/components/auth/google-oauth-button'
+import { Separator } from '@/components/ui/separator'
 
 export function SignUpForm() {
   const router = useRouter()
@@ -48,12 +50,26 @@ export function SignUpForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      {error && (
-        <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
+    <div className="space-y-6">
+      <GoogleOAuthButton mode="signup" />
+      
+      <div className="relative">
+        <div className="absolute inset-0 flex items-center">
+          <Separator className="w-full" />
+        </div>
+        <div className="relative flex justify-center text-xs uppercase">
+          <span className="bg-white px-2 text-muted-foreground">
+            Or continue with email
+          </span>
+        </div>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {error && (
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
       
       <div className="space-y-2">
         <Label htmlFor="email">Email</Label>
@@ -93,9 +109,10 @@ export function SignUpForm() {
         />
       </div>
 
-      <Button type="submit" className="w-full" disabled={loading}>
-        {loading ? 'Creating account...' : 'Create account'}
-      </Button>
-    </form>
+        <Button type="submit" className="w-full" disabled={loading}>
+          {loading ? 'Creating account...' : 'Create account'}
+        </Button>
+      </form>
+    </div>
   )
 } 

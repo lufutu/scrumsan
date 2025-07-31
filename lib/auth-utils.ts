@@ -7,16 +7,31 @@ import { prisma } from './prisma'
  */
 export async function ensureUserExists(user: User) {
   try {
+    // Handle different OAuth providers and extract name appropriately
+    const fullName = user.user_metadata?.full_name || 
+                     user.user_metadata?.name ||
+                     user.user_metadata?.display_name ||
+                     user.email?.split('@')[0] || 
+                     'Unknown User'
+    
+    // Handle avatar URL from different providers
+    const avatarUrl = user.user_metadata?.avatar_url || 
+                      user.user_metadata?.picture ||
+                      null
+
     const dbUser = await prisma.user.upsert({
       where: { id: user.id },
       create: {
         id: user.id,
-        fullName: user.user_metadata?.full_name || user.email || 'Unknown User',
-        avatarUrl: user.user_metadata?.avatar_url || null,
+        email: user.email!,
+        fullName,
+        avatarUrl,
       },
       update: {
-        fullName: user.user_metadata?.full_name || user.email || 'Unknown User',
-        avatarUrl: user.user_metadata?.avatar_url || null,
+        fullName,
+        avatarUrl,
+        // Update email in case it changed (though unlikely)
+        email: user.email!,
       }
     })
     
