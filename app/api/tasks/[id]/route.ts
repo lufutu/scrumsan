@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth-utils'
 import { z } from 'zod'
 import { TaskActivityTriggers } from '@/lib/activity-service'
+import { NotificationService } from '@/lib/notification-service'
 
 const taskUpdateSchema = z.object({
   title: z.string().min(1).optional(),
@@ -458,6 +459,21 @@ export async function PATCH(
           oldColumn?.name || null,
           newColumn?.name || null
         )
+
+        // Send notifications for column change
+        const recipients = await NotificationService.getItemNotificationRecipients(id, user.id)
+        if (recipients.length > 0) {
+          await NotificationService.createBulkNotifications(recipients, {
+            organizationId: existingTask.board!.organizationId,
+            type: NotificationService.TYPES.ITEM_MOVED,
+            title: `Task moved to ${newColumn?.name || 'No Column'}`,
+            content: `"${task?.title}" was moved from ${oldColumn?.name || 'No Column'} to ${newColumn?.name || 'No Column'}`,
+            link: `/boards/${existingTask.boardId}?task=${id}`,
+            entityType: 'task',
+            entityId: id,
+            triggeredBy: user.id
+          })
+        }
       }
 
       // Track sprint column changes
@@ -480,6 +496,21 @@ export async function PATCH(
           oldSprintColumn?.name || null,
           newSprintColumn?.name || null
         )
+
+        // Send notifications for sprint column change
+        const recipients = await NotificationService.getItemNotificationRecipients(id, user.id)
+        if (recipients.length > 0) {
+          await NotificationService.createBulkNotifications(recipients, {
+            organizationId: existingTask.board!.organizationId,
+            type: NotificationService.TYPES.ITEM_MOVED,
+            title: `Task moved to ${newSprintColumn?.name || 'No Column'}`,
+            content: `"${task?.title}" was moved from ${oldSprintColumn?.name || 'No Column'} to ${newSprintColumn?.name || 'No Column'} in sprint`,
+            link: `/boards/${existingTask.boardId}?task=${id}`,
+            entityType: 'task',
+            entityId: id,
+            triggeredBy: user.id
+          })
+        }
       }
 
       // Track assignee changes
@@ -510,6 +541,19 @@ export async function PATCH(
             task?.title || '',
             true
           )
+
+          // Send notification to newly assigned user
+          await NotificationService.createNotification({
+            userId: assigneeId,
+            organizationId: existingTask.board!.organizationId,
+            type: NotificationService.TYPES.ITEM_ASSIGNED,
+            title: 'You have been assigned to a task',
+            content: `You have been assigned to "${task?.title}"`,
+            link: `/boards/${existingTask.boardId}?task=${id}`,
+            entityType: 'task',
+            entityId: id,
+            triggeredBy: user.id
+          })
         }
 
         // Track removed assignments
@@ -521,6 +565,19 @@ export async function PATCH(
             task?.title || '',
             false
           )
+
+          // Send notification to removed assignee
+          await NotificationService.createNotification({
+            userId: assigneeId,
+            organizationId: existingTask.board!.organizationId,
+            type: NotificationService.TYPES.ITEM_UPDATED,
+            title: 'You have been unassigned from a task',
+            content: `You have been removed from "${task?.title}"`,
+            link: `/boards/${existingTask.boardId}?task=${id}`,
+            entityType: 'task',
+            entityId: id,
+            triggeredBy: user.id
+          })
         }
       }
 
