@@ -20,6 +20,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { EnhancedAvatar } from '@/components/ui/enhanced-avatar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/animate-ui/radix/popover';
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
@@ -32,6 +33,7 @@ import { useSupabase } from '@/providers/supabase-provider';
 import { useComments } from '@/hooks/useComments';
 import { useAttachments } from '@/hooks/useAttachments';
 import { useChecklists } from '@/hooks/useChecklists';
+import { MiniCalendar } from '@/components/ui/mini-calendar';
 import { toast } from 'sonner';
 
 import { TaskCardProps as TaskCardModernProps } from '@/types/shared';
@@ -1033,51 +1035,100 @@ export function TaskCardModern({
             </Popover>
 
             {/* Due Date - Interactive */}
-            <Popover modal={true} open={dueDateOpen} onOpenChange={setDueDateOpen}>
-              <PopoverTrigger asChild>
-                <button
-                  className="flex items-center gap-1 hover:bg-orange-100 p-1 rounded transition-colors"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <Calendar className="h-5 w-5" />
-                  <span className="text-xs">
-                    {dueDate
-                      ? new Date(dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-                      : 'Due'
-                    }
-                  </span>
-                </button>
-              </PopoverTrigger>
-              <PopoverContent className="w-64 p-4" align="start">
-                <div className="space-y-3">
-                  <Label className="text-sm font-medium">Due Date</Label>
-                  <Input
-                    type="date"
-                    defaultValue={dueDate ? new Date(dueDate).toISOString().split('T')[0] : ''}
-                    onChange={(e) => {
-                      e.stopPropagation();
-                      // Handle due date change
-                      if (e.target.value) {
-                        // Update due date via API
-                        fetch(`/api/tasks/${id}`, {
-                          method: 'PATCH',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ dueDate: e.target.value })
-                        }).then(() => {
-                          onAssigneesChange?.();
-                          toast.success('Due date updated');
-                          setDueDateOpen(false);
-                        }).catch(() => {
-                          toast.error('Failed to update due date');
-                        });
-                      }
-                    }}
+            {dueDate ? (
+              <HoverCard>
+                <HoverCardTrigger asChild>
+                  <div>
+                    <Popover modal={true} open={dueDateOpen} onOpenChange={setDueDateOpen}>
+                      <PopoverTrigger asChild>
+                        <button
+                          className="flex items-center gap-1 hover:bg-orange-100 p-1 rounded transition-colors"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <Calendar className="h-5 w-5" />
+                          <span className="text-xs">
+                            {new Date(dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                          </span>
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-64 p-4" align="start">
+                        <div className="space-y-3">
+                          <Label className="text-sm font-medium">Due Date</Label>
+                          <Input
+                            type="date"
+                            defaultValue={dueDate ? new Date(dueDate).toISOString().split('T')[0] : ''}
+                            onChange={(e) => {
+                              e.stopPropagation();
+                              // Handle due date change
+                              if (e.target.value) {
+                                // Update due date via API
+                                fetch(`/api/tasks/${id}`, {
+                                  method: 'PATCH',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ dueDate: e.target.value })
+                                }).then(() => {
+                                  onAssigneesChange?.();
+                                  toast.success('Due date updated');
+                                  setDueDateOpen(false);
+                                }).catch(() => {
+                                  toast.error('Failed to update due date');
+                                });
+                              }
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            onFocus={(e) => e.stopPropagation()}
+                          />
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                </HoverCardTrigger>
+                <HoverCardContent className="w-auto p-0" align="start">
+                  <MiniCalendar date={new Date(dueDate)} />
+                </HoverCardContent>
+              </HoverCard>
+            ) : (
+              <Popover modal={true} open={dueDateOpen} onOpenChange={setDueDateOpen}>
+                <PopoverTrigger asChild>
+                  <button
+                    className="flex items-center gap-1 hover:bg-orange-100 p-1 rounded transition-colors"
                     onClick={(e) => e.stopPropagation()}
-                    onFocus={(e) => e.stopPropagation()}
-                  />
-                </div>
-              </PopoverContent>
-            </Popover>
+                  >
+                    <Calendar className="h-5 w-5" />
+                    <span className="text-xs">Due</span>
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent className="w-64 p-4" align="start">
+                  <div className="space-y-3">
+                    <Label className="text-sm font-medium">Due Date</Label>
+                    <Input
+                      type="date"
+                      defaultValue=""
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        // Handle due date change
+                        if (e.target.value) {
+                          // Update due date via API
+                          fetch(`/api/tasks/${id}`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ dueDate: e.target.value })
+                          }).then(() => {
+                            onAssigneesChange?.();
+                            toast.success('Due date updated');
+                            setDueDateOpen(false);
+                          }).catch(() => {
+                            toast.error('Failed to update due date');
+                          });
+                        }
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      onFocus={(e) => e.stopPropagation()}
+                    />
+                  </div>
+                </PopoverContent>
+              </Popover>
+            )}
           </div>
 
           {/* Priority Badge - Interactive */}
