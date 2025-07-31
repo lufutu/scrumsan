@@ -80,9 +80,7 @@ export async function GET(
             return attachment;
           }
           
-          console.log('[DEBUG] Processing attachment:', attachment.id, 'URL:', attachment.url);
           const s3Key = extractS3KeyFromUrl(attachment.url)
-          console.log('[DEBUG] Using S3 key for signed URL:', s3Key);
           
           try {
             const signedUrl = await getSignedUrlForS3File(s3Key, 3600) // 1 hour expiry

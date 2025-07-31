@@ -109,23 +109,16 @@ export async function deleteFileFromS3(key: string): Promise<void> {
 export function extractS3KeyFromUrl(url: string): string {
   try {
     const urlObj = new URL(url)
-    console.log('[DEBUG] extractS3KeyFromUrl:', {
-      url,
-      hostname: urlObj.hostname,
-      pathname: urlObj.pathname
-    });
     
     // Handle different S3 URL formats
     if (urlObj.hostname.includes('.s3.') && urlObj.hostname.includes('.amazonaws.com')) {
       // https://bucket.s3.region.amazonaws.com/path/file.jpg
       const key = urlObj.pathname.substring(1); // Remove leading slash
-      console.log('[DEBUG] Extracted key (format 1):', key);
       return key;
     } else if (urlObj.hostname.includes('s3.amazonaws.com')) {
       // https://s3.region.amazonaws.com/bucket/path/file.jpg
       const pathParts = urlObj.pathname.split('/')
       const key = pathParts.slice(2).join('/'); // Remove leading slash and bucket name
-      console.log('[DEBUG] Extracted key (format 2):', key);
       return key;
     }
     

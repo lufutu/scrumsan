@@ -206,18 +206,24 @@ export default function StandaloneBoardView({ board, onUpdate }: StandaloneBoard
                             description={task.description || ''}
                             taskType={task.taskType as 'story' | 'bug' | 'task' | 'epic' | 'improvement' | 'idea' | 'note' || 'task'}
                             storyPoints={task.storyPoints || 0}
+                            priority={task.priority as 'critical' | 'high' | 'medium' | 'low'}
                             assignees={task.taskAssignees?.map((ta: any) => ({
                               id: ta.user.id,
                               name: ta.user.fullName || ta.user.email || 'Unknown User',
                               avatar: ta.user.avatarUrl || undefined,
                               initials: ta.user.fullName?.split(' ').map((n: string) => n[0]).join('') || 'U'
                             })) || []}
+                            labels={task.taskLabels ? task.taskLabels.map(tl => ({
+                              id: tl.label.id,
+                              name: tl.label.name,
+                              color: tl.label.color || '#6B7280'
+                            })) : []}
+                            dueDate={task.dueDate}
                             organizationId={board.organizationId}
                             boardId={board.id}
-                            status={'todo'}
                             onClick={() => setSelectedTask(task)}
                             onAssigneesChange={() => {
-                              // Trigger refetch if needed
+                              onUpdate() // Trigger board refresh when assignees change
                             }}
                           />
                         </div>
@@ -358,18 +364,24 @@ export default function StandaloneBoardView({ board, onUpdate }: StandaloneBoard
                       description={task.description || ''}
                       taskType={task.taskType as 'story' | 'bug' | 'task' | 'epic' | 'improvement' | 'idea' | 'note' || 'task'}
                       storyPoints={task.storyPoints || 0}
+                      priority={task.priority as 'critical' | 'high' | 'medium' | 'low'}
                       assignees={task.taskAssignees?.map((ta: any) => ({
                         id: ta.user.id,
                         name: ta.user.fullName || ta.user.email || 'Unknown User',
                         avatar: ta.user.avatarUrl || undefined,
                         initials: ta.user.fullName?.split(' ').map((n: string) => n[0]).join('') || 'U'
                       })) || []}
+                      labels={task.taskLabels ? task.taskLabels.map(tl => ({
+                        id: tl.label.id,
+                        name: tl.label.name,
+                        color: tl.label.color || '#6B7280'
+                      })) : []}
+                      dueDate={task.dueDate}
                       organizationId={board.organizationId}
                       boardId={board.id}
-                      status={task.status === 'todo' ? 'todo' : task.status === 'done' ? 'done' : 'in_progress'}
                       onClick={() => setSelectedTask(task)}
                       onAssigneesChange={() => {
-                        // Trigger refetch if needed
+                        onUpdate() // Trigger board refresh when assignees change
                       }}
                     />
                   </div>
