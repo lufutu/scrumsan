@@ -58,8 +58,13 @@ export async function GET(
           select: {
             id: true,
             title: true,
+            description: true,
+            taskType: true,
             priority: true,
             storyPoints: true,
+            dueDate: true,
+            createdAt: true,
+            updatedAt: true,
             taskAssignees: {
               select: {
                 user: {
@@ -67,6 +72,17 @@ export async function GET(
                     id: true,
                     fullName: true,
                     avatarUrl: true
+                  }
+                }
+              }
+            },
+            taskLabels: {
+              include: {
+                label: {
+                  select: {
+                    id: true,
+                    name: true,
+                    color: true
                   }
                 }
               }
@@ -156,8 +172,13 @@ export async function POST(
           select: {
             id: true,
             title: true,
+            description: true,
+            taskType: true,
             priority: true,
             storyPoints: true,
+            dueDate: true,
+            createdAt: true,
+            updatedAt: true,
             taskAssignees: {
               select: {
                 user: {
@@ -165,6 +186,17 @@ export async function POST(
                     id: true,
                     fullName: true,
                     avatarUrl: true
+                  }
+                }
+              }
+            },
+            taskLabels: {
+              include: {
+                label: {
+                  select: {
+                    id: true,
+                    name: true,
+                    color: true
                   }
                 }
               }

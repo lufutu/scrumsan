@@ -53,6 +53,7 @@ export function DraggableTask({
               name: tl.label.name,
               color: tl.label.color || '#6B7280'
             })) : []}
+            dueDate={task.dueDate}
             organizationId={task.board?.organizationId}
             boardId={boardId}
             onClick={!snapshot.isDragging ? () => onTaskClick?.(task) : undefined}
