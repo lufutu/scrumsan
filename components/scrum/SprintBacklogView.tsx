@@ -416,6 +416,7 @@ export default function SprintBacklogView({
   const [labels, setLabels] = useState<Label[]>([])
 
   // Use sprint columns hook
+  console.log('🔍 Sprint ID for useSprintColumns:', sprint.id)
   const {
     columns: originalColumns,
     isLoading: columnsLoading,
@@ -426,6 +427,12 @@ export default function SprintBacklogView({
     initializeDefaultColumns,
     mutate: mutateColumns
   } = useSprintColumns(sprint.id)
+  
+  console.log('🔍 Sprint columns hook result:', { 
+    columnsLength: originalColumns?.length, 
+    isLoading: columnsLoading,
+    columns: originalColumns 
+  })
 
   // Use the columns from the hook (SWR will handle optimistic updates)
   const columns = originalColumns
