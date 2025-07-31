@@ -22,21 +22,23 @@ import {
 import { Card, CardContent } from '@/components/ui/card'
 import { toast } from 'sonner'
 
-interface EnhancedDescriptionFieldProps {
+interface DescriptionFieldProps {
   value: string
   onChange: (value: string) => void
   placeholder?: string
   className?: string
   taskId?: string
+  enhanced?: boolean // Flag to enable rich text features
 }
 
-export function EnhancedDescriptionField({
+export function DescriptionField({
   value,
   onChange,
   placeholder = "Write a description...",
   className = "",
-  taskId
-}: EnhancedDescriptionFieldProps) {
+  taskId,
+  enhanced = false
+}: DescriptionFieldProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [isDragging, setIsDragging] = useState(false)
@@ -92,7 +94,7 @@ export function EnhancedDescriptionField({
     }
   }, [value, onChange, insertText])
 
-  // Handle image upload
+  // Handle image upload - FIX: Use 'files' parameter name
   const handleImageUpload = useCallback(async (file: File) => {
     if (!taskId) {
       toast.error('Task ID required for image upload')
@@ -102,7 +104,7 @@ export function EnhancedDescriptionField({
     setUploadingImage(true)
     try {
       const formData = new FormData()
-      formData.append('file', file)
+      formData.append('files', file) // FIX: Use 'files' instead of 'file'
 
       const response = await fetch(`/api/tasks/${taskId}/attachments`, {
         method: 'POST',
@@ -110,10 +112,12 @@ export function EnhancedDescriptionField({
       })
 
       if (!response.ok) {
-        throw new Error('Failed to upload image')
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to upload image')
       }
 
-      const attachment = await response.json()
+      const attachments = await response.json()
+      const attachment = Array.isArray(attachments) ? attachments[0] : attachments
       
       // Insert image markdown
       const imageMarkdown = `![${file.name}](${attachment.url})`
@@ -122,7 +126,7 @@ export function EnhancedDescriptionField({
       toast.success('Image uploaded successfully')
     } catch (error) {
       console.error('Error uploading image:', error)
-      toast.error('Failed to upload image')
+      toast.error(error instanceof Error ? error.message : 'Failed to upload image')
     } finally {
       setUploadingImage(false)
     }
@@ -161,6 +165,44 @@ export function EnhancedDescriptionField({
     }
   }, [handleImageUpload])
 
+  // Simple markdown renderer for display
+  const renderMarkdown = (text: string) => {
+    if (!text) return null
+    
+    // Convert markdown to HTML (basic implementation)
+    let html = text
+      // Images
+      .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" class="max-w-full h-auto my-2 rounded" />')
+      // Links
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:text-blue-800 underline">$1</a>')
+      // Bold
+      .replace(/\*\*([^*]+)\*\*/g, '<strong class="font-semibold">$1</strong>')
+      .replace(/__([^_]+)__/g, '<strong class="font-semibold">$1</strong>')
+      // Italic
+      .replace(/\*([^*]+)\*/g, '<em class="italic">$1</em>')
+      .replace(/_([^_]+)_/g, '<em class="italic">$1</em>')
+      // Inline code
+      .replace(/`([^`]+)`/g, '<code class="bg-slate-100 px-1 py-0.5 rounded text-sm font-mono">$1</code>')
+      // Line breaks
+      .replace(/\n/g, '<br>')
+
+    return <div dangerouslySetInnerHTML={{ __html: html }} />
+  }
+
+  // Basic textarea for non-enhanced mode
+  if (!enhanced) {
+    return (
+      <Textarea
+        ref={textareaRef}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className={className}
+      />
+    )
+  }
+
+  // Enhanced mode with formatting toolbar
   return (
     <div className={`space-y-2 ${className}`}>
       {/* Formatting Toolbar */}
@@ -337,5 +379,41 @@ export function EnhancedDescriptionField({
         onChange={handleFileChange}
       />
     </div>
+  )
+}
+
+// Display component for rendering markdown content
+interface DescriptionDisplayProps {
+  content: string
+  className?: string
+}
+
+export function DescriptionDisplay({ content, className = "" }: DescriptionDisplayProps) {
+  if (!content.trim()) {
+    return null
+  }
+
+  // Convert markdown to HTML (enhanced version)
+  let html = content
+    // Images
+    .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" class="max-w-full h-auto my-2 rounded shadow-sm" />')
+    // Links
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:text-blue-800 underline">$1</a>')
+    // Bold
+    .replace(/\*\*([^*]+)\*\*/g, '<strong class="font-semibold">$1</strong>')
+    .replace(/__([^_]+)__/g, '<strong class="font-semibold">$1</strong>')
+    // Italic
+    .replace(/\*([^*]+)\*/g, '<em class="italic">$1</em>')
+    .replace(/_([^_]+)_/g, '<em class="italic">$1</em>')
+    // Inline code
+    .replace(/`([^`]+)`/g, '<code class="bg-slate-100 px-1 py-0.5 rounded text-sm font-mono">$1</code>')
+    // Line breaks
+    .replace(/\n/g, '<br>')
+
+  return (
+    <div 
+      className={`prose prose-sm max-w-none ${className}`}
+      dangerouslySetInnerHTML={{ __html: html }} 
+    />
   )
 }
