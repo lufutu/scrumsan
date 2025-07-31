@@ -21,6 +21,7 @@ export function DraggableTask({
   boardId,
   onTaskUpdate
 }: DraggableTaskProps) {
+
   return (
     <Draggable draggableId={task.id} index={index}>
       {(provided, snapshot) => (

@@ -103,9 +103,12 @@ export default function ProductBacklog({
     setTimeout(() => mutateTasks(), 300)
   }, [mutateTasks])
 
-  // Filter sprints
+  // Filter sprints - always include backlog sprint
   const visibleSprints = useMemo(() =>
-    sprints.filter((s: Sprint) => !s.isDeleted && (showFinishedSprints || !s.isFinished)),
+    sprints.filter((s: Sprint) => 
+      !s.isDeleted && 
+      (s.isBacklog || showFinishedSprints || !s.isFinished)
+    ),
     [sprints, showFinishedSprints]
   )
 
@@ -114,10 +117,15 @@ export default function ProductBacklog({
     const sprint = sprintDetails.find((s: Sprint) => s.id === sprintId) || sprints.find((s: Sprint) => s.id === sprintId)
     if (!sprint) return []
 
-    // For all sprints (including backlog), return tasks directly from tasks relation
+    // For backlog sprint, return tasks with no sprintId
+    if (sprint.isBacklog) {
+      return tasks.filter((task: Task) => !task.sprintId)
+    }
+
+    // For regular sprints, return tasks from sprint relation
     if (!sprint.tasks) return []
     return sprint.tasks
-  }, [sprintDetails, sprints])
+  }, [sprintDetails, sprints, tasks])
 
   const handleDragEnd = useCallback(async (result: DropResult) => {
     const { destination, source, draggableId, type } = result
