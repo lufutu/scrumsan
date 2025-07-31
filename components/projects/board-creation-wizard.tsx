@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useSupabase } from '@/providers/supabase-provider'
 import { useToast } from '@/hooks/use-toast'
 import { useActiveOrg } from '@/hooks/useActiveOrg'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -300,10 +300,22 @@ export default function BoardCreationWizard({ projectId, organizationId, onSucce
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[600px] sm:max-h-[700px]">
+      <DialogContent 
+        className="sm:max-w-[600px] sm:max-h-[700px]"
+        aria-describedby="board-creation-description"
+        onInteractOutside={(e) => {
+          // Prevent closing during creation to avoid focus issues
+          if (isCreating) {
+            e.preventDefault()
+          }
+        }}
+      >
         <DialogHeader>
           <div className="flex items-center justify-between">
             <DialogTitle className="sr-only">Create New Board</DialogTitle>
+            <DialogDescription id="board-creation-description" className="sr-only">
+              Step-by-step wizard to create a new board for your project
+            </DialogDescription>
             <Button
               variant="ghost"
               size="sm"

@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useToast } from '@/hooks/use-toast'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -99,11 +99,23 @@ export default function BoardCreationWizard({ organizationId, onSuccess, childre
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent 
+        className="sm:max-w-[500px]"
+        aria-describedby="simple-board-creation-description"
+        onInteractOutside={(e) => {
+          // Prevent closing during creation to avoid focus issues
+          if (isCreating) {
+            e.preventDefault()
+          }
+        }}
+      >
         <DialogHeader>
           <DialogTitle>
             Create New Board
           </DialogTitle>
+          <DialogDescription id="simple-board-creation-description">
+            Create a new board to organize your work and tasks
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6">
