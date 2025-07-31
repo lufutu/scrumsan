@@ -161,20 +161,20 @@ export function FileUploadQueue({
     if (validFiles.length > 0) {
       setFileQueue(prev => {
         const newQueue = multiple ? [...prev, ...validFiles] : validFiles
+        
+        // Auto-upload if enabled - pass the new queue to uploadFile
+        if (autoUpload) {
+          setTimeout(() => {
+            validFiles.forEach(queuedFile => {
+              uploadFile(queuedFile.id, newQueue)
+            })
+          }, 0)
+        }
+        
         return newQueue
       })
-      
-      // Auto-upload if enabled (moved outside setFileQueue to avoid dependency issues)
-      if (autoUpload) {
-        // Use setTimeout to ensure state is updated before uploading
-        setTimeout(() => {
-          validFiles.forEach(queuedFile => {
-            uploadFile(queuedFile.id)
-          })
-        }, 0)
-      }
     }
-  }, [fileQueue.length, maxFiles, validateFile, multiple, autoUpload])
+  }, [fileQueue.length, maxFiles, validateFile, multiple, autoUpload, uploadFile])
 
   const uploadFile = useCallback(async (fileId: string, currentQueue?: QueuedFile[]) => {
     const queue = currentQueue || fileQueue
