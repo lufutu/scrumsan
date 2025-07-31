@@ -9,6 +9,7 @@ import { z } from "zod"
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
@@ -331,6 +332,12 @@ export function ProfileEditorDialog({
     return (
       <Dialog open={isOpen} onOpenChange={handleClose}>
         <DialogContent className="w-full max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Profile Editor</DialogTitle>
+            <DialogDescription>
+              Loading your profile information...
+            </DialogDescription>
+          </DialogHeader>
           <div className="flex items-center justify-center p-8">
             <Loader2 className="h-6 w-6 animate-spin mr-2" />
             <span>Loading profile...</span>
@@ -373,6 +380,14 @@ export function ProfileEditorDialog({
                 </Badge>
               )}
             </DialogTitle>
+            <DialogDescription>
+              {isOwnProfile 
+                ? 'Manage your personal profile information and preferences.' 
+                : isAdminEdit 
+                  ? 'Edit member profile information and settings as an administrator.' 
+                  : 'Edit profile information and settings.'
+              }
+            </DialogDescription>
           </DialogHeader>
 
           {/* Global Error State */}
