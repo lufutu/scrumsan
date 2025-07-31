@@ -13,7 +13,11 @@ import {
   Search,
   X,
   Plus,
-  Upload
+  Upload,
+  Loader2,
+  Trash2,
+  CheckSquare,
+  Square
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -100,6 +104,12 @@ export function TaskCardModern({
   const [newLabelColor, setNewLabelColor] = useState('#3B82F6');
   const [isDragOver, setIsDragOver] = useState(false);
   const [uploadingImages, setUploadingImages] = useState<File[]>([]);
+  
+  // Checklist states
+  const [showNewChecklistForm, setShowNewChecklistForm] = useState(false);
+  const [newChecklistTitle, setNewChecklistTitle] = useState('');
+  const [editingChecklistId, setEditingChecklistId] = useState<string | null>(null);
+  const [newChecklistItemText, setNewChecklistItemText] = useState('');
 
   // Ref to track previous assignees to prevent infinite re-renders
   const prevAssigneesRef = useRef<string>('');
@@ -463,6 +473,177 @@ export function TaskCardModern({
       setPriorityOpen(false);
     } catch (error) {
       toast.error('Failed to update priority');
+    }
+  };
+
+  // File upload handlers
+  const handleFileUpload = async (files: File[]) => {
+    if (!id || files.length === 0) return;
+
+    setUploadingImages(files);
+
+    try {
+      const uploadPromises = files.map(async (file) => {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const response = await fetch(`/api/tasks/${id}/attachments`, {
+          method: 'POST',
+          body: formData
+        });
+
+        if (!response.ok) throw new Error('Failed to upload file');
+        return await response.json();
+      });
+
+      await Promise.all(uploadPromises);
+      
+      // Refresh attachments data
+      mutateAttachments();
+      onAssigneesChange?.();
+      
+      toast.success(`${files.length} file(s) uploaded successfully`);
+    } catch (error) {
+      console.error('File upload error:', error);
+      toast.error('Failed to upload files');
+    } finally {
+      setUploadingImages([]);
+    }
+  };
+
+  const handleDeleteAttachment = async (attachmentId: string) => {
+    if (!id) return;
+
+    try {
+      const response = await fetch(`/api/tasks/${id}/attachments/${attachmentId}`, {
+        method: 'DELETE'
+      });
+
+      if (!response.ok) throw new Error('Failed to delete attachment');
+
+      // Refresh attachments data
+      mutateAttachments();
+      onAssigneesChange?.();
+      
+      toast.success('Attachment deleted');
+    } catch (error) {
+      console.error('Delete attachment error:', error);
+      toast.error('Failed to delete attachment');
+    }
+  };
+
+  // Checklist handlers
+  const handleCreateChecklist = async () => {
+    if (!id || !newChecklistTitle.trim()) return;
+
+    try {
+      const response = await fetch(`/api/tasks/${id}/checklists`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: newChecklistTitle.trim() })
+      });
+
+      if (!response.ok) throw new Error('Failed to create checklist');
+
+      // Refresh checklists data
+      mutateChecklists();
+      onAssigneesChange?.();
+      
+      setShowNewChecklistForm(false);
+      setNewChecklistTitle('');
+      toast.success('Checklist created');
+    } catch (error) {
+      console.error('Create checklist error:', error);
+      toast.error('Failed to create checklist');
+    }
+  };
+
+  const handleDeleteChecklist = async (checklistId: string) => {
+    if (!id) return;
+
+    try {
+      const response = await fetch(`/api/tasks/${id}/checklists/${checklistId}`, {
+        method: 'DELETE'
+      });
+
+      if (!response.ok) throw new Error('Failed to delete checklist');
+
+      // Refresh checklists data
+      mutateChecklists();
+      onAssigneesChange?.();
+      
+      toast.success('Checklist deleted');
+    } catch (error) {
+      console.error('Delete checklist error:', error);
+      toast.error('Failed to delete checklist');
+    }
+  };
+
+  const handleAddChecklistItem = async (checklistId: string) => {
+    if (!id || !newChecklistItemText.trim()) return;
+
+    try {
+      const response = await fetch(`/api/tasks/${id}/checklists/${checklistId}/items`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: newChecklistItemText.trim() })
+      });
+
+      if (!response.ok) throw new Error('Failed to add checklist item');
+
+      // Refresh checklists data
+      mutateChecklists();
+      onAssigneesChange?.();
+      
+      setEditingChecklistId(null);
+      setNewChecklistItemText('');
+      toast.success('Item added');
+    } catch (error) {
+      console.error('Add checklist item error:', error);
+      toast.error('Failed to add item');
+    }
+  };
+
+  const handleToggleChecklistItem = async (checklistId: string, itemId: string, completed: boolean) => {
+    if (!id) return;
+
+    try {
+      const response = await fetch(`/api/tasks/${id}/checklists/${checklistId}/items/${itemId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ completed })
+      });
+
+      if (!response.ok) throw new Error('Failed to toggle checklist item');
+
+      // Refresh checklists data
+      mutateChecklists();
+      onAssigneesChange?.();
+      
+    } catch (error) {
+      console.error('Toggle checklist item error:', error);
+      toast.error('Failed to update item');
+    }
+  };
+
+  const handleDeleteChecklistItem = async (checklistId: string, itemId: string) => {
+    if (!id) return;
+
+    try {
+      const response = await fetch(`/api/tasks/${id}/checklists/${checklistId}/items/${itemId}`, {
+        method: 'DELETE'
+      });
+
+      if (!response.ok) throw new Error('Failed to delete checklist item');
+
+      // Refresh checklists data
+      mutateChecklists();
+      onAssigneesChange?.();
+      
+      toast.success('Item deleted');
+    } catch (error) {
+      console.error('Delete checklist item error:', error);
+      toast.error('Failed to delete item');
     }
   };
 
@@ -989,21 +1170,126 @@ export function TaskCardModern({
                   <span>{actualFilesCount}</span>
                 </button>
               </PopoverTrigger>
-              <PopoverContent className="w-64 p-4" align="start">
+              <PopoverContent className="w-80 p-4" align="start">
                 <div className="space-y-3">
-                  <Label className="text-sm font-medium">Files</Label>
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                    <Upload className="h-6 w-6 mx-auto mb-2 text-gray-400" />
-                    <p className="text-sm text-gray-500">Drop files here</p>
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-medium">Attachments</Label>
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="mt-2"
-                      onClick={(e) => e.stopPropagation()}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setFilesOpen(false);
+                      }}
                     >
-                      or browse files
+                      <X className="h-4 w-4" />
                     </Button>
                   </div>
+                  
+                  {/* File Upload Zone */}
+                  <div 
+                    className={cn(
+                      "border-2 border-dashed rounded-lg p-4 text-center transition-colors",
+                      isDragOver ? "border-blue-400 bg-blue-50" : "border-gray-300"
+                    )}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setIsDragOver(true);
+                    }}
+                    onDragLeave={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setIsDragOver(false);
+                    }}
+                    onDrop={async (e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setIsDragOver(false);
+                      
+                      const files = Array.from(e.dataTransfer.files);
+                      if (files.length > 0) {
+                        await handleFileUpload(files);
+                      }
+                    }}
+                  >
+                    <Upload className="h-6 w-6 mx-auto mb-2 text-gray-400" />
+                    <p className="text-sm text-gray-500 mb-2">Drop files here or</p>
+                    <input
+                      type="file"
+                      multiple
+                      className="hidden"
+                      ref={(input) => {
+                        if (input) {
+                          input.onclick = (e) => e.stopPropagation();
+                          input.onchange = async (e) => {
+                            const target = e.target as HTMLInputElement;
+                            if (target.files && target.files.length > 0) {
+                              const files = Array.from(target.files);
+                              await handleFileUpload(files);
+                              target.value = ''; // Reset input
+                            }
+                          };
+                        }
+                      }}
+                      id={`file-upload-${id}`}
+                    />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        document.getElementById(`file-upload-${id}`)?.click();
+                      }}
+                    >
+                      Browse Files
+                    </Button>
+                  </div>
+
+                  {/* Upload Progress */}
+                  {uploadingImages.length > 0 && (
+                    <div className="space-y-2">
+                      <Label className="text-xs text-gray-500">Uploading...</Label>
+                      {uploadingImages.map((file, index) => (
+                        <div key={index} className="flex items-center gap-2 text-xs">
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          <span className="truncate">{file.name}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Existing Attachments */}
+                  {loading ? (
+                    <div className="flex items-center justify-center py-4">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    </div>
+                  ) : attachments.length > 0 ? (
+                    <div className="space-y-2 max-h-32 overflow-y-auto">
+                      <Label className="text-xs text-gray-500">Files ({attachments.length})</Label>
+                      {attachments.map((attachment) => (
+                        <div key={attachment.id} className="flex items-center justify-between gap-2 p-2 bg-gray-50 rounded text-xs">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <Paperclip className="h-3 w-3 text-gray-400 shrink-0" />
+                            <span className="truncate">{attachment.filename}</span>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              await handleDeleteAttachment(attachment.id);
+                            }}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-500 text-center py-2">No attachments yet</p>
+                  )}
                 </div>
               </PopoverContent>
             </Popover>
@@ -1019,18 +1305,200 @@ export function TaskCardModern({
                   <span>{totalItems > 0 ? `${actualCompletedChecklists}/${totalItems}` : '0'}</span>
                 </button>
               </PopoverTrigger>
-              <PopoverContent className="w-64 p-4" align="start">
+              <PopoverContent className="w-80 p-4" align="start">
                 <div className="space-y-3">
-                  <Label className="text-sm font-medium">Checklists</Label>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full justify-start"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Checklist
-                  </Button>
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-medium">Checklists</Label>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setChecklistsOpen(false);
+                      }}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+
+                  {/* Add New Checklist */}
+                  {!showNewChecklistForm ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full justify-start"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowNewChecklistForm(true);
+                      }}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Checklist
+                    </Button>
+                  ) : (
+                    <div className="space-y-2">
+                      <Input
+                        placeholder="Checklist title"
+                        value={newChecklistTitle}
+                        onChange={(e) => {
+                          e.stopPropagation();
+                          setNewChecklistTitle(e.target.value);
+                        }}
+                        onKeyDown={(e) => {
+                          e.stopPropagation();
+                          if (e.key === 'Enter') {
+                            handleCreateChecklist();
+                          } else if (e.key === 'Escape') {
+                            setShowNewChecklistForm(false);
+                            setNewChecklistTitle('');
+                          }
+                        }}
+                        autoFocus
+                      />
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCreateChecklist();
+                          }}
+                          disabled={!newChecklistTitle.trim()}
+                        >
+                          Add
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowNewChecklistForm(false);
+                            setNewChecklistTitle('');
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Existing Checklists */}
+                  {loading ? (
+                    <div className="flex items-center justify-center py-4">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    </div>
+                  ) : checklists.length > 0 ? (
+                    <div className="space-y-3 max-h-64 overflow-y-auto">
+                      {checklists.map((checklist) => (
+                        <div key={checklist.id} className="border rounded-lg p-3 bg-gray-50">
+                          <div className="flex items-center justify-between mb-2">
+                            <Label className="text-sm font-medium">{checklist.title}</Label>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                await handleDeleteChecklist(checklist.id);
+                              }}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                          
+                          {/* Checklist Items */}
+                          <div className="space-y-1">
+                            {checklist.items?.map((item) => (
+                              <div key={item.id} className="flex items-center gap-2">
+                                <button
+                                  onClick={async (e) => {
+                                    e.stopPropagation();
+                                    await handleToggleChecklistItem(checklist.id, item.id, !item.completed);
+                                  }}
+                                  className="shrink-0"
+                                >
+                                  {item.completed ? (
+                                    <CheckSquare className="h-4 w-4 text-green-600" />
+                                  ) : (
+                                    <Square className="h-4 w-4 text-gray-400" />
+                                  )}
+                                </button>
+                                <span 
+                                  className={cn(
+                                    "text-xs flex-1",
+                                    item.completed && "line-through text-gray-500"
+                                  )}
+                                >
+                                  {item.text}
+                                </span>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-4 w-4 p-0 text-red-500 hover:text-red-700"
+                                  onClick={async (e) => {
+                                    e.stopPropagation();
+                                    await handleDeleteChecklistItem(checklist.id, item.id);
+                                  }}
+                                >
+                                  <X className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            )) || []}
+                            
+                            {/* Add Item Form */}
+                            {editingChecklistId === checklist.id ? (
+                              <div className="flex gap-2 mt-2">
+                                <Input
+                                  placeholder="Add item..."
+                                  value={newChecklistItemText}
+                                  onChange={(e) => {
+                                    e.stopPropagation();
+                                    setNewChecklistItemText(e.target.value);
+                                  }}
+                                  onKeyDown={(e) => {
+                                    e.stopPropagation();
+                                    if (e.key === 'Enter') {
+                                      handleAddChecklistItem(checklist.id);
+                                    } else if (e.key === 'Escape') {
+                                      setEditingChecklistId(null);
+                                      setNewChecklistItemText('');
+                                    }
+                                  }}
+                                  className="text-xs h-7"
+                                  autoFocus
+                                />
+                                <Button
+                                  size="sm"
+                                  className="h-7 px-2"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleAddChecklistItem(checklist.id);
+                                  }}
+                                  disabled={!newChecklistItemText.trim()}
+                                >
+                                  <Plus className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            ) : (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="w-full justify-start h-6 text-xs mt-1"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingChecklistId(checklist.id);
+                                }}
+                              >
+                                <Plus className="h-3 w-3 mr-1" />
+                                Add item
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-500 text-center py-2">No checklists yet</p>
+                  )}
                 </div>
               </PopoverContent>
             </Popover>
