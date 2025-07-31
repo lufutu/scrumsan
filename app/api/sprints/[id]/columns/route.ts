@@ -90,19 +90,6 @@ export async function GET(
       }
     })
     
-    // Debug: Log task data to see what's actually being returned
-    console.log('🔍 API Debug - Sprint columns count:', columns.length)
-    columns.forEach((column, colIndex) => {
-      console.log(`🔍 API Debug - Column ${colIndex} (${column.name}): ${column.tasks.length} tasks`)
-      column.tasks.forEach((task, taskIndex) => {
-        console.log(`🔍 API Debug - Task ${taskIndex} (${task.id}):`, {
-          title: task.title,
-          _count: task._count,
-          commentsCount: task._count?.comments,
-          taskLabelsCount: task.taskLabels?.length
-        })
-      })
-    })
     
     return NextResponse.json(columns)
   } catch (error: unknown) {

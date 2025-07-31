@@ -121,6 +121,9 @@ export function TaskCardModern({
 
   // Fetch comments
   const { comments, loading: loadingComments, mutate: mutateComments } = useComments(id);
+  
+  // Use actual comments length as the source of truth for count
+  const actualCommentsCount = comments.length;
 
   const checklistProgress = checklistsCount ?
     Math.round((completedChecklists || 0) / checklistsCount * 100) : 0;
@@ -841,7 +844,7 @@ export function TaskCardModern({
                   onClick={(e) => e.stopPropagation()}
                 >
                   <MessageCircle className="h-5 w-5" />
-                  <span>{commentsCount || 0}</span>
+                  <span>{actualCommentsCount}</span>
                 </button>
               </PopoverTrigger>
               <PopoverContent className="w-96 p-0" align="start">
