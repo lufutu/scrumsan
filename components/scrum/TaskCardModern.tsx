@@ -1260,11 +1260,7 @@ export function TaskCardModern({
                   )}
 
                   {/* Existing Attachments */}
-                  {loading ? (
-                    <div className="flex items-center justify-center py-4">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    </div>
-                  ) : attachments.length > 0 ? (
+                  {attachments.length > 0 ? (
                     <div className="space-y-2 max-h-32 overflow-y-auto">
                       <Label className="text-xs text-gray-500">Files ({attachments.length})</Label>
                       {attachments.map((attachment) => (
@@ -1382,11 +1378,7 @@ export function TaskCardModern({
                   )}
 
                   {/* Existing Checklists */}
-                  {loading ? (
-                    <div className="flex items-center justify-center py-4">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    </div>
-                  ) : checklists.length > 0 ? (
+                  {checklists.length > 0 ? (
                     <div className="space-y-3 max-h-64 overflow-y-auto">
                       {checklists.map((checklist) => (
                         <div key={checklist.id} className="border rounded-lg p-3 bg-gray-50">
