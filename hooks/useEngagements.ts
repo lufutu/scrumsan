@@ -120,7 +120,7 @@ export function useEngagements(organizationId: string, memberId: string) {
   }, [organizationId, memberId, mutate])
 
   const calculateTotalHours = useCallback((engagements?: ProjectEngagement[]): number => {
-    const engagementsToUse = engagements || data || []
+    const engagementsToUse = Array.isArray(engagements) ? engagements : Array.isArray(data) ? data : []
     return engagementsToUse
       .filter(e => e.isActive)
       .reduce((sum, e) => sum + e.hoursPerWeek, 0)
@@ -135,12 +135,12 @@ export function useEngagements(organizationId: string, memberId: string) {
   }, [calculateTotalHours])
 
   const getActiveEngagements = useCallback((engagements?: ProjectEngagement[]): ProjectEngagement[] => {
-    const engagementsToUse = engagements || data || []
+    const engagementsToUse = Array.isArray(engagements) ? engagements : Array.isArray(data) ? data : []
     return engagementsToUse.filter(e => e.isActive)
   }, [data])
 
   const getPastEngagements = useCallback((engagements?: ProjectEngagement[]): ProjectEngagement[] => {
-    const engagementsToUse = engagements || data || []
+    const engagementsToUse = Array.isArray(engagements) ? engagements : Array.isArray(data) ? data : []
     return engagementsToUse.filter(e => !e.isActive)
   }, [data])
 
@@ -148,7 +148,7 @@ export function useEngagements(organizationId: string, memberId: string) {
     projectId: string, 
     engagements?: ProjectEngagement[]
   ): ProjectEngagement[] => {
-    const engagementsToUse = engagements || data || []
+    const engagementsToUse = Array.isArray(engagements) ? engagements : Array.isArray(data) ? data : []
     return engagementsToUse.filter(e => e.projectId === projectId)
   }, [data])
 
@@ -159,7 +159,7 @@ export function useEngagements(organizationId: string, memberId: string) {
     excludeEngagementId?: string
   ): string[] => {
     const errors: string[] = []
-    const engagementsToCheck = existingEngagements || data || []
+    const engagementsToCheck = Array.isArray(existingEngagements) ? existingEngagements : Array.isArray(data) ? data : []
 
     // Validate hours per week
     if ('hoursPerWeek' in engagementData && engagementData.hoursPerWeek !== undefined) {
