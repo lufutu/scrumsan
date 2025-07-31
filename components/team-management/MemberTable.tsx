@@ -14,7 +14,12 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
-  ChevronsRight
+  ChevronsRight,
+  RotateCcw,
+  Download,
+  Edit,
+  CheckCircle,
+  XCircle
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { EnhancedAvatar } from '@/components/ui/enhanced-avatar'
@@ -49,11 +54,13 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
+import { Checkbox } from '@/components/ui/checkbox'
 import { MemberTableSkeleton } from '@/components/ui/skeleton'
 import { ComponentErrorBoundary } from '@/components/ui/error-boundary'
 import { VirtualTable } from '@/components/ui/virtual-scroll'
 import { OrganizationMember, PendingInvitation } from '@/hooks/useTeamMembers'
 import { useCustomRoles } from '@/hooks/useCustomRoles'
+import { toast } from 'sonner'
 
 interface MemberTableProps {
   members: OrganizationMember[]
@@ -70,6 +77,9 @@ interface MemberTableProps {
   organizationId: string
   enableVirtualScrolling?: boolean
   containerHeight?: number
+  // Admin functions
+  onAvatarReset?: (memberId: string) => void
+  onBulkAvatarReset?: (memberIds: string[]) => void
 }
 
 const MEMBER_ROW_HEIGHT = 80 // Height of each member row in pixels
@@ -98,6 +108,8 @@ export function MemberTable({
   isCancellingInvitation = false,
   canManage = false,
   organizationId,
+  onAvatarReset,
+  onBulkAvatarReset,
 }: MemberTableProps) {
   return (
     <ComponentErrorBoundary>
@@ -114,6 +126,8 @@ export function MemberTable({
         isCancellingInvitation={isCancellingInvitation}
         canManage={canManage}
         organizationId={organizationId}
+        onAvatarReset={onAvatarReset}
+        onBulkAvatarReset={onBulkAvatarReset}
       />
     </ComponentErrorBoundary>
   )
@@ -134,10 +148,14 @@ function MemberTableContent({
   organizationId,
   enableVirtualScrolling = false,
   containerHeight = 600,
+  onAvatarReset,
+  onBulkAvatarReset,
 }: MemberTableProps) {
   const [sortConfig, setSortConfig] = useState<SortConfig>({ field: 'name', direction: 'asc' })
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(25)
+  const [selectedMembers, setSelectedMembers] = useState<Set<string>>(new Set())
+  const [isProcessingBulk, setIsProcessingBulk] = useState(false)
   const tableContainerRef = useRef<HTMLDivElement>(null)
 
   // Determine if we should use virtual scrolling
@@ -288,6 +306,104 @@ function MemberTableContent({
   const goToPage = useCallback((page: number) => {
     setCurrentPage(Math.max(1, Math.min(page, totalPages)))
   }, [totalPages])
+
+  // Handle member selection
+  const handleMemberSelect = useCallback((memberId: string, selected: boolean) => {
+    setSelectedMembers(prev => {
+      const newSet = new Set(prev)
+      if (selected) {
+        newSet.add(memberId)
+      } else {
+        newSet.delete(memberId)
+      }
+      return newSet
+    })
+  }, [])
+
+  // Handle select all
+  const handleSelectAll = useCallback((selected: boolean) => {
+    if (selected) {
+      const memberIds = members.filter(m => m).map(m => m.id)
+      setSelectedMembers(new Set(memberIds))
+    } else {
+      setSelectedMembers(new Set())
+    }
+  }, [members])
+
+  // Handle bulk avatar reset
+  const handleBulkAvatarReset = useCallback(async () => {
+    if (selectedMembers.size === 0) {
+      toast.error('Please select at least one member')
+      return
+    }
+
+    setIsProcessingBulk(true)
+    try {
+      const memberIds = Array.from(selectedMembers)
+      if (onBulkAvatarReset) {
+        await onBulkAvatarReset(memberIds)
+        toast.success(`Reset avatars for ${memberIds.length} members`)
+      }
+      setSelectedMembers(new Set())
+    } catch (error) {
+      console.error('Bulk avatar reset failed:', error)
+      toast.error('Failed to reset avatars')
+    } finally {
+      setIsProcessingBulk(false)
+    }
+  }, [selectedMembers, onBulkAvatarReset])
+
+  // Export profiles to CSV
+  const handleExportProfiles = useCallback(async () => {
+    if (selectedMembers.size === 0) {
+      toast.error('Please select at least one member')
+      return
+    }
+
+    const selectedMemberData = members.filter(m => selectedMembers.has(m.id))
+    
+    const csvData = selectedMemberData.map(member => ({
+      'Full Name': member.user.fullName || '',
+      'Email': member.user.email || '',
+      'Role': member.role,
+      'Job Title': member.jobTitle || '',
+      'Join Date': member.joinDate ? new Date(member.joinDate).toLocaleDateString() : '',
+      'Working Hours': member.workingHoursPerWeek || '',
+      'Has Avatar': member.user.avatarUrl ? 'Yes' : 'No',
+      'Created At': new Date(member.createdAt).toLocaleDateString()
+    }))
+    
+    const csvContent = [
+      Object.keys(csvData[0]).join(','),
+      ...csvData.map(row => Object.values(row).map(val => `"${val}"`).join(','))
+    ].join('\n')
+    
+    const blob = new Blob([csvContent], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `member-profiles-${new Date().toISOString().split('T')[0]}.csv`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+    
+    toast.success(`Exported profiles for ${selectedMemberData.length} members`)
+    setSelectedMembers(new Set())
+  }, [selectedMembers, members])
+
+  // Handle individual avatar reset
+  const handleAvatarReset = useCallback(async (memberId: string) => {
+    try {
+      if (onAvatarReset) {
+        await onAvatarReset(memberId)
+        toast.success('Avatar reset successfully')
+      }
+    } catch (error) {
+      console.error('Avatar reset failed:', error)
+      toast.error('Failed to reset avatar')
+    }
+  }, [onAvatarReset])
 
   // Render sort icon
   const renderSortIcon = (field: SortField) => {
@@ -453,6 +569,17 @@ function MemberTableContent({
         }}
         aria-label={onMemberClick ? `View profile for ${getMemberDisplayName(member)}` : undefined}
       >
+        {canManage && (
+          <TableCell onClick={(e) => e.stopPropagation()}>
+            <Checkbox
+              checked={selectedMembers.has(member.id)}
+              onCheckedChange={(checked) => 
+                handleMemberSelect(member.id, checked as boolean)
+              }
+              aria-label={`Select ${getMemberDisplayName(member)}`}
+            />
+          </TableCell>
+        )}
         <TableCell>
           <div className="flex items-center gap-2 sm:gap-3">
             <EnhancedAvatar
@@ -549,8 +676,24 @@ function MemberTableContent({
           </div>
         </TableCell>
 
+        <TableCell className="hidden sm:table-cell">
+          <div className="flex items-center gap-2">
+            {member.user.avatarUrl ? (
+              <>
+                <CheckCircle className="w-4 h-4 text-green-500" />
+                <span className="text-sm">Custom</span>
+              </>
+            ) : (
+              <>
+                <XCircle className="w-4 h-4 text-orange-500" />
+                <span className="text-sm">Generated</span>
+              </>
+            )}
+          </div>
+        </TableCell>
+
         {canManage && (
-          <TableCell>
+          <TableCell onClick={(e) => e.stopPropagation()}>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -574,9 +717,18 @@ function MemberTableContent({
                   onClick={() => onMemberEdit?.(member)}
                   className="cursor-pointer"
                 >
-                  <Mail className="w-4 h-4 mr-2" />
+                  <Edit className="w-4 h-4 mr-2" />
                   Edit Member
                 </DropdownMenuItem>
+                {member.user.avatarUrl && (
+                  <DropdownMenuItem
+                    onClick={() => handleAvatarReset(member.id)}
+                    className="cursor-pointer"
+                  >
+                    <RotateCcw className="w-4 h-4 mr-2" />
+                    Reset Avatar
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={() => onMemberRemove?.(member)}
@@ -607,6 +759,15 @@ function MemberTableContent({
   const renderTableHeader = useCallback(() => (
     <TableHeader>
       <TableRow>
+        {canManage && (
+          <TableHead className="w-12">
+            <Checkbox
+              checked={selectedMembers.size > 0 && selectedMembers.size === members.length}
+              onCheckedChange={handleSelectAll}
+              aria-label="Select all members"
+            />
+          </TableHead>
+        )}
         <TableHead className="min-w-[200px]">
           <Button
             variant="ghost"
@@ -656,10 +817,11 @@ function MemberTableContent({
             {renderSortIcon('totalHours')}
           </Button>
         </TableHead>
+        <TableHead className="hidden sm:table-cell min-w-[120px]">Avatar</TableHead>
         {canManage && <TableHead className="w-12" aria-label="Actions"></TableHead>}
       </TableRow>
     </TableHeader>
-  ), [handleSort, renderSortIcon, canManage])
+  ), [handleSort, renderSortIcon, canManage, selectedMembers.size, members.length, handleSelectAll])
 
   if (isLoading) {
     return <MemberTableSkeleton rows={5} />
@@ -681,6 +843,45 @@ function MemberTableContent({
 
   return (
     <div className="space-y-4" ref={tableContainerRef}>
+      {/* Bulk Actions Bar */}
+      {canManage && selectedMembers.size > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-4 p-4 bg-muted/50 rounded-lg border border-primary/20">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium">
+              {selectedMembers.size} member{selectedMembers.size !== 1 ? 's' : ''} selected
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleBulkAvatarReset}
+              disabled={isProcessingBulk}
+            >
+              <RotateCcw className="w-4 h-4 mr-2" />
+              Reset Avatars
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportProfiles}
+              disabled={isProcessingBulk}
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Export CSV
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setSelectedMembers(new Set())}
+              disabled={isProcessingBulk}
+            >
+              Clear Selection
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Table */}
       {shouldUseVirtualScrolling ? (
         // Virtual scrolling table for large datasets

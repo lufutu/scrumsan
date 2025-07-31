@@ -27,7 +27,6 @@ import { MemberProfileCard } from './MemberProfileCard'
 import { PermissionSetManager } from './PermissionSetManager'
 import { RoleManager } from './RoleManager'
 import { GuestsTab } from './GuestsTab'
-import { AdminProfileManager } from './AdminProfileManager'
 
 
 interface TeamManagementPageProps {
@@ -101,7 +100,7 @@ function TeamManagementPageContent({ organizationId }: TeamManagementPageProps) 
   useEffect(() => {
     const tab = searchParams.get('tab') || 'members'
     
-    // Redirect to members tab if user tries to access restricted tabs
+    // Redirect to members tab if user tries to access restricted tabs  
     if ((tab === 'permission-sets' || tab === 'custom-roles') && !canManagePermissions) {
       handleTabChange('members')
       return
@@ -303,7 +302,7 @@ function TeamManagementPageContent({ organizationId }: TeamManagementPageProps) 
       <main id="main-content" className="flex-1 flex flex-col h-full" role="main">
         <div className="px-4 py-6 space-y-6 mobile-spacing">
           <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-            <TabsList className="grid w-full gap-1 h-auto p-1 grid-cols-2 sm:grid-cols-5">
+            <TabsList className="grid w-full gap-1 h-auto p-1 grid-cols-2 sm:grid-cols-4">
               <TabsTrigger
                 value="members"
                 className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3 py-2 min-h-[2.5rem]"
@@ -364,18 +363,6 @@ function TeamManagementPageContent({ organizationId }: TeamManagementPageProps) 
                   </span>
                 )}
               </TabsTrigger>
-              <TabsTrigger
-                value="admin-profiles"
-                className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3 py-2 min-h-[2.5rem]"
-                aria-label="Admin Profile Management"
-                disabled={!canManagePermissions}
-                style={{ display: canManagePermissions ? 'flex' : 'none' }}
-              >
-                <Settings className="w-3 h-3 sm:w-4 sm:h-4 shrink-0" />
-                <span className="hidden sm:inline">Profile Admin</span>
-                <span className="sm:hidden">Admin</span>
-              </TabsTrigger>
-
             </TabsList>
 
             <TabsContents className="mt-6">
@@ -395,6 +382,33 @@ function TeamManagementPageContent({ organizationId }: TeamManagementPageProps) 
                     isCancellingInvitation={isCancellingInvitation}
                     filters={filters}
                     onFiltersChange={handleFiltersChange}
+                    onAvatarReset={async (memberId) => {
+                      // Handle individual avatar reset
+                      const response = await fetch(
+                        `/api/organizations/${organizationId}/admin/profiles/${memberId}/avatar/reset`,
+                        { method: 'POST' }
+                      )
+                      if (!response.ok) {
+                        throw new Error('Failed to reset avatar')
+                      }
+                    }}
+                    onBulkAvatarReset={async (memberIds) => {
+                      // Handle bulk avatar reset
+                      const response = await fetch(
+                        `/api/organizations/${organizationId}/admin/profiles`,
+                        {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            action: 'reset_avatars',
+                            memberIds,
+                          }),
+                        }
+                      )
+                      if (!response.ok) {
+                        throw new Error('Failed to reset avatars')
+                      }
+                    }}
                   />
                 </SectionErrorBoundary>
               </TabsContent>
@@ -437,53 +451,6 @@ function TeamManagementPageContent({ organizationId }: TeamManagementPageProps) 
                   )}
                 </SectionErrorBoundary>
               </TabsContent>
-
-              <TabsContent value="admin-profiles" className="space-y-6">
-                <SectionErrorBoundary>
-                  {canManagePermissions ? (
-                    <AdminProfileManager
-                      members={membersArray}
-                      organizationId={organizationId}
-                      onMemberUpdate={(memberId) => {
-                        // Refresh member data
-                        // This could trigger a refetch of team members
-                      }}
-                      onAvatarReset={async (memberId) => {
-                        // Handle individual avatar reset
-                        const response = await fetch(
-                          `/api/organizations/${organizationId}/admin/profiles/${memberId}/avatar/reset`,
-                          { method: 'POST' }
-                        )
-                        if (!response.ok) {
-                          throw new Error('Failed to reset avatar')
-                        }
-                      }}
-                      onBulkAvatarReset={async (memberIds) => {
-                        // Handle bulk avatar reset
-                        const response = await fetch(
-                          `/api/organizations/${organizationId}/admin/profiles`,
-                          {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                              action: 'reset_avatars',
-                              memberIds,
-                            }),
-                          }
-                        )
-                        if (!response.ok) {
-                          throw new Error('Failed to reset avatars')
-                        }
-                      }}
-                    />
-                  ) : (
-                    <div className="text-center py-8">
-                      <p className="text-muted-foreground">You don't have permission to manage admin profiles.</p>
-                    </div>
-                  )}
-                </SectionErrorBoundary>
-              </TabsContent>
-
 
             </TabsContents>
           </Tabs>
@@ -554,7 +521,9 @@ function MembersTabContent({
   isResendingInvitation,
   isCancellingInvitation,
   filters,
-  onFiltersChange
+  onFiltersChange,
+  onAvatarReset,
+  onBulkAvatarReset
 }: {
   members: import('@/hooks/useTeamMembers').OrganizationMember[]
   pendingInvitations?: import('@/hooks/useTeamMembers').PendingInvitation[]
@@ -569,6 +538,8 @@ function MembersTabContent({
   isCancellingInvitation?: boolean
   filters: FilterOptions
   onFiltersChange: (filters: FilterOptions) => void
+  onAvatarReset?: (memberId: string) => Promise<void>
+  onBulkAvatarReset?: (memberIds: string[]) => Promise<void>
 }) {
 
 
@@ -619,6 +590,8 @@ function MembersTabContent({
         onCancelInvitation={onCancelInvitation}
         isResendingInvitation={isResendingInvitation}
         isCancellingInvitation={isCancellingInvitation}
+        onAvatarReset={onAvatarReset}
+        onBulkAvatarReset={onBulkAvatarReset}
       />
     </div>
   )
