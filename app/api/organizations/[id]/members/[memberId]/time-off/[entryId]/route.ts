@@ -124,10 +124,10 @@ async function getTimeOffEntry(entryId: string, memberId: string, organizationId
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string; memberId: string; entryId: string } }
+  { params }: { params: Promise<{ id: string; memberId: string; entryId: string }> }
 ) {
   try {
-    const { id: organizationId, memberId, entryId } = params
+    const { id: organizationId, memberId, entryId  } = await params
     
     // Validate IDs
     const orgIdValidation = validateUUID(organizationId, 'Organization ID')
@@ -183,10 +183,10 @@ export async function GET(
 
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { id: string; memberId: string; entryId: string } }
+  { params }: { params: Promise<{ id: string; memberId: string; entryId: string }> }
 ) {
   try {
-    const { id: organizationId, memberId, entryId } = params
+    const { id: organizationId, memberId, entryId  } = await params
     
     // Validate IDs
     const orgIdValidation = validateUUID(organizationId, 'Organization ID')
@@ -372,10 +372,10 @@ export async function PUT(
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string; memberId: string; entryId: string } }
+  { params }: { params: Promise<{ id: string; memberId: string; entryId: string }> }
 ) {
   try {
-    const { id: organizationId, memberId, entryId } = params
+    const { id: organizationId, memberId, entryId  } = await params
     
     // Validate IDs
     const orgIdValidation = validateUUID(organizationId, 'Organization ID')

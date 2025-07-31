@@ -80,10 +80,10 @@ async function validateEngagementHours(
 
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { id: string; memberId: string; engagementId: string } }
+  { params }: { params: Promise<{ id: string; memberId: string; engagementId: string }> }
 ) {
   try {
-    const { id: organizationId, memberId, engagementId } = params
+    const { id: organizationId, memberId, engagementId  } = await params
     
     // Validate IDs
     const orgIdValidation = validateUUID(organizationId, 'Organization ID')
@@ -286,10 +286,10 @@ export async function PUT(
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string; memberId: string; engagementId: string } }
+  { params }: { params: Promise<{ id: string; memberId: string; engagementId: string }> }
 ) {
   try {
-    const { id: organizationId, memberId, engagementId } = params
+    const { id: organizationId, memberId, engagementId  } = await params
     
     // Validate IDs
     const orgIdValidation = validateUUID(organizationId, 'Organization ID')

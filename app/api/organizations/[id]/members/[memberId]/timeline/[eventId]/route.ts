@@ -40,10 +40,10 @@ async function checkOrganizationPermission(
 
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { id: string; memberId: string; eventId: string } }
+  { params }: { params: Promise<{ id: string; memberId: string; eventId: string }> }
 ) {
   try {
-    const { id: organizationId, memberId, eventId } = params
+    const { id: organizationId, memberId, eventId  } = await params
     
     // Validate IDs
     const orgIdValidation = validateUUID(organizationId, 'Organization ID')
@@ -197,10 +197,10 @@ export async function PUT(
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string; memberId: string; eventId: string } }
+  { params }: { params: Promise<{ id: string; memberId: string; eventId: string }> }
 ) {
   try {
-    const { id: organizationId, memberId, eventId } = params
+    const { id: organizationId, memberId, eventId  } = await params
     
     // Validate IDs
     const orgIdValidation = validateUUID(organizationId, 'Organization ID')

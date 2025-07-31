@@ -12,10 +12,10 @@ import { deleteFileFromS3ByUrl } from '@/lib/aws/s3'
  */
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string; memberId: string } }
+  { params }: { params: Promise<{ id: string; memberId: string }> }
 ) {
   try {
-    const { id: organizationId, memberId } = params
+    const { id: organizationId, memberId  } = await params
     
     // Validate IDs
     const orgIdValidation = validateUUID(organizationId, 'Organization ID')

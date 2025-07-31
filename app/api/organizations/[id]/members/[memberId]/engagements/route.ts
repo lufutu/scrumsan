@@ -87,10 +87,10 @@ async function validateEngagementHours(
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string; memberId: string } }
+  { params }: { params: Promise<{ id: string; memberId: string }> }
 ) {
   try {
-    const { id: organizationId, memberId } = params
+    const { id: organizationId, memberId  } = await params
     
     // Validate IDs
     const orgIdValidation = validateUUID(organizationId, 'Organization ID')
@@ -184,10 +184,10 @@ export async function GET(
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string; memberId: string } }
+  { params }: { params: Promise<{ id: string; memberId: string }> }
 ) {
   try {
-    const { id: organizationId, memberId } = params
+    const { id: organizationId, memberId  } = await params
     
     // Validate IDs
     const orgIdValidation = validateUUID(organizationId, 'Organization ID')
