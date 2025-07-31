@@ -102,9 +102,9 @@ export function TimeOffManager({ member, organizationId, canEdit }: TimeOffManag
 
   // Filter entries based on current filters
   const filteredEntries = useMemo(() => {
-    if (!timeOffEntries) return []
+    const entriesArray = Array.isArray(timeOffEntries) ? timeOffEntries : []
     
-    return timeOffEntries.filter(entry => {
+    return entriesArray.filter(entry => {
       const statusMatch = filterStatus === 'all' || entry.status === filterStatus
       const typeMatch = filterType === 'all' || entry.type === filterType
       return statusMatch && typeMatch
@@ -113,13 +113,13 @@ export function TimeOffManager({ member, organizationId, canEdit }: TimeOffManag
 
   // Calculate statistics
   const statistics = useMemo(() => {
-    if (!timeOffEntries) return { totalDays: 0, vacationDaysUsed: 0, pendingDays: 0 }
+    const entriesArray = Array.isArray(timeOffEntries) ? timeOffEntries : []
     
     const currentYear = new Date().getFullYear()
     return {
-      totalDays: calculateTotalDays(timeOffEntries, undefined, 'approved'),
-      vacationDaysUsed: calculateVacationDaysUsed(currentYear, timeOffEntries),
-      pendingDays: calculateTotalDays(timeOffEntries, undefined, 'pending')
+      totalDays: calculateTotalDays(entriesArray, undefined, 'approved'),
+      vacationDaysUsed: calculateVacationDaysUsed(currentYear, entriesArray),
+      pendingDays: calculateTotalDays(entriesArray, undefined, 'pending')
     }
   }, [timeOffEntries, calculateTotalDays, calculateVacationDaysUsed])
 
@@ -217,9 +217,9 @@ export function TimeOffManager({ member, organizationId, canEdit }: TimeOffManag
 
   // Get time-off entries for a specific date
   const getEntriesForDate = useCallback((date: Date): TimeOffEntry[] => {
-    if (!timeOffEntries) return []
+    const entriesArray = Array.isArray(timeOffEntries) ? timeOffEntries : []
     
-    return timeOffEntries.filter(entry => {
+    return entriesArray.filter(entry => {
       const entryStart = new Date(entry.startDate)
       const entryEnd = new Date(entry.endDate)
       return date >= entryStart && date <= entryEnd
