@@ -330,6 +330,10 @@ const DraggableSprintColumn = ({
                         className={`hover:shadow-lg transition-all border-l-4 bg-white ${column.isDone ? 'border-l-green-400 opacity-75' : 'border-l-blue-400'
                           }`}
                       />
+                      {/* Debug task data */}
+                      <div style={{display: 'none'}}>
+                        Task {task.id}: labels={JSON.stringify(task.taskLabels)}, comments={task._count?.comments}, attachments={task._count?.attachments}
+                      </div>
                     ))}
                     {columnTasks.length === 0 && !showInlineForm && (
                       <div className="text-center text-sm text-muted-foreground py-12 border-2 border-dashed border-gray-200 rounded-lg bg-gray-50/30">
@@ -545,6 +549,15 @@ export default function SprintBacklogView({
   const getTasksByColumn = (columnId: string) => {
     const column = columns.find(c => c.id === columnId)
     if (!column) return []
+
+    // Debug: Log the first task to see what data we have
+    if (column.tasks.length > 0) {
+      console.log('🔍 Sprint column tasks sample:', JSON.stringify(column.tasks[0], null, 2))
+      console.log('🔢 Sample task _count:', column.tasks[0]._count)
+      console.log('🏷️ Sample task taskLabels:', column.tasks[0].taskLabels)
+      console.log('💬 Comments count passed to TaskCard:', column.tasks[0]._count?.comments || 0)
+      console.log('📎 Files count passed to TaskCard:', column.tasks[0]._count?.attachments || 0)
+    }
 
     // Filter column tasks based on search and filter criteria
     return column.tasks.filter(task => {
@@ -851,6 +864,33 @@ export default function SprintBacklogView({
           <Button onClick={() => setIsAddColumnOpen(true)} className="bg-blue-600 hover:bg-blue-700">
             <Plus className="h-4 w-4 mr-2" />
             Add Column
+          </Button>
+          
+          <Button onClick={() => {
+            console.log('Manual refresh - current columns:', columns)
+            mutateColumns()
+          }} variant="outline">
+            Debug Refresh
+          </Button>
+          
+          <Button onClick={async () => {
+            console.log('🧪 Testing API directly...')
+            try {
+              const response = await fetch(`/api/sprints/${sprint.id}/columns`)
+              const data = await response.json()
+              console.log('🧪 API Response:', JSON.stringify(data, null, 2))
+              
+              if (data.length > 0 && data[0].tasks.length > 0) {
+                const firstTask = data[0].tasks[0]
+                console.log('🧪 First task from API:', JSON.stringify(firstTask, null, 2))
+                console.log('🧪 First task _count:', firstTask._count)
+                console.log('🧪 First task taskLabels:', firstTask.taskLabels)
+              }
+            } catch (error) {
+              console.error('🧪 API Error:', error)
+            }
+          }} variant="outline">
+            Test API
           </Button>
         </div>
       </div>
