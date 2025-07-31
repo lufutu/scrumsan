@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -163,26 +163,7 @@ const DraggableTask = ({ task, index, onTaskClick, boardId, onTaskUpdate, ...pro
   )
 }
 
-interface DraggableSprintColumnProps {
-  column: SprintColumn
-  index: number
-  columnTasks: unknown[]
-  onTaskClick: (task: unknown) => void
-  onRefresh: () => void
-  organizationId?: string
-  boardId: string
-  handleRenameColumn: (columnId: string, newName: string) => void
-  handleMarkColumnAsDone: (columnId: string, isDone: boolean) => void
-  handleSetColumnLimit: (columnId: string, limit: number) => void
-  handleExportColumn: (columnId: string, format: 'csv' | 'json') => void
-  handleDeleteColumn: (columnId: string) => void
-  handleAddTask: (data: any, columnId: string) => Promise<void>
-  sprint: Sprint
-  users: User[]
-  labels: Label[]
-}
-
-const DraggableSprintColumn: React.FC<DraggableSprintColumnProps> = ({
+const DraggableSprintColumn = ({
   column,
   index,
   columnTasks,
@@ -199,6 +180,23 @@ const DraggableSprintColumn: React.FC<DraggableSprintColumnProps> = ({
   sprint,
   users,
   labels
+}: {
+  column: SprintColumn
+  index: number
+  columnTasks: unknown[]
+  onTaskClick: (task: unknown) => void
+  onRefresh: () => void
+  organizationId?: string
+  boardId: string
+  handleRenameColumn: (columnId: string, newName: string) => void
+  handleMarkColumnAsDone: (columnId: string, isDone: boolean) => void
+  handleSetColumnLimit: (columnId: string, limit: number) => void
+  handleExportColumn: (columnId: string, format: 'csv' | 'json') => void
+  handleDeleteColumn: (columnId: string) => void
+  handleAddTask: (data: any, columnId: string) => Promise<void>
+  sprint: Sprint
+  users: User[]
+  labels: Label[]
 }) => {
   const [showInlineForm, setShowInlineForm] = useState(false)
   const isLimitExceeded = column.wipLimit && columnTasks.length > column.wipLimit
@@ -322,6 +320,7 @@ const DraggableSprintColumn: React.FC<DraggableSprintColumnProps> = ({
 
                   {/* Column Content */}
                   <div className="space-y-3 p-4 min-h-[600px]">
+                    {/* Render Tasks */}
                     {columnTasks.map((task, taskIndex) => (
                       <DraggableTask
                         key={task.id}
@@ -334,11 +333,8 @@ const DraggableSprintColumn: React.FC<DraggableSprintColumnProps> = ({
                         className={`hover:shadow-lg transition-all border-l-4 bg-white ${column.isDone ? 'border-l-green-400 opacity-75' : 'border-l-blue-400'
                           }`}
                       />
-                      {/* Debug task data */}
-                      <div style={{display: 'none'}}>
-                        Task {task.id}: labels={JSON.stringify(task.taskLabels)}, comments={task._count?.comments}, attachments={task._count?.attachments}
-                      </div>
                     ))}
+                  
                     {columnTasks.length === 0 && !showInlineForm && (
                       <div className="text-center text-sm text-muted-foreground py-12 border-2 border-dashed border-gray-200 rounded-lg bg-gray-50/30">
                         <div className="flex flex-col items-center gap-2">
@@ -418,6 +414,7 @@ export default function SprintBacklogView({
   const [labels, setLabels] = useState<Label[]>([])
 
   // Use sprint columns hook
+  console.log('🔍 Sprint ID for useSprintColumns:', sprint.id)
   const {
     columns: originalColumns,
     isLoading: columnsLoading,
@@ -428,6 +425,26 @@ export default function SprintBacklogView({
     initializeDefaultColumns,
     mutate: mutateColumns
   } = useSprintColumns(sprint.id)
+  
+  console.log('🔍 Sprint columns hook result:', { 
+    columnsLength: originalColumns?.length, 
+    isLoading: columnsLoading,
+    columns: originalColumns 
+  })
+  
+  // Debug: Log each column and its tasks
+  originalColumns?.forEach((column, index) => {
+    console.log(`🔍 Column ${index} (${column.name}):`, {
+      id: column.id,
+      tasksCount: column.tasks?.length || 0,
+      tasks: column.tasks?.map(task => ({
+        id: task.id,
+        title: task.title,
+        commentsCount: task._count?.comments || 0,
+        labelsCount: task.taskLabels?.length || 0
+      })) || []
+    })
+  })
 
   // Use the columns from the hook (SWR will handle optimistic updates)
   const columns = originalColumns
