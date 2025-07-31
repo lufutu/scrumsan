@@ -30,6 +30,8 @@ import { useUsers } from '@/hooks/useUsers';
 import { useLabels } from '@/hooks/useLabels';
 import { useSupabase } from '@/providers/supabase-provider';
 import { useComments } from '@/hooks/useComments';
+import { useAttachments } from '@/hooks/useAttachments';
+import { useChecklists } from '@/hooks/useChecklists';
 import { toast } from 'sonner';
 
 import { TaskCardProps as TaskCardModernProps } from '@/types/shared';
@@ -122,11 +124,20 @@ export function TaskCardModern({
   // Fetch comments
   const { comments, loading: loadingComments, mutate: mutateComments } = useComments(id);
   
-  // Use actual comments length as the source of truth for count
+  // Fetch attachments
+  const { attachments, loading: loadingAttachments, mutate: mutateAttachments } = useAttachments(id);
+  
+  // Fetch checklists
+  const { checklists, totalItems, completedItems, checklistsCount: actualChecklistsCount, loading: loadingChecklists, mutate: mutateChecklists } = useChecklists(id);
+  
+  // Use actual data length as the source of truth for counts
   const actualCommentsCount = comments.length;
+  const actualFilesCount = attachments.length;
+  const actualChecklistItemsCount = actualChecklistsCount;
+  const actualCompletedChecklists = completedItems;
 
-  const checklistProgress = checklistsCount ?
-    Math.round((completedChecklists || 0) / checklistsCount * 100) : 0;
+  const checklistProgress = totalItems > 0 ?
+    Math.round((actualCompletedChecklists / totalItems) * 100) : 0;
 
   const filteredMembers = organizationMembers?.filter(member =>
     member.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -388,6 +399,9 @@ export function TaskCardModern({
       const newComment = quickComment + (quickComment ? '\n\n' : '') + imageMarkdown;
       setQuickComment(newComment);
 
+      // Refresh attachments data
+      mutateAttachments();
+      
       toast.success(`${imageFiles.length} image(s) uploaded`);
     } catch (error) {
       toast.error('Failed to upload images');
@@ -969,7 +983,7 @@ export function TaskCardModern({
                   onClick={(e) => e.stopPropagation()}
                 >
                   <Paperclip className="h-5 w-5" />
-                  <span>{filesCount || 0}</span>
+                  <span>{actualFilesCount}</span>
                 </button>
               </PopoverTrigger>
               <PopoverContent className="w-64 p-4" align="start">
@@ -999,7 +1013,7 @@ export function TaskCardModern({
                   onClick={(e) => e.stopPropagation()}
                 >
                   <ListTodo className="h-5 w-5" />
-                  <span>{checklistsCount > 0 ? `${completedChecklists || 0}/${checklistsCount}` : '0'}</span>
+                  <span>{totalItems > 0 ? `${actualCompletedChecklists}/${totalItems}` : '0'}</span>
                 </button>
               </PopoverTrigger>
               <PopoverContent className="w-64 p-4" align="start">
@@ -1111,7 +1125,7 @@ export function TaskCardModern({
       </div>
 
       {/* Checklist Progress Bar */}
-      {checklistsCount > 0 && (
+      {totalItems > 0 && (
         <div className="px-3 pb-3">
           <div className="w-full bg-gray-200 rounded-full h-1">
             <div
