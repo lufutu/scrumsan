@@ -102,7 +102,7 @@ interface Label {
 
 
 
-const DraggableTask = ({ task, index, onTaskClick, boardId, onTaskUpdate, ...props }: any) => {
+const DraggableTask = ({ task, index, onTaskClick, boardId, onTaskUpdate, mutateColumns, ...props }: any) => {
   return (
     <Draggable draggableId={task.id} index={index}>
       {(provided, snapshot) => {
@@ -179,7 +179,8 @@ const DraggableSprintColumn = ({
   handleAddTask,
   sprint,
   users,
-  labels
+  labels,
+  mutateColumns
 }: {
   column: SprintColumn
   index: number
@@ -197,6 +198,7 @@ const DraggableSprintColumn = ({
   sprint: Sprint
   users: User[]
   labels: Label[]
+  mutateColumns: () => void
 }) => {
   const [showInlineForm, setShowInlineForm] = useState(false)
   const isLimitExceeded = column.wipLimit && columnTasks.length > column.wipLimit
@@ -329,6 +331,7 @@ const DraggableSprintColumn = ({
                         onTaskClick={onTaskClick}
                         boardId={boardId}
                         onTaskUpdate={onRefresh}
+                        mutateColumns={mutateColumns}
                         organizationId={organizationId}
                         className={`hover:shadow-lg transition-all border-l-4 bg-white ${column.isDone ? 'border-l-green-400 opacity-75' : 'border-l-blue-400'
                           }`}
@@ -923,6 +926,7 @@ export default function SprintBacklogView({
                       sprint={sprint}
                       users={users}
                       labels={labels}
+                      mutateColumns={mutateColumns}
                     />
                   )
                 }
@@ -936,7 +940,7 @@ export default function SprintBacklogView({
       </ScrollArea>
 
     </div>
-  ), [columns, searchTerm, activeId, handleDragStart, handleDragEnd, getTasksByColumn, onRefresh, organizationId, boardId, handleRenameColumn, handleMarkColumnAsDone, handleSetColumnLimit, handleExportColumn, handleDeleteColumn, handleAddTask, sprint, users, labels])
+  ), [columns, searchTerm, activeId, handleDragStart, handleDragEnd, getTasksByColumn, onRefresh, organizationId, boardId, handleRenameColumn, handleMarkColumnAsDone, handleSetColumnLimit, handleExportColumn, handleDeleteColumn, handleAddTask, sprint, users, labels, mutateColumns])
 
   return (
     <div className=""
