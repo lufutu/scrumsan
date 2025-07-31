@@ -112,18 +112,24 @@ export function DescriptionField({
       })
 
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to upload image')
+        const errorData = await response.json().catch(() => ({ error: 'Upload failed' }))
+        throw new Error(errorData.error || `Upload failed with status ${response.status}`)
       }
 
       const attachments = await response.json()
+      
+      // Handle both single attachment and array responses
       const attachment = Array.isArray(attachments) ? attachments[0] : attachments
       
-      // Insert image markdown
-      const imageMarkdown = `![${file.name}](${attachment.url})`
+      if (!attachment || !attachment.url) {
+        throw new Error('No attachment data received from server')
+      }
+      
+      // Insert image markdown - use the attachment's URL which should be properly signed
+      const imageMarkdown = `![${attachment.name || file.name}](${attachment.url})`
       insertText(imageMarkdown)
       
-      toast.success('Image uploaded successfully')
+      toast.success(`Image "${attachment.name || file.name}" uploaded successfully`)
     } catch (error) {
       console.error('Error uploading image:', error)
       toast.error(error instanceof Error ? error.message : 'Failed to upload image')
@@ -165,24 +171,23 @@ export function DescriptionField({
     }
   }, [handleImageUpload])
 
-  // Simple markdown renderer for display
+  // Simple markdown renderer for display (unused in current implementation)
   const renderMarkdown = (text: string) => {
     if (!text) return null
     
-    // Convert markdown to HTML (basic implementation)
+    // Convert markdown to HTML with proper order to avoid conflicts
     let html = text
-      // Images
+      // Images and links first
       .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" class="max-w-full h-auto my-2 rounded" />')
-      // Links
       .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:text-blue-800 underline">$1</a>')
+      // Code blocks
+      .replace(/`([^`]+)`/g, '<code class="bg-slate-100 px-1 py-0.5 rounded text-sm font-mono">$1</code>')
       // Bold
       .replace(/\*\*([^*]+)\*\*/g, '<strong class="font-semibold">$1</strong>')
       .replace(/__([^_]+)__/g, '<strong class="font-semibold">$1</strong>')
-      // Italic
-      .replace(/\*([^*]+)\*/g, '<em class="italic">$1</em>')
-      .replace(/_([^_]+)_/g, '<em class="italic">$1</em>')
-      // Inline code
-      .replace(/`([^`]+)`/g, '<code class="bg-slate-100 px-1 py-0.5 rounded text-sm font-mono">$1</code>')
+      // Italic (asterisks only to avoid filename conflicts)
+      .replace(/\*([^*\s][^*]*[^*\s])\*/g, '<em class="italic">$1</em>')
+      .replace(/\*([^*\s])\*/g, '<em class="italic">$1</em>')
       // Line breaks
       .replace(/\n/g, '<br>')
 
@@ -393,20 +398,20 @@ export function DescriptionDisplay({ content, className = "" }: DescriptionDispl
     return null
   }
 
-  // Convert markdown to HTML (enhanced version)
+  // Convert markdown to HTML with proper order to avoid conflicts
   let html = content
-    // Images
+    // First, handle images and links (before italic processing to avoid conflicts)
     .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" class="max-w-full h-auto my-2 rounded shadow-sm" />')
-    // Links
     .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:text-blue-800 underline">$1</a>')
-    // Bold
+    // Handle code blocks first (to protect content from other formatting)
+    .replace(/```([^`]+)```/g, '<pre class="bg-slate-100 p-3 rounded-md my-2 overflow-x-auto"><code>$1</code></pre>')
+    .replace(/`([^`]+)`/g, '<code class="bg-slate-100 px-1 py-0.5 rounded text-sm font-mono">$1</code>')
+    // Bold (double asterisks and underscores)
     .replace(/\*\*([^*]+)\*\*/g, '<strong class="font-semibold">$1</strong>')
     .replace(/__([^_]+)__/g, '<strong class="font-semibold">$1</strong>')
-    // Italic
-    .replace(/\*([^*]+)\*/g, '<em class="italic">$1</em>')
-    .replace(/_([^_]+)_/g, '<em class="italic">$1</em>')
-    // Inline code
-    .replace(/`([^`]+)`/g, '<code class="bg-slate-100 px-1 py-0.5 rounded text-sm font-mono">$1</code>')
+    // Italic (single asterisks only - avoid single underscores to prevent filename conflicts)
+    .replace(/\*([^*\s][^*]*[^*\s])\*/g, '<em class="italic">$1</em>')
+    .replace(/\*([^*\s])\*/g, '<em class="italic">$1</em>')
     // Line breaks
     .replace(/\n/g, '<br>')
 
