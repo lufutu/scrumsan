@@ -69,6 +69,8 @@ import { Search } from 'lucide-react';
 import { format } from 'date-fns';
 import { TaskFollowers } from '@/components/tasks/task-followers';
 import { TaskActivities } from '@/components/tasks/task-activities';
+import { EnhancedDescriptionField } from '@/components/ui/enhanced-description-field';
+import { MarkdownRenderer } from '@/components/ui/markdown-renderer';
 
 type Task = Tables<'tasks'> & {
   taskAssignees?: {
@@ -830,11 +832,11 @@ export function ItemModal({
                   <Label className="text-sm font-semibold text-slate-700 mb-3 block">DESCRIPTION</Label>
                   {editingDescription ? (
                     <div className="space-y-3">
-                      <Textarea
+                      <EnhancedDescriptionField
                         value={description}
-                        onChange={(e) => setDescription(e.target.value)}
-                        className="min-h-[120px] resize-none border-slate-200 focus:border-emerald-500 focus:ring-emerald-500"
+                        onChange={setDescription}
                         placeholder="Add a detailed description..."
+                        taskId={task?.id}
                       />
                       <div className="flex gap-2">
                         <Button type="button" size="sm" onClick={handleSaveDescription} disabled={isSaving}>
@@ -855,7 +857,7 @@ export function ItemModal({
                       onClick={() => setEditingDescription(true)}
                     >
                       {description ? (
-                        <p className="text-slate-700 whitespace-pre-wrap">{description}</p>
+                        <MarkdownRenderer content={description} className="text-slate-700" />
                       ) : (
                         <p className="text-slate-400 italic">Click to add a description...</p>
                       )}
