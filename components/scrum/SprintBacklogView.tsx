@@ -144,6 +144,8 @@ const DraggableTask = ({ task, index, onTaskClick, boardId, onTaskUpdate, ...pro
                   name: tl.label.name,
                   color: tl.label.color || '#6B7280'
                 })) : []}
+                commentsCount={task._count?.comments || 0}
+                filesCount={task._count?.attachments || 0}
                 organizationId={props.organizationId}
                 boardId={boardId}
                 onClick={!isDragging ? () => onTaskClick?.(task) : undefined}

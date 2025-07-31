@@ -62,9 +62,27 @@ export async function GET(
                   select: {
                     id: true,
                     fullName: true,
+                    email: true,
                     avatarUrl: true
                   }
                 }
+              }
+            },
+            taskLabels: {
+              include: {
+                label: {
+                  select: {
+                    id: true,
+                    name: true,
+                    color: true
+                  }
+                }
+              }
+            },
+            _count: {
+              select: {
+                comments: true,
+                attachments: true
               }
             }
           }
