@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth-utils'
 import { z } from 'zod'
+import { unstable_cache, revalidateTag } from 'next/cache'
 
 const boardUpdateSchema = z.object({
   name: z.string().min(1).optional(),
@@ -11,15 +12,9 @@ const boardUpdateSchema = z.object({
   boardType: z.enum(['kanban', 'scrum']).optional(),
 })
 
-export async function GET(
-  req: NextRequest,
-  { params }: { params: Promise<{ boardId: string }> }
-) {
-  try {
-    const supabase = await createClient()
-    const user = await getCurrentUser(supabase)
-    const { boardId } = await params
-    
+// Cached board data fetching function
+const getCachedBoardData = unstable_cache(
+  async (boardId: string, userId: string) => {
     // Find the board with all related data
     const board = await prisma.board.findUnique({
       where: { id: boardId },
@@ -105,24 +100,45 @@ export async function GET(
     })
 
     if (!board) {
-      return NextResponse.json(
-        { error: 'Board not found' },
-        { status: 404 }
-      )
+      return null
     }
 
     // Check if user is a member of the organization
     const orgMember = await prisma.organizationMember.findFirst({
       where: {
         organizationId: board.organizationId,
-        userId: user.id
+        userId: userId
       }
     })
     
     if (!orgMember) {
+      return null
+    }
+
+    return board
+  },
+  ['board-data'],
+  {
+    revalidate: 30 // Cache for 30 seconds
+  }
+)
+
+export async function GET(
+  req: NextRequest,
+  { params }: { params: Promise<{ boardId: string }> }
+) {
+  try {
+    const supabase = await createClient()
+    const user = await getCurrentUser(supabase)
+    const { boardId } = await params
+    
+    // Use cached board data
+    const board = await getCachedBoardData(boardId, user.id)
+
+    if (!board) {
       return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 403 }
+        { error: 'Board not found or unauthorized' },
+        { status: 404 }
       )
     }
 
@@ -204,6 +220,9 @@ export async function PATCH(
         }
       }
     })
+    
+    // Invalidate the cache for this board
+    revalidateTag('board-data')
     
     return NextResponse.json(updatedBoard)
   } catch (error: unknown) {

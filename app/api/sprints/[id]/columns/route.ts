@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth-utils'
 import { z } from 'zod'
+import { unstable_cache, revalidateTag } from 'next/cache'
 
 const sprintColumnCreateSchema = z.object({
   name: z.string().min(1, 'Column name is required'),
@@ -11,15 +12,9 @@ const sprintColumnCreateSchema = z.object({
   wipLimit: z.number().int().min(0).optional()
 })
 
-export async function GET(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id: sprintId } = await params
-    const supabase = await createClient()
-    const user = await getCurrentUser(supabase)
-    
+// Cached sprint columns fetching function
+const getCachedSprintColumns = unstable_cache(
+  async (sprintId: string, userId: string) => {
     // Check if user has access to the sprint
     const sprint = await prisma.sprint.findUnique({
       where: { id: sprintId },
@@ -27,7 +22,7 @@ export async function GET(
     })
     
     if (!sprint) {
-      return NextResponse.json({ error: 'Sprint not found' }, { status: 404 })
+      return null
     }
     
     // Check if user has access to the board through organization membership
@@ -40,12 +35,12 @@ export async function GET(
       const orgMember = await prisma.organizationMember.findFirst({
         where: {
           organizationId: board.organizationId,
-          userId: user.id
+          userId: userId
         }
       })
       
       if (!orgMember) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+        return null
       }
     }
     
@@ -99,6 +94,29 @@ export async function GET(
       }
     })
     
+    return columns
+  },
+  ['sprint-columns'],
+  {
+    revalidate: 30 // Cache for 30 seconds
+  }
+)
+
+export async function GET(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id: sprintId } = await params
+    const supabase = await createClient()
+    const user = await getCurrentUser(supabase)
+    
+    // Use cached sprint columns data
+    const columns = await getCachedSprintColumns(sprintId, user.id)
+    
+    if (columns === null) {
+      return NextResponse.json({ error: 'Sprint not found or unauthorized' }, { status: 404 })
+    }
     
     return NextResponse.json(columns)
   } catch (error: unknown) {
@@ -208,6 +226,9 @@ export async function POST(
         }
       }
     })
+    
+    // Invalidate the cache for sprint columns
+    revalidateTag('sprint-columns')
     
     return NextResponse.json(column)
   } catch (error: unknown) {
