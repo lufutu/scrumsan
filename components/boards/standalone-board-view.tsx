@@ -5,14 +5,35 @@ import { useToast } from '@/hooks/use-toast'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import { GripVertical, Plus } from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu'
+import { GripVertical, Plus, MoreHorizontal, Edit, Trash2 } from 'lucide-react'
 import { TaskCardModern } from '@/components/scrum/TaskCardModern'
 import TaskCreationDialog from '@/components/common/TaskCreationDialog'
 import { ComprehensiveInlineForm } from '@/components/scrum/ComprehensiveInlineForm'
 import { ItemModal } from '@/components/scrum/ItemModal'
 import { useUsers } from '@/hooks/useUsers'
 import { useLabels } from '@/hooks/useLabels'
+import { useBoardColumns } from '@/hooks/useBoardColumns'
 import { Task } from '@/types/shared'
+import { toast } from 'sonner'
 import {
   DragDropContext,
   Droppable,
@@ -60,11 +81,15 @@ interface StandaloneBoardViewProps {
 }
 
 export default function StandaloneBoardView({ board, onUpdate }: StandaloneBoardViewProps) {
-  const { toast } = useToast()
+  const { toast: uiToast } = useToast()
   const [showInlineForm, setShowInlineForm] = useState<{[key: string]: boolean}>({})
   const [selectedTask, setSelectedTask] = useState<any | null>(null)
+  const [isAddColumnOpen, setIsAddColumnOpen] = useState(false)
+  const [newColumnName, setNewColumnName] = useState('')
+  const [columnToDelete, setColumnToDelete] = useState<string | null>(null)
   const { users } = useUsers({ organizationId: board.organizationId })
   const { labels } = useLabels(board.id)
+  const { createColumn, updateColumn, deleteColumn, mutate: mutateColumns } = useBoardColumns(board.id)
   console.log("board", board, labels)
 
   // Drag and drop handlers for @hello-pangea/dnd
@@ -124,7 +149,7 @@ export default function StandaloneBoardView({ board, onUpdate }: StandaloneBoard
 
       if (!response.ok) throw new Error('Failed to update task')
 
-      toast({
+      uiToast({
         title: "Success",
         description: "Task moved successfully"
       })
@@ -135,10 +160,48 @@ export default function StandaloneBoardView({ board, onUpdate }: StandaloneBoard
       board.columns = originalColumns
       onUpdate()
       
-      toast({
+      uiToast({
         title: "Error",
         description: "Failed to move task"
       })
+    }
+  }
+
+  // Column CRUD handlers
+  const handleAddColumn = async () => {
+    if (!newColumnName.trim()) return
+
+    try {
+      await createColumn({
+        name: newColumnName.trim(),
+        position: board.columns?.length || 0,
+      })
+      setNewColumnName('')
+      setIsAddColumnOpen(false)
+      toast.success('Column added successfully')
+      onUpdate() // Refresh board data
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : 'Failed to add column')
+    }
+  }
+
+  const handleDeleteColumn = async (columnId: string) => {
+    try {
+      await deleteColumn(columnId)
+      toast.success('Column deleted successfully')
+      onUpdate() // Refresh board data
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : 'Failed to delete column')
+    }
+  }
+
+  const handleRenameColumn = async (columnId: string, newName: string) => {
+    try {
+      await updateColumn(columnId, { name: newName })
+      toast.success('Column renamed successfully')
+      onUpdate() // Refresh board data
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : 'Failed to rename column')
     }
   }
 
@@ -175,6 +238,30 @@ export default function StandaloneBoardView({ board, onUpdate }: StandaloneBoard
                             {column.name} ({column.tasks.length})
                           </CardTitle>
                         </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm" className="hover:bg-gray-100">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => {
+                              const newName = prompt('Enter new column name:', column.name)
+                              if (newName && newName.trim()) handleRenameColumn(column.id, newName.trim())
+                            }}>
+                              <Edit className="h-4 w-4 mr-2" />
+                              Rename Column
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={() => setColumnToDelete(column.id)}
+                              className="text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete Column
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </CardHeader>
                   
@@ -282,13 +369,13 @@ export default function StandaloneBoardView({ board, onUpdate }: StandaloneBoard
                                       
                                       onUpdate();
                                       setShowInlineForm(prev => ({ ...prev, [column.id]: false }));
-                                      toast({
+                                      uiToast({
                                         title: "Success",
                                         description: "Task created successfully"
                                       });
                                     } catch (err: any) {
                                       console.error('Error creating task:', err)
-                                      toast({
+                                      uiToast({
                                         title: "Error",
                                         description: "Failed to create task"
                                       })
@@ -334,7 +421,13 @@ export default function StandaloneBoardView({ board, onUpdate }: StandaloneBoard
           </div>
           
           <div className="flex gap-2">
-            {/* Add buttons removed - using inline add in columns */}
+            <Button 
+              onClick={() => setIsAddColumnOpen(true)}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Column
+            </Button>
           </div>
         </div>
 
@@ -351,6 +444,30 @@ export default function StandaloneBoardView({ board, onUpdate }: StandaloneBoard
                           {column.name} ({column.tasks.length})
                         </CardTitle>
                       </div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm" className="hover:bg-gray-100">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => {
+                            const newName = prompt('Enter new column name:', column.name)
+                            if (newName && newName.trim()) handleRenameColumn(column.id, newName.trim())
+                          }}>
+                            <Edit className="h-4 w-4 mr-2" />
+                            Rename Column
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onClick={() => setColumnToDelete(column.id)}
+                            className="text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete Column
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                   </CardHeader>
                   
@@ -450,13 +567,13 @@ export default function StandaloneBoardView({ board, onUpdate }: StandaloneBoard
                                     
                                     onUpdate();
                                     setShowInlineForm(prev => ({ ...prev, [column.id]: false }));
-                                    toast({
+                                    uiToast({
                                       title: "Success",
                                       description: "Task created successfully"
                                     });
                                   } catch (err: unknown) {
                                     console.error('Error creating task:', err)
-                                    toast({
+                                    uiToast({
                                       title: "Error",
                                       description: "Failed to create task"
                                     })
@@ -500,6 +617,62 @@ export default function StandaloneBoardView({ board, onUpdate }: StandaloneBoard
             }}
           />
         )}
+
+        {/* Add Column Dialog */}
+        <Dialog open={isAddColumnOpen} onOpenChange={setIsAddColumnOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Add New Column</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="column-name">Column Name</Label>
+                <Input
+                  id="column-name"
+                  value={newColumnName}
+                  onChange={(e) => setNewColumnName(e.target.value)}
+                  placeholder="Enter column name..."
+                  className="border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 pt-4 border-t">
+              <Button variant="outline" onClick={() => setIsAddColumnOpen(false)} className="px-4">
+                Cancel
+              </Button>
+              <Button onClick={handleAddColumn} disabled={!newColumnName.trim()} className="px-4 bg-blue-600 hover:bg-blue-700">
+                Add Column
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete Column Confirmation Dialog */}
+        <AlertDialog open={!!columnToDelete} onOpenChange={() => setColumnToDelete(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Column</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete this column? This action cannot be undone.
+                All tasks in this column will need to be moved to another column first.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  if (columnToDelete) {
+                    handleDeleteColumn(columnToDelete)
+                    setColumnToDelete(null)
+                  }
+                }}
+                className="bg-destructive hover:bg-destructive/90"
+              >
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </DragDropContext>
   )
