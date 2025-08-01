@@ -257,16 +257,48 @@ export default function EnhancedScrumBoard({
 
     const overId = destination.droppableId
 
+    // Store original state for rollback on error
+    const originalBacklogTasks = [...backlogTasks]
+    const originalSprintColumns = sprintColumns.map(col => ({ ...col, tasks: [...col.tasks] }))
+
     try {
       // If dropping on backlog
       if (overId === 'backlog') {
-        // Remove from sprint if it was in one
         if (activeSprint && draggedTask.sprintColumnId) {
-          await fetch(`/api/sprints/${activeSprint.id}/tasks/${draggedTask.id}`, {
+          // OPTIMISTIC UPDATE: Immediately move task to backlog
+          const updatedTask = { 
+            ...draggedTask, 
+            sprintColumnId: null, 
+            sprintId: null 
+          }
+          
+          // Remove from sprint column
+          const updatedSprintColumns = sprintColumns.map(col => ({
+            ...col,
+            tasks: col.tasks.filter(task => task.id !== draggedTask.id)
+          }))
+          
+          // Add to backlog
+          const updatedBacklogTasks = [...backlogTasks, updatedTask]
+          
+          // Update UI immediately
+          setSprintColumns(updatedSprintColumns)
+          setBacklogTasks(updatedBacklogTasks)
+
+          // Make API call in background
+          fetch(`/api/sprints/${activeSprint.id}/tasks/${draggedTask.id}`, {
             method: 'DELETE'
           })
-          toast.success('Task moved to backlog')
-          fetchData()
+          .then(response => {
+            if (!response.ok) throw new Error('Failed to move task to backlog')
+            toast.success('Task moved to backlog')
+          })
+          .catch(error => {
+            // Rollback on error
+            setSprintColumns(originalSprintColumns)
+            setBacklogTasks(originalBacklogTasks)
+            toast.error(error instanceof Error ? error.message : 'Failed to move task to backlog')
+          })
         }
         return
       }
@@ -274,29 +306,88 @@ export default function EnhancedScrumBoard({
       // If dropping on a sprint column
       const targetColumn = sprintColumns.find(col => col.id === overId)
       if (targetColumn && activeSprint) {
+        // OPTIMISTIC UPDATE: Immediately move task to target column
+        const updatedTask = { 
+          ...draggedTask, 
+          sprintColumnId: overId, 
+          sprintId: activeSprint.id 
+        }
+
+        let updatedBacklogTasks = backlogTasks
+        let updatedSprintColumns = [...sprintColumns]
+
+        // Remove from backlog if it was there
+        if (!draggedTask.sprintColumnId) {
+          updatedBacklogTasks = backlogTasks.filter(task => task.id !== draggedTask.id)
+        } else {
+          // Remove from current sprint column
+          updatedSprintColumns = updatedSprintColumns.map(col => ({
+            ...col,
+            tasks: col.tasks.filter(task => task.id !== draggedTask.id)
+          }))
+        }
+
+        // Add to target column
+        updatedSprintColumns = updatedSprintColumns.map(col => {
+          if (col.id === overId) {
+            return {
+              ...col,
+              tasks: [...col.tasks, updatedTask]
+            }
+          }
+          return col
+        })
+
+        // Update UI immediately
+        setBacklogTasks(updatedBacklogTasks)
+        setSprintColumns(updatedSprintColumns)
+
+        // Make API calls in background
+        const apiCalls = []
+
         // Add to sprint if not already in it
         if (!draggedTask.sprintColumnId) {
-          await fetch(`/api/sprints/${activeSprint.id}/tasks`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ taskId: draggedTask.id })
-          })
+          apiCalls.push(
+            fetch(`/api/sprints/${activeSprint.id}/tasks`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ taskId: draggedTask.id })
+            })
+          )
         }
 
         // Move to target column
-        await fetch(`/api/sprints/${activeSprint.id}/tasks/move`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            taskId: draggableId,
-            targetColumnId: overId
+        apiCalls.push(
+          fetch(`/api/sprints/${activeSprint.id}/tasks/move`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              taskId: draggableId,
+              targetColumnId: overId
+            })
           })
-        })
+        )
 
-        toast.success('Task moved successfully')
-        fetchData()
+        Promise.all(apiCalls)
+          .then(responses => {
+            // Check if all responses are ok
+            const failedResponse = responses.find(response => !response.ok)
+            if (failedResponse) {
+              throw new Error('Failed to move task')
+            }
+            toast.success('Task moved successfully')
+          })
+          .catch(error => {
+            // Rollback on error
+            setBacklogTasks(originalBacklogTasks)
+            setSprintColumns(originalSprintColumns)
+            toast.error(error instanceof Error ? error.message : 'Failed to move task')
+          })
       }
     } catch (error: unknown) {
+      // Rollback on immediate error
+      setBacklogTasks(originalBacklogTasks)
+      setSprintColumns(originalSprintColumns)
       toast.error(error instanceof Error ? error.message : 'Failed to move task')
     }
   }
