@@ -723,38 +723,40 @@ export default function SprintBacklogView({
       const destinationIndex = destination.index
       const columnId = draggableId.replace('column-', '')
 
-      // Optimistically update columns using SWR
-      const newColumns = [...originalColumns]
-      const [movedColumn] = newColumns.splice(sourceIndex, 1)
-      newColumns.splice(destinationIndex, 0, movedColumn)
+      // Store original state for rollback
+      const originalColumnsState = [...originalColumns]
 
-      // Use SWR's optimistic update
-      mutateColumns(
-        async () => {
-          // Call API to update column positions
-          const response = await fetch(`/api/sprints/${sprint.id}/columns/${columnId}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ position: destinationIndex })
-          })
+      try {
+        // OPTIMISTIC UPDATE: Immediately reorder columns
+        const updatedColumns = [...originalColumns]
+        const [movedColumn] = updatedColumns.splice(sourceIndex, 1)
+        updatedColumns.splice(destinationIndex, 0, movedColumn)
 
-          if (!response.ok) {
-            throw new Error('Failed to reorder column')
-          }
+        // Update UI immediately
+        mutateColumns(updatedColumns, { revalidate: false })
 
-          toast.success('Column reordered successfully')
-          // Return the updated data
-          return newColumns
-        },
-        {
-          optimisticData: newColumns,
-          rollbackOnError: true,
-          revalidate: true
+        // Make API call in background
+        const response = await fetch(`/api/sprints/${sprint.id}/columns/${columnId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ position: destinationIndex })
+        })
+
+        if (!response.ok) {
+          throw new Error('Failed to reorder column')
         }
-      ).catch((error: unknown) => {
+
+        // Success - revalidate to get latest data
+        mutateColumns()
+        toast.success('Column reordered successfully')
+        
+      } catch (error: unknown) {
         console.error('Error reordering column:', error)
+        
+        // Rollback on error - restore original state
+        mutateColumns(originalColumnsState, { revalidate: false })
         toast.error('Failed to reorder column')
-      })
+      }
       return
     }
 
@@ -762,6 +764,9 @@ export default function SprintBacklogView({
     const taskId = draggableId
     const targetColumnId = destination.droppableId
     const sourceColumnId = source.droppableId
+
+    // Store original state for rollback
+    const originalColumnsState = originalColumns.map(col => ({ ...col, tasks: [...col.tasks] }))
 
     // Find current task and column from original columns
     const currentTask = originalColumns.flatMap(col => col.tasks).find(task => task.id === taskId)
@@ -771,70 +776,69 @@ export default function SprintBacklogView({
       return
     }
 
-    // Optimistically update task position
-    const newColumns = originalColumns.map(col => ({
-      ...col,
-      tasks: [...col.tasks]
-    }))
+    try {
+      // OPTIMISTIC UPDATE: Immediately move task
+      const updatedColumns = originalColumns.map(col => ({
+        ...col,
+        tasks: [...col.tasks]
+      }))
 
-    // Remove task from source column
-    const sourceCol = newColumns.find(col => col.id === sourceColumnId)
-    if (sourceCol) {
-      sourceCol.tasks.splice(source.index, 1)
-    }
-
-    // Add task to destination column
-    const destCol = newColumns.find(col => col.id === targetColumnId)
-    if (destCol) {
-      destCol.tasks.splice(destination.index, 0, currentTask)
-    }
-
-    // Use SWR's optimistic update
-    mutateColumns(
-      async () => {
-        if (sourceColumnId === targetColumnId) {
-          // Handle position change within the same column
-          const response = await fetch(`/api/tasks/${taskId}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ position: destination.index }),
-          })
-
-          if (!response.ok) {
-            throw new Error('Failed to update task position')
-          }
-
-          toast.success('Task position updated')
-        } else {
-          // Handle column change
-          const response = await fetch(`/api/sprints/${sprint.id}/tasks/move`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              taskId,
-              targetColumnId
-            }),
-          })
-
-          if (!response.ok) {
-            const error = await response.json()
-            throw new Error(error.error || 'Failed to move task')
-          }
-
-          toast.success('Task moved successfully')
-        }
-
-        // Return the updated data
-        return newColumns
-      },
-      {
-        optimisticData: newColumns,
-        rollbackOnError: true,
-        revalidate: true
+      // Remove task from source column
+      const sourceCol = updatedColumns.find(col => col.id === sourceColumnId)
+      if (sourceCol) {
+        sourceCol.tasks.splice(source.index, 1)
       }
-    ).catch((error: unknown) => {
+
+      // Add task to destination column at correct position
+      const destCol = updatedColumns.find(col => col.id === targetColumnId)
+      if (destCol) {
+        const updatedTask = { ...currentTask, sprintColumnId: targetColumnId }
+        destCol.tasks.splice(destination.index, 0, updatedTask)
+      }
+
+      // Update UI immediately
+      mutateColumns(updatedColumns, { revalidate: false })
+
+      // Make API call in background
+      let apiCall: Promise<Response>
+      
+      if (sourceColumnId === targetColumnId) {
+        // Handle position change within the same column
+        apiCall = fetch(`/api/tasks/${taskId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ position: destination.index }),
+        })
+      } else {
+        // Handle column change
+        apiCall = fetch(`/api/sprints/${sprint.id}/tasks/move`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            taskId,
+            targetColumnId
+          }),
+        })
+      }
+
+      const response = await apiCall
+      
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to move task')
+      }
+
+      // Success - revalidate to get latest data
+      mutateColumns()
+      toast.success('Task moved successfully')
+      
+    } catch (error: unknown) {
+      console.error('Error moving task:', error)
+      
+      // Rollback on error - restore original state
+      mutateColumns(originalColumnsState, { revalidate: false })
       toast.error(error instanceof Error ? error.message : 'Failed to move task')
-    })
+    }
   }
 
 
