@@ -746,8 +746,8 @@ export default function SprintBacklogView({
           throw new Error('Failed to reorder column')
         }
 
-        // Success - revalidate to get latest data
-        mutateColumns()
+        // Success - force immediate cache refresh to get latest data
+        await mutateColumns()
         toast.success('Column reordered successfully')
         
       } catch (error: unknown) {
@@ -828,8 +828,8 @@ export default function SprintBacklogView({
         throw new Error(error.error || 'Failed to move task')
       }
 
-      // Success - revalidate to get latest data
-      mutateColumns()
+      // Success - force immediate cache refresh to get latest data
+      await mutateColumns()
       toast.success('Task moved successfully')
       
     } catch (error: unknown) {

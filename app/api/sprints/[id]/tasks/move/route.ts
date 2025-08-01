@@ -3,7 +3,6 @@ import { createClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth-utils'
 import { z } from 'zod'
-import { revalidateTag } from 'next/cache'
 
 const moveTaskSchema = z.object({
   taskId: z.string(),
@@ -108,9 +107,6 @@ export async function POST(
         }
       }
     })
-    
-    // Invalidate the cache for sprint columns to ensure fresh data
-    revalidateTag('sprint-columns')
     
     return NextResponse.json(updatedTask)
   } catch (error: unknown) {

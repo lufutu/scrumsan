@@ -3,7 +3,6 @@ import { createClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth-utils'
 import { z } from 'zod'
-import { unstable_cache, revalidateTag } from 'next/cache'
 
 const sprintColumnCreateSchema = z.object({
   name: z.string().min(1, 'Column name is required'),
@@ -12,95 +11,89 @@ const sprintColumnCreateSchema = z.object({
   wipLimit: z.number().int().min(0).optional()
 })
 
-// Cached sprint columns fetching function
-const getCachedSprintColumns = unstable_cache(
-  async (sprintId: string, userId: string) => {
-    // Check if user has access to the sprint
-    const sprint = await prisma.sprint.findUnique({
-      where: { id: sprintId },
-      select: { boardId: true }
+// Sprint columns fetching function (no caching to avoid stale data issues)
+const getSprintColumns = async (sprintId: string, userId: string) => {
+  // Check if user has access to the sprint
+  const sprint = await prisma.sprint.findUnique({
+    where: { id: sprintId },
+    select: { boardId: true }
+  })
+  
+  if (!sprint) {
+    return null
+  }
+  
+  // Check if user has access to the board through organization membership
+  const board = await prisma.board.findUnique({
+    where: { id: sprint.boardId },
+    select: { organizationId: true }
+  })
+  
+  if (board) {
+    const orgMember = await prisma.organizationMember.findFirst({
+      where: {
+        organizationId: board.organizationId,
+        userId: userId
+      }
     })
     
-    if (!sprint) {
+    if (!orgMember) {
       return null
     }
-    
-    // Check if user has access to the board through organization membership
-    const board = await prisma.board.findUnique({
-      where: { id: sprint.boardId },
-      select: { organizationId: true }
-    })
-    
-    if (board) {
-      const orgMember = await prisma.organizationMember.findFirst({
-        where: {
-          organizationId: board.organizationId,
-          userId: userId
-        }
-      })
-      
-      if (!orgMember) {
-        return null
-      }
-    }
-    
-    // Get sprint columns
-    const columns = await prisma.sprintColumn.findMany({
-      where: { sprintId },
-      orderBy: { position: 'asc' },
-      include: {
-        tasks: {
-          select: {
-            id: true,
-            title: true,
-            description: true,
-            taskType: true,
-            priority: true,
-            storyPoints: true,
-            dueDate: true,
-            createdAt: true,
-            updatedAt: true,
-            taskAssignees: {
-              select: {
-                user: {
-                  select: {
-                    id: true,
-                    fullName: true,
-                    email: true,
-                    avatarUrl: true
-                  }
+  }
+  
+  // Get sprint columns with fresh data
+  const columns = await prisma.sprintColumn.findMany({
+    where: { sprintId },
+    orderBy: { position: 'asc' },
+    include: {
+      tasks: {
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          taskType: true,
+          priority: true,
+          storyPoints: true,
+          dueDate: true,
+          createdAt: true,
+          updatedAt: true,
+          taskAssignees: {
+            select: {
+              user: {
+                select: {
+                  id: true,
+                  fullName: true,
+                  email: true,
+                  avatarUrl: true
                 }
               }
-            },
-            taskLabels: {
-              select: {
-                label: {
-                  select: {
-                    id: true,
-                    name: true,
-                    color: true
-                  }
+            }
+          },
+          taskLabels: {
+            select: {
+              label: {
+                select: {
+                  id: true,
+                  name: true,
+                  color: true
                 }
               }
-            },
-            _count: {
-              select: {
-                comments: true,
-                attachments: true
-              }
+            }
+          },
+          _count: {
+            select: {
+              comments: true,
+              attachments: true
             }
           }
         }
       }
-    })
-    
-    return columns
-  },
-  ['sprint-columns'],
-  {
-    revalidate: 30 // Cache for 30 seconds
-  }
-)
+    }
+  })
+  
+  return columns
+}
 
 export async function GET(
   req: NextRequest,
@@ -111,8 +104,8 @@ export async function GET(
     const supabase = await createClient()
     const user = await getCurrentUser(supabase)
     
-    // Use cached sprint columns data
-    const columns = await getCachedSprintColumns(sprintId, user.id)
+    // Use non-cached sprint columns data for fresh results
+    const columns = await getSprintColumns(sprintId, user.id)
     
     if (columns === null) {
       return NextResponse.json({ error: 'Sprint not found or unauthorized' }, { status: 404 })
@@ -226,9 +219,6 @@ export async function POST(
         }
       }
     })
-    
-    // Invalidate the cache for sprint columns
-    revalidateTag('sprint-columns')
     
     return NextResponse.json(column)
   } catch (error: unknown) {
