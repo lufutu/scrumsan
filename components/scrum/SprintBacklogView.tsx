@@ -64,6 +64,7 @@ import { Sprint, Task } from '@/types/shared'
 import { useSprintColumns } from '@/hooks/useSprintColumns'
 import { toast } from 'sonner'
 import { ComprehensiveInlineForm } from './ComprehensiveInlineForm'
+import { TaskAssignee } from '@prisma/client'
 
 interface SprintColumn {
   id: string
@@ -132,8 +133,9 @@ const DraggableTask = ({ task, index, onTaskClick, boardId, onTaskUpdate, mutate
                 description={task.description || ''}
                 taskType={task.taskType as any}
                 storyPoints={task.storyPoints || 0}
-                priority={task.priority as unknown}
-                assignees={task.taskAssignees?.map((ta: unknown) => ({
+                priority={task.priority as 'critical' | 'high' | 'medium' | 'low'}
+                dueDate={task.dueDate}
+                assignees={task.taskAssignees?.map((ta: TaskAssignee) => ({
                   id: ta.user.id,
                   name: ta.user.fullName || ta.user.email || 'Unknown User',
                   avatar: ta.user.avatarUrl || undefined,

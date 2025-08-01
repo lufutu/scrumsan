@@ -55,7 +55,16 @@ export async function GET(
       orderBy: { position: 'asc' },
       include: {
         tasks: {
-          include: {
+          select: {
+            id: true,
+            title: true,
+            description: true,
+            taskType: true,
+            priority: true,
+            storyPoints: true,
+            dueDate: true,
+            createdAt: true,
+            updatedAt: true,
             taskAssignees: {
               select: {
                 user: {
@@ -69,7 +78,7 @@ export async function GET(
               }
             },
             taskLabels: {
-              include: {
+              select: {
                 label: {
                   select: {
                     id: true,
@@ -156,16 +165,43 @@ export async function POST(
       },
       include: {
         tasks: {
-          include: {
+          select: {
+            id: true,
+            title: true,
+            description: true,
+            taskType: true,
+            priority: true,
+            storyPoints: true,
+            dueDate: true,
+            createdAt: true,
+            updatedAt: true,
             taskAssignees: {
               select: {
                 user: {
                   select: {
                     id: true,
                     fullName: true,
+                    email: true,
                     avatarUrl: true
                   }
                 }
+              }
+            },
+            taskLabels: {
+              select: {
+                label: {
+                  select: {
+                    id: true,
+                    name: true,
+                    color: true
+                  }
+                }
+              }
+            },
+            _count: {
+              select: {
+                comments: true,
+                attachments: true
               }
             }
           }
