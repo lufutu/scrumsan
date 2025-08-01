@@ -1,11 +1,36 @@
 import { cn } from "@/lib/utils";
 import { Frames, MotionGrid } from "./animate-ui/components/motion-grid";
+import { useEffect, useState } from "react";
+import { Button } from "./ui/button";
 
 interface LoadingProps {
     className?: string;
+    timeout?: number; // timeout in milliseconds
+    onTimeout?: () => void;
+    showTimeoutAction?: boolean;
 }
 
-export function Loading({ className }: LoadingProps) {
+export function Loading({ 
+    className, 
+    timeout = 15000, // 15 seconds default
+    onTimeout,
+    showTimeoutAction = true 
+}: LoadingProps) {
+    const [showTimeout, setShowTimeout] = useState(false);
+    
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setShowTimeout(true);
+            onTimeout?.();
+        }, timeout);
+        
+        return () => clearTimeout(timer);
+    }, [timeout, onTimeout]);
+
+    const handleRefresh = () => {
+        window.location.reload();
+    };
+
     const importingFrames = [
         [[2, 2]],
         [
@@ -100,14 +125,39 @@ export function Loading({ className }: LoadingProps) {
         ],
         [],
     ] as Frames;
+    
     return (
         <div
             className={cn(
-                "flex items-center justify-center min-h-[400px]",
+                "flex flex-col items-center justify-center min-h-[400px] gap-4",
                 className
             )}
         >
             <MotionGrid gridSize={[5, 5]} frames={importingFrames} />
+            
+            {showTimeout && showTimeoutAction && (
+                <div className="text-center space-y-3">
+                    <p className="text-sm text-muted-foreground">
+                        Taking longer than expected...
+                    </p>
+                    <div className="flex gap-2 justify-center">
+                        <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={handleRefresh}
+                        >
+                            Refresh Page
+                        </Button>
+                        <Button 
+                            variant="secondary" 
+                            size="sm" 
+                            onClick={() => window.location.href = '/recovery.html'}
+                        >
+                            Recovery Mode
+                        </Button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

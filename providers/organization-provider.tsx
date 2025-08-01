@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react'
 import { useSupabase } from '@/providers/supabase-provider'
 import { Organization } from '@/hooks/useOrganizations'
+import { debugLoadingState, createLoadingTimeout } from '@/lib/loading-debug'
 
 interface OrganizationContextType {
   organizations: Organization[]
@@ -40,6 +41,7 @@ export function OrganizationProvider({ children }: OrganizationProviderProps) {
 
   const fetchOrganizations = useCallback(async () => {
     if (!user) {
+      debugLoadingState('OrganizationProvider', { status: 'no user, clearing state' });
       setOrganizations([])
       setActiveOrgState(null)
       setIsLoading(false)
@@ -48,44 +50,93 @@ export function OrganizationProvider({ children }: OrganizationProviderProps) {
       return
     }
 
+    debugLoadingState('OrganizationProvider', { status: 'fetching organizations', userId: user.id });
+    const timeout = createLoadingTimeout('Organization fetch', 8000);
+
     try {
       setIsLoading(true)
       setError(null)
       
-      const response = await fetch('/api/organizations')
+      // Add timeout to prevent hanging
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 8000)
+      
+      const response = await fetch('/api/organizations', {
+        signal: controller.signal
+      })
+      
+      clearTimeout(timeoutId)
+      
       if (!response.ok) {
         throw new Error('Failed to fetch organizations')
       }
       
       const data = await response.json()
+      debugLoadingState('OrganizationProvider', { 
+        status: 'organizations fetched', 
+        count: data.length 
+      });
       setOrganizations(data)
       hasLoadedOrganizations.current = true
       
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load organizations')
+      if (err instanceof Error && err.name === 'AbortError') {
+        setError('Request timeout - please refresh the page')
+        debugLoadingState('OrganizationProvider', { status: 'fetch timeout' });
+      } else {
+        setError(err instanceof Error ? err.message : 'Failed to load organizations')
+        debugLoadingState('OrganizationProvider', { 
+          status: 'fetch error', 
+          error: err instanceof Error ? err.message : 'Unknown error' 
+        });
+      }
       console.error('Error fetching organizations:', err)
     } finally {
+      timeout.clear();
       setIsLoading(false)
+      debugLoadingState('OrganizationProvider', { status: 'fetch complete' });
     }
   }, [user])
 
   // Separate effect to handle setting active org after organizations are loaded
   useEffect(() => {
     if (hasLoadedOrganizations.current && organizations.length > 0 && !hasSetInitialActiveOrg.current) {
-      const savedActiveOrgId = localStorage.getItem('activeOrgId')
+      // Safely access localStorage with fallback
+      let savedActiveOrgId: string | null = null
+      try {
+        savedActiveOrgId = typeof window !== 'undefined' ? localStorage.getItem('activeOrgId') : null
+      } catch (error) {
+        console.warn('Failed to access localStorage:', error)
+      }
+      
       const orgToActivate = savedActiveOrgId 
         ? organizations.find((org: Organization) => org.id === savedActiveOrgId) || organizations[0]
         : organizations[0]
       
       setActiveOrgState(orgToActivate)
-      localStorage.setItem('activeOrgId', orgToActivate.id)
+      
+      // Safely set localStorage
+      try {
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('activeOrgId', orgToActivate.id)
+        }
+      } catch (error) {
+        console.warn('Failed to save to localStorage:', error)
+      }
+      
       hasSetInitialActiveOrg.current = true
     }
   }, [organizations])
 
   const setActiveOrg = useCallback((org: Organization) => {
     setActiveOrgState(org)
-    localStorage.setItem('activeOrgId', org.id)
+    try {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('activeOrgId', org.id)
+      }
+    } catch (error) {
+      console.warn('Failed to save active org to localStorage:', error)
+    }
   }, [])
 
   const refreshOrganizations = useCallback(async () => {
@@ -120,7 +171,13 @@ export function OrganizationProvider({ children }: OrganizationProviderProps) {
     // Only clear localStorage if user is null AND we're not still loading the user
     if (!user && !userLoading) {
       setActiveOrgState(null)
-      localStorage.removeItem('activeOrgId')
+      try {
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('activeOrgId')
+        }
+      } catch (error) {
+        console.warn('Failed to clear localStorage:', error)
+      }
       hasLoadedOrganizations.current = false
       hasSetInitialActiveOrg.current = false
     }
