@@ -64,7 +64,7 @@ import { Sprint, Task } from '@/types/shared'
 import { useSprintColumns } from '@/hooks/useSprintColumns'
 import { toast } from 'sonner'
 import { ComprehensiveInlineForm } from './ComprehensiveInlineForm'
-import { TaskAssignee } from '@prisma/client'
+import { TaskAssignee } from '@types/
 
 interface SprintColumn {
   id: string
