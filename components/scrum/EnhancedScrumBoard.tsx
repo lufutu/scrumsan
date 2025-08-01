@@ -129,7 +129,7 @@ export default function EnhancedScrumBoard({
     }
   }
 
-  const fetchSprints = async () => {
+  const fetchSprints = useCallback(async () => {
     try {
       const response = await fetch(`/api/projects/${projectId}/sprints`)
       if (!response.ok) throw new Error('Failed to fetch sprints')
@@ -142,7 +142,7 @@ export default function EnhancedScrumBoard({
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : 'Failed to fetch sprints')
     }
-  }
+  })
 
   const fetchSprintColumns = async () => {
     if (!activeSprint) {
@@ -577,9 +577,10 @@ export default function EnhancedScrumBoard({
           {/* Sprint Columns - Right Side */}
           <div className="col-span-8">
             {activeSprint ? (
-              <div className="grid grid-cols-4 gap-4 h-full">
-                {sprintColumns.map(column => (
-                  <Card key={column.id} className="h-full">
+              <div className="flex gap-4 h-full overflow-x-auto">
+                <div className="flex gap-4 min-w-max">
+                  {sprintColumns.map(column => (
+                    <Card key={column.id} className="h-full w-[350px] flex-shrink-0">
                     <CardHeader className="pb-3">
                       <CardTitle className="flex items-center justify-between text-base">
                         <span>{column.name}</span>
@@ -650,8 +651,9 @@ export default function EnhancedScrumBoard({
                         </div>
                       </DroppableArea>
                     </CardContent>
-                  </Card>
-                ))}
+                    </Card>
+                  ))}
+                </div>
               </div>
             ) : (
               <Card className="h-full flex items-center justify-center">

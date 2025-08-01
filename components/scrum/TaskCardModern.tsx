@@ -1017,7 +1017,7 @@ export function TaskCardModern({
                       </Button>
                     ))}
                   </div>
-                  {storyPoints && (
+                  {storyPoints > 0 && (
                     <Button
                       variant="ghost"
                       size="sm"

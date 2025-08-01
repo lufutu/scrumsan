@@ -339,3 +339,14 @@ export interface WorklogEntry {
   };
   createdAt: string;
 }
+
+export interface SprintColumn {
+  id: string
+  sprintId: string
+  name: string
+  position: number
+  isDone: boolean
+  wipLimit?: number
+  tasks: Task[]
+  createdAt: string
+}

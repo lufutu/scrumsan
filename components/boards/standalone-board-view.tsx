@@ -165,9 +165,10 @@ export default function StandaloneBoardView({ board, onUpdate }: StandaloneBoard
         </div>
         
         {/* Import and use ProjectScrumBoard but pass organizationId instead of projectId */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 h-full min-h-96">
-          {board.columns.map((column) => (
-            <div key={column.id} className="flex flex-col">
+        <div className="flex gap-6 h-full min-h-96 overflow-x-auto">
+          <div className="flex gap-6 min-w-max">
+            {board.columns.map((column) => (
+              <div key={column.id} className="flex flex-col w-[350px] flex-shrink-0">
               <Card className={`flex-1 transition-all ${
                 draggedOver === column.id ? 'ring-2 ring-blue-500' : ''
               }`}>
@@ -304,8 +305,9 @@ export default function StandaloneBoardView({ board, onUpdate }: StandaloneBoard
                   )}
                 </CardContent>
               </Card>
-            </div>
-          ))}
+              </div>
+            ))}
+          </div>
         </div>
         
         {/* Footer removed - using inline add in columns */}
@@ -329,9 +331,10 @@ export default function StandaloneBoardView({ board, onUpdate }: StandaloneBoard
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 h-full min-h-96">
-        {board.columns?.map((column) => (
-          <div key={column.id} className="flex flex-col">
+      <div className="flex gap-6 h-full min-h-96 overflow-x-auto">
+        <div className="flex gap-6 min-w-max">
+          {board.columns?.map((column) => (
+            <div key={column.id} className="flex flex-col w-[350px] flex-shrink-0">
             <Card className={`flex-1 transition-all ${
               draggedOver === column.id ? 'ring-2 ring-blue-500' : ''
             }`}>
@@ -434,7 +437,7 @@ export default function StandaloneBoardView({ board, onUpdate }: StandaloneBoard
                             title: "Success",
                             description: "Task created successfully"
                           });
-                        } catch (err: any) {
+                        } catch (err: unknown) {
                           console.error('Error creating task:', err)
                           toast({
                             title: "Error",
@@ -461,8 +464,9 @@ export default function StandaloneBoardView({ board, onUpdate }: StandaloneBoard
                 )}
               </CardContent>
             </Card>
-          </div>
-        ))}
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Task Modal */}

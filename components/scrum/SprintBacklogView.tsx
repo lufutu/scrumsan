@@ -60,22 +60,12 @@ import {
 import { TaskCardModern } from './TaskCardModern'
 import { ItemModal } from './ItemModal'
 import BurndownChart from './BurndownChart'
-import { Sprint, Task } from '@/types/shared'
+import { Sprint, Task, TaskAssignee, TaskLabel, SprintColumn } from '@/types/shared'
 import { useSprintColumns } from '@/hooks/useSprintColumns'
 import { toast } from 'sonner'
 import { ComprehensiveInlineForm } from './ComprehensiveInlineForm'
-import { TaskAssignee } from '@types/
 
-interface SprintColumn {
-  id: string
-  sprintId: string
-  name: string
-  position: number
-  isDone: boolean
-  wipLimit?: number
-  tasks: any[]
-  createdAt: string
-}
+
 
 interface SprintBacklogViewProps {
   sprint: Sprint
@@ -141,7 +131,7 @@ const DraggableTask = ({ task, index, onTaskClick, boardId, onTaskUpdate, mutate
                   avatar: ta.user.avatarUrl || undefined,
                   initials: ta.user.fullName?.split(' ').map((n: string) => n[0]).join('') || 'U'
                 })) || []}
-                labels={task.taskLabels ? task.taskLabels.map((tl: unknown) => ({
+                labels={task.taskLabels ? task.taskLabels.map((tl: TaskLabel) => ({
                   id: tl.label.id,
                   name: tl.label.name,
                   color: tl.label.color || '#6B7280'

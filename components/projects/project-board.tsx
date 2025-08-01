@@ -396,11 +396,12 @@ export default function ProjectBoard({ projectId }: ProjectBoardProps) {
       </div>
 
       {/* Board Columns */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 h-full min-h-96">
-        {((board as any).board_columns || []).map((column: any) => (
-          <div 
-            key={column.id} 
-            className="flex flex-col"
+      <div className="flex gap-6 h-full min-h-96 overflow-x-auto">
+        <div className="flex gap-6 min-w-max">
+          {((board as any).board_columns || []).map((column: any) => (
+            <div 
+              key={column.id} 
+              className="flex flex-col w-[350px] flex-shrink-0"
             onDragOver={(e) => handleColumnDragOver(e, column.id)}
             onDragLeave={handleColumnDragLeave}
             onDrop={(e) => handleColumnDrop(e, column.id)}
@@ -552,8 +553,9 @@ export default function ProjectBoard({ projectId }: ProjectBoardProps) {
                 )}
               </CardContent>
             </Card>
-          </div>
-        ))}
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Task Modal */}
