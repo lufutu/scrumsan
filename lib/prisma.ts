@@ -8,8 +8,8 @@ const globalForPrisma = globalThis as unknown as {
 // Optimized Prisma client configuration
 const createPrismaClient = () => {
   return new PrismaClient({
-    // Enable query logging in development
-    log: process.env.NODE_ENV === 'development' ? ['query', 'info', 'warn', 'error'] : ['error'],
+    // Disable all Prisma logging to reduce noise
+    log: [],
     
     // Connection pool and timeout settings
     datasources: {
