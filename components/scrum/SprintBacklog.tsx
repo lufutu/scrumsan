@@ -477,47 +477,75 @@ export default function SprintBacklog({ sprint, onBackToBacklog }: SprintBacklog
     if (!destination) return
 
     const taskId = draggableId
+    const sourceColumnId = source.droppableId
     const targetColumnId = destination.droppableId
+    
+    // If dropped in same position, do nothing
+    if (sourceColumnId === targetColumnId && source.index === destination.index) {
+      return
+    }
 
     // Find the task being moved
     const taskToMove = allTasks.find(task => task.id === taskId)
     if (!taskToMove) return
 
-    // Check if task is already in the target column
-    if (source.droppableId === targetColumnId) return
+    // Store original state for rollback
+    const originalColumns = columns.map(col => ({ ...col, tasks: [...col.tasks] }))
 
-    // Optimistically update UI
-    setColumns(prev => {
-      const newColumns = prev.map(col => ({
-        ...col,
-        tasks: col.tasks.filter(task => task.id !== taskId)
-      }))
+    // Optimistically update UI immediately
+    const newColumns = columns.map(col => ({ ...col, tasks: [...col.tasks] }))
+    
+    // Remove task from source column
+    const sourceColumn = newColumns.find(col => col.id === sourceColumnId)
+    if (sourceColumn) {
+      sourceColumn.tasks.splice(source.index, 1)
+    }
 
-      const targetColumn = newColumns.find(col => col.id === targetColumnId)
-      if (targetColumn) {
-        targetColumn.tasks.push({ ...taskToMove, sprintColumnId: targetColumnId })
-      }
+    // Add task to destination column at specific position
+    const targetColumn = newColumns.find(col => col.id === targetColumnId)
+    if (targetColumn) {
+      const updatedTask = { ...taskToMove, sprintColumnId: targetColumnId }
+      targetColumn.tasks.splice(destination.index, 0, updatedTask)
+    }
 
-      return newColumns
-    })
+    // Update UI immediately
+    setColumns(newColumns)
 
     try {
-      // Update task in database
-      const response = await fetch(`/api/tasks/${taskId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sprintColumnId: targetColumnId })
-      })
+      if (sourceColumnId === targetColumnId) {
+        // Handle position change within the same column
+        const response = await fetch(`/api/tasks/${taskId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ position: destination.index })
+        })
 
-      if (!response.ok) {
-        throw new Error('Failed to update task')
+        if (!response.ok) {
+          throw new Error('Failed to update task position')
+        }
+
+        toast.success('Task position updated')
+      } else {
+        // Handle column change
+        const response = await fetch(`/api/tasks/${taskId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            sprintColumnId: targetColumnId,
+            position: destination.index 
+          })
+        })
+
+        if (!response.ok) {
+          throw new Error('Failed to move task')
+        }
+
+        toast.success('Task moved successfully')
       }
-
-      toast.success('Task moved successfully')
     } catch (error: any) {
+      // Rollback to original state on error
+      setColumns(originalColumns)
       toast.error(error.message || 'Failed to move task')
-      // Revert optimistic update on error
-      fetchColumns()
     }
   }
 
