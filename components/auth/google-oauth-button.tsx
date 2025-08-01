@@ -24,7 +24,7 @@ export function GoogleOAuthButton({ mode, redirectTo, className }: GoogleOAuthBu
       const supabase = createClient()
       
       // Always redirect to our callback, but pass the intended destination as a query param
-      let redirectUrl = `${window.location.origin}/auth/callback`
+      let redirectUrl = `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback`
       
       if (redirectTo) {
         const returnUrl = encodeURIComponent(redirectTo)

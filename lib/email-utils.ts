@@ -27,10 +27,10 @@ const sesClient = new SESClient({
  */
 export async function sendInvitationEmail(data: InvitationEmailData): Promise<void> {
   const { to, organizationName, inviterName, role, token, expiresAt } = data
-  
+
   const inviteUrl = `${process.env.NEXT_PUBLIC_APP_URL}/invite/${token}`
   const expiryDate = expiresAt.toLocaleDateString()
-  
+
   // Check if AWS SES is configured
   if (!process.env.AWS_ACCESS_KEY_ID || !process.env.AWS_SECRET_ACCESS_KEY || !process.env.SES_FROM_EMAIL) {
     console.log('=== INVITATION EMAIL (AWS SES NOT CONFIGURED) ===')
@@ -54,7 +54,7 @@ export async function sendInvitationEmail(data: InvitationEmailData): Promise<vo
     console.log('========================')
     console.log('To enable email sending, add these environment variables:')
     console.log('- AWS_ACCESS_KEY_ID')
-    console.log('- AWS_SECRET_ACCESS_KEY') 
+    console.log('- AWS_SECRET_ACCESS_KEY')
     console.log('- AWS_REGION')
     console.log('- SES_FROM_EMAIL')
     return
@@ -92,14 +92,14 @@ export async function sendInvitationEmail(data: InvitationEmailData): Promise<vo
     })
   } catch (error) {
     console.error('❌ Failed to send invitation email via AWS SES:', error)
-    
+
     // Fall back to console logging if SES fails
     console.log('=== INVITATION EMAIL (SES FAILED - FALLBACK) ===')
     console.log(`To: ${to}`)
     console.log(`Subject: You're invited to join ${organizationName}`)
     console.log(`Invite URL: ${inviteUrl}`)
     console.log('========================')
-    
+
     throw error
   }
 }
@@ -110,13 +110,13 @@ export async function sendInvitationEmail(data: InvitationEmailData): Promise<vo
 function generateInvitationEmailTemplate(data: InvitationEmailData): string {
   const { organizationName, inviterName, role, token, expiresAt } = data
   const inviteUrl = `${process.env.NEXT_PUBLIC_APP_URL}/invite/${token}`
-  const expiryDate = expiresAt.toLocaleDateString('en-US', { 
-    weekday: 'long', 
-    year: 'numeric', 
-    month: 'long', 
-    day: 'numeric' 
+  const expiryDate = expiresAt.toLocaleDateString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
   })
-  
+
   return `
     <!DOCTYPE html>
     <html lang="en">
@@ -272,7 +272,7 @@ function generateInvitationEmailText(data: InvitationEmailData): string {
   const { organizationName, inviterName, role, token, expiresAt } = data
   const inviteUrl = `${process.env.NEXT_PUBLIC_APP_URL}/invite/${token}`
   const expiryDate = expiresAt.toLocaleDateString()
-  
+
   return `
 You're invited to join ${organizationName}
 
