@@ -1,6 +1,15 @@
 import { createClient } from './supabase/client';
 
 export async function testSupabaseConnection() {
+  // Only run on client side
+  if (typeof window === 'undefined') {
+    return {
+      timestamp: new Date().toISOString(),
+      environment: { error: 'Server-side execution not supported' },
+      tests: { error: 'Client-side only' }
+    };
+  }
+
   const results = {
     timestamp: new Date().toISOString(),
     environment: {
@@ -99,6 +108,12 @@ export async function testSupabaseConnection() {
 }
 
 export function logSupabaseDiagnostics() {
+  // Only run on client side
+  if (typeof window === 'undefined') {
+    console.warn('Supabase diagnostics can only run on client side');
+    return;
+  }
+
   testSupabaseConnection().then(results => {
     console.group('🔍 Supabase Diagnostics');
     console.log('Environment:', results.environment);
@@ -106,7 +121,7 @@ export function logSupabaseDiagnostics() {
     
     const failures = Object.entries(results.tests)
       .filter(([_, test]: [string, any]) => !test.success)
-      .map(([name, test]: [string, any]) => `${name}: ${test.error}`);
+      .map(([name, test]: [string, unknown]) => `${name}: ${test.error}`);
     
     if (failures.length > 0) {
       console.warn('❌ Failed tests:', failures);
