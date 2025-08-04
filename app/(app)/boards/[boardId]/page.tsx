@@ -161,7 +161,7 @@ function BoardContent() {
   })
 
   // Header actions
-  const canManageBoard = user?.id === board.created_by || ['owner', 'admin'].includes(currentMember?.role || '')
+  const canManageBoard = user?.id === board.createdBy || ['owner', 'admin'].includes(currentMember?.role || '')
   
   const boardActions = canManageBoard ? (
     <DropdownMenu>
