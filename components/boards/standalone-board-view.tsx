@@ -24,9 +24,8 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu'
-import { GripVertical, Plus, MoreHorizontal, Edit, Trash2 } from 'lucide-react'
+import { GripVertical, Plus, MoreHorizontal, Edit, Trash2, Settings } from 'lucide-react'
 import { TaskCardModern } from '@/components/scrum/TaskCardModern'
-import TaskCreationDialog from '@/components/common/TaskCreationDialog'
 import { ComprehensiveInlineForm } from '@/components/scrum/ComprehensiveInlineForm'
 import { ItemModal } from '@/components/scrum/ItemModal'
 import { useUsers } from '@/hooks/useUsers'

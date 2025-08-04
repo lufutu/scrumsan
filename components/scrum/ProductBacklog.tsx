@@ -6,7 +6,6 @@ import { toast } from 'sonner'
 import { ItemModal } from './ItemModal'
 import { DraggableSprintColumn } from './DraggableSprintColumn'
 import { SprintDialogs } from './SprintDialogs'
-import { useSupabase } from '@/providers/supabase-provider'
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area"
 
 import {
@@ -15,7 +14,7 @@ import {
   DropResult,
 } from '@hello-pangea/dnd'
 import { useRouter } from 'next/navigation'
-import { Sprint, Task, ProductBacklogProps as ProductBacklogProps } from '@/types/shared'
+import { Sprint, Task, ProductBacklogProps } from '@/types/shared'
 
 interface ProductBacklogState {
   showFinishedSprints: boolean
@@ -34,7 +33,6 @@ export default function ProductBacklog({
   onDataChange,
   onStateChange
 }: ExtendedProductBacklogProps) {
-  const { } = useSupabase()
   const router = useRouter()
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [showFinishedSprints, setShowFinishedSprints] = useState(false)
