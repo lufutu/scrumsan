@@ -1,38 +1,43 @@
-import useSWR from 'swr'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useCallback } from 'react'
 import { toast } from 'sonner'
 import { Sprint } from '@/types/shared'
+import { cacheKeys, invalidationPatterns } from '@/lib/query-optimization'
 
-const fetcher = (url: string) => fetch(url).then(res => {
-  if (!res.ok) {
-    console.error('Fetch failed:', res.status, res.statusText, url)
+const fetcher = async (url: string) => {
+  const response = await fetch(url)
+  if (!response.ok) {
+    console.error('Fetch failed:', response.status, response.statusText, url)
     throw new Error('Failed to fetch')
   }
-  return res.json()
-})
+  return response.json()
+}
 
 export function useSprints(boardId?: string, projectId?: string, organizationId?: string, status?: string) {
+  const queryClient = useQueryClient()
+  
   const params = new URLSearchParams()
   if (boardId) params.append('boardId', boardId)
   if (projectId) params.append('projectId', projectId)
   if (organizationId) params.append('organizationId', organizationId)
   if (status) params.append('status', status)
   
-  const { data, error, isLoading, mutate } = useSWR<Sprint[]>(
-    `/api/sprints?${params.toString()}`,
-    fetcher
-  )
+  const { data, error, isLoading, refetch } = useQuery<Sprint[]>({
+    queryKey: cacheKeys.sprints(boardId || projectId || organizationId, status),
+    queryFn: () => fetcher(`/api/sprints?${params.toString()}`),
+    enabled: !!(boardId || projectId || organizationId),
+  })
 
-  const createSprint = useCallback(async (sprintData: {
-    name: string
-    goal?: string
-    boardId?: string
-    projectId?: string
-    startDate?: string
-    endDate?: string
-    status?: 'planning' | 'active' | 'completed'
-  }) => {
-    try {
+  const createSprintMutation = useMutation({
+    mutationFn: async (sprintData: {
+      name: string
+      goal?: string
+      boardId?: string
+      projectId?: string
+      startDate?: string
+      endDate?: string
+      status?: 'planning' | 'active' | 'completed'
+    }) => {
       const response = await fetch('/api/sprints', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -44,22 +49,31 @@ export function useSprints(boardId?: string, projectId?: string, organizationId?
         throw new Error(error.message || 'Failed to create sprint')
       }
 
-      await mutate()
+      return response.json()
+    },
+    onSuccess: (newSprint) => {
+      // Invalidate related queries
+      queryClient.invalidateQueries({ queryKey: cacheKeys.sprints() })
+      if (boardId) {
+        const invalidations = invalidationPatterns.boardData(boardId)
+        invalidations.forEach(queryKey => {
+          queryClient.invalidateQueries({ queryKey })
+        })
+      }
       toast.success('Sprint created successfully')
-      return await response.json()
-    } catch (error: any) {
+    },
+    onError: (error) => {
       console.error('Failed to create sprint:', error)
       toast.error(error.message || 'Failed to create sprint')
-      throw error
     }
-  }, [mutate])
+  })
 
-  const updateSprint = useCallback(async (sprintId: string, sprintData: Partial<Sprint>) => {
-    try {
+  const updateSprintMutation = useMutation({
+    mutationFn: async ({ sprintId, data }: { sprintId: string; data: Partial<Sprint> }) => {
       const response = await fetch(`/api/sprints/${sprintId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(sprintData),
+        body: JSON.stringify(data),
       })
 
       if (!response.ok) {
@@ -67,17 +81,26 @@ export function useSprints(boardId?: string, projectId?: string, organizationId?
         throw new Error(error.message || 'Failed to update sprint')
       }
 
-      await mutate()
+      return response.json()
+    },
+    onSuccess: (updatedSprint, { sprintId }) => {
+      // Invalidate related queries
+      queryClient.invalidateQueries({ queryKey: ['sprint', sprintId] })
+      queryClient.invalidateQueries({ queryKey: cacheKeys.sprints() })
+      const invalidations = invalidationPatterns.sprintData(sprintId)
+      invalidations.forEach(queryKey => {
+        queryClient.invalidateQueries({ queryKey })
+      })
       toast.success('Sprint updated successfully')
-    } catch (error: any) {
+    },
+    onError: (error) => {
       console.error('Failed to update sprint:', error)
       toast.error(error.message || 'Failed to update sprint')
-      throw error
     }
-  }, [mutate])
+  })
 
-  const deleteSprint = useCallback(async (sprintId: string) => {
-    try {
+  const deleteSprintMutation = useMutation({
+    mutationFn: async (sprintId: string) => {
       const response = await fetch(`/api/sprints/${sprintId}`, {
         method: 'DELETE',
       })
@@ -87,14 +110,56 @@ export function useSprints(boardId?: string, projectId?: string, organizationId?
         throw new Error(error.message || 'Failed to delete sprint')
       }
 
-      await mutate()
+      return true
+    },
+    onSuccess: (_, sprintId) => {
+      // Invalidate related queries
+      queryClient.invalidateQueries({ queryKey: ['sprint', sprintId] })
+      queryClient.invalidateQueries({ queryKey: cacheKeys.sprints() })
       toast.success('Sprint deleted successfully')
-    } catch (error: any) {
+    },
+    onError: (error) => {
       console.error('Failed to delete sprint:', error)
       toast.error(error.message || 'Failed to delete sprint')
-      throw error
     }
-  }, [mutate])
+  })
+
+  const finishSprintMutation = useMutation({
+    mutationFn: async (sprintId: string) => {
+      const response = await fetch(`/api/sprints/${sprintId}/finish`, {
+        method: 'POST',
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to finish sprint')
+      }
+
+      return response.json()
+    },
+    onSuccess: (result, sprintId) => {
+      // Invalidate related queries
+      queryClient.invalidateQueries({ queryKey: ['sprint', sprintId] })
+      queryClient.invalidateQueries({ queryKey: cacheKeys.sprints() })
+      const invalidations = invalidationPatterns.sprintData(sprintId)
+      invalidations.forEach(queryKey => {
+        queryClient.invalidateQueries({ queryKey })
+      })
+    },
+    onError: (error) => {
+      console.error('Failed to finish sprint:', error)
+      toast.error(error.message || 'Failed to finish sprint')
+    }
+  })
+
+  const createSprint = useCallback((sprintData: Parameters<typeof createSprintMutation.mutate>[0]) => 
+    createSprintMutation.mutate(sprintData), [createSprintMutation])
+
+  const updateSprint = useCallback((sprintId: string, data: Partial<Sprint>) => 
+    updateSprintMutation.mutate({ sprintId, data }), [updateSprintMutation])
+
+  const deleteSprint = useCallback((sprintId: string) => 
+    deleteSprintMutation.mutate(sprintId), [deleteSprintMutation])
 
   const startSprint = useCallback(async (sprintId: string, startDate: string, endDate: string, name?: string, goal?: string) => {
     return updateSprint(sprintId, {
@@ -106,28 +171,8 @@ export function useSprints(boardId?: string, projectId?: string, organizationId?
     })
   }, [updateSprint])
 
-  const finishSprint = useCallback(async (sprintId: string) => {
-    try {
-      const response = await fetch(`/api/sprints/${sprintId}/finish`, {
-        method: 'POST',
-      })
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Failed to finish sprint')
-      }
-
-      const result = await response.json()
-      await mutate()
-      
-      // Return the result so the caller can handle the response
-      return result
-    } catch (error: any) {
-      console.error('Failed to finish sprint:', error)
-      toast.error(error.message || 'Failed to finish sprint')
-      throw error
-    }
-  }, [mutate])
+  const finishSprint = useCallback((sprintId: string) => 
+    finishSprintMutation.mutateAsync(sprintId), [finishSprintMutation])
 
   return {
     sprints: data,
@@ -138,20 +183,21 @@ export function useSprints(boardId?: string, projectId?: string, organizationId?
     deleteSprint,
     startSprint,
     finishSprint,
-    mutate,
+    mutate: refetch,
   }
 }
 
 export function useSprint(sprintId: string) {
-  const { data, error, isLoading, mutate } = useSWR<Sprint>(
-    sprintId ? `/api/sprints/${sprintId}` : null,
-    fetcher
-  )
+  const { data, error, isLoading, refetch } = useQuery<Sprint>({
+    queryKey: ['sprint', sprintId],
+    queryFn: () => fetcher(`/api/sprints/${sprintId}`),
+    enabled: !!sprintId,
+  })
 
   return {
     sprint: data,
     isLoading,
     error,
-    mutate,
+    mutate: refetch,
   }
 }

@@ -1,13 +1,17 @@
 'use client'
 
-import useSWR from 'swr'
-import { useCallback } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useCallback, useMemo } from 'react'
 import { toast } from 'sonner'
+import { cacheKeys } from '@/lib/query-optimization'
 
-const fetcher = (url: string) => fetch(url).then(res => {
-  if (!res.ok) throw new Error('Failed to fetch')
-  return res.json()
-})
+const fetcher = async (url: string) => {
+  const response = await fetch(url)
+  if (!response.ok) {
+    throw new Error('Failed to fetch')
+  }
+  return response.json()
+}
 
 export interface ProjectEngagement {
   id: string
@@ -43,17 +47,18 @@ export interface EngagementUpdateData {
 }
 
 export function useEngagements(organizationId: string, memberId: string) {
-  const { data, error, isLoading, mutate } = useSWR<ProjectEngagement[]>(
-    organizationId && memberId 
-      ? `/api/organizations/${organizationId}/members/${memberId}/engagements`
-      : null,
-    fetcher
-  )
+  const queryClient = useQueryClient()
+  
+  const { data, error, isLoading, refetch } = useQuery<ProjectEngagement[]>({
+    queryKey: cacheKeys.memberEngagements(organizationId, memberId),
+    queryFn: () => fetcher(`/api/organizations/${organizationId}/members/${memberId}/engagements`),
+    enabled: !!organizationId && !!memberId,
+  })
 
-  const createEngagement = useCallback(async (engagementData: EngagementCreateData) => {
-    if (!organizationId || !memberId) throw new Error('Organization ID and Member ID are required')
+  const createEngagementMutation = useMutation({
+    mutationFn: async (engagementData: EngagementCreateData) => {
+      if (!organizationId || !memberId) throw new Error('Organization ID and Member ID are required')
 
-    try {
       const response = await fetch(`/api/organizations/${organizationId}/members/${memberId}/engagements`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -65,23 +70,26 @@ export function useEngagements(organizationId: string, memberId: string) {
         throw new Error(error.error || 'Failed to create engagement')
       }
 
-      await mutate()
+      return response.json()
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: cacheKeys.memberEngagements(organizationId, memberId) })
+      queryClient.invalidateQueries({ queryKey: cacheKeys.organizationMembers(organizationId) })
       toast.success('Engagement created successfully')
-      return await response.json()
-    } catch (error: any) {
+    },
+    onError: (error) => {
       toast.error(error.message)
-      throw error
     }
-  }, [organizationId, memberId, mutate])
+  })
 
-  const updateEngagement = useCallback(async (engagementId: string, engagementData: EngagementUpdateData) => {
-    if (!organizationId || !memberId) throw new Error('Organization ID and Member ID are required')
+  const updateEngagementMutation = useMutation({
+    mutationFn: async ({ engagementId, data }: { engagementId: string; data: EngagementUpdateData }) => {
+      if (!organizationId || !memberId) throw new Error('Organization ID and Member ID are required')
 
-    try {
       const response = await fetch(`/api/organizations/${organizationId}/members/${memberId}/engagements/${engagementId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(engagementData),
+        body: JSON.stringify(data),
       })
 
       if (!response.ok) {
@@ -89,19 +97,22 @@ export function useEngagements(organizationId: string, memberId: string) {
         throw new Error(error.error || 'Failed to update engagement')
       }
 
-      await mutate()
+      return response.json()
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: cacheKeys.memberEngagements(organizationId, memberId) })
+      queryClient.invalidateQueries({ queryKey: cacheKeys.organizationMembers(organizationId) })
       toast.success('Engagement updated successfully')
-      return await response.json()
-    } catch (error: any) {
+    },
+    onError: (error) => {
       toast.error(error.message)
-      throw error
     }
-  }, [organizationId, memberId, mutate])
+  })
 
-  const deleteEngagement = useCallback(async (engagementId: string) => {
-    if (!organizationId || !memberId) throw new Error('Organization ID and Member ID are required')
+  const deleteEngagementMutation = useMutation({
+    mutationFn: async (engagementId: string) => {
+      if (!organizationId || !memberId) throw new Error('Organization ID and Member ID are required')
 
-    try {
       const response = await fetch(`/api/organizations/${organizationId}/members/${memberId}/engagements/${engagementId}`, {
         method: 'DELETE',
       })
@@ -111,13 +122,17 @@ export function useEngagements(organizationId: string, memberId: string) {
         throw new Error(error.error || 'Failed to delete engagement')
       }
 
-      await mutate()
+      return true
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: cacheKeys.memberEngagements(organizationId, memberId) })
+      queryClient.invalidateQueries({ queryKey: cacheKeys.organizationMembers(organizationId) })
       toast.success('Engagement deleted successfully')
-    } catch (error: any) {
+    },
+    onError: (error) => {
       toast.error(error.message)
-      throw error
     }
-  }, [organizationId, memberId, mutate])
+  })
 
   const calculateTotalHours = useCallback((engagements?: ProjectEngagement[]): number => {
     const engagementsToUse = Array.isArray(engagements) ? engagements : Array.isArray(data) ? data : []
@@ -208,9 +223,10 @@ export function useEngagements(organizationId: string, memberId: string) {
     engagements: data,
     isLoading,
     error,
-    createEngagement,
-    updateEngagement,
-    deleteEngagement,
+    createEngagement: createEngagementMutation.mutate,
+    updateEngagement: (engagementId: string, data: EngagementUpdateData) => 
+      updateEngagementMutation.mutate({ engagementId, data }),
+    deleteEngagement: deleteEngagementMutation.mutate,
     calculateTotalHours,
     calculateAvailability,
     getActiveEngagements,
@@ -218,6 +234,6 @@ export function useEngagements(organizationId: string, memberId: string) {
     getEngagementsByProject,
     validateEngagement,
     isOverallocated,
-    mutate,
+    mutate: refetch,
   }
 }

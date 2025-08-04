@@ -23,12 +23,35 @@ export function ReactQueryProvider({ children }: ReactQueryProviderProps) {
               switch (queryKey) {
                 case 'user':
                 case 'profile':
-                  return 10 * 60 * 1000 // 10 minutes for user data
+                case 'organizationLogo':
+                  return 10 * 60 * 1000 // 10 minutes for static user data
+                case 'organizations':
                 case 'organization':
+                case 'users':
                   return 5 * 60 * 1000  // 5 minutes for org data
+                case 'projects':
+                case 'project':
+                case 'labels':
+                  return 3 * 60 * 1000  // 3 minutes for semi-static data
+                case 'boards':
                 case 'board':
+                case 'boardColumns':
                 case 'tasks':
+                case 'task':
+                case 'sprints':
+                case 'sprint':
+                case 'sprintColumns':
                   return 30 * 1000      // 30 seconds for dynamic data
+                case 'taskAttachments':
+                case 'taskChecklists':
+                  return 1 * 60 * 1000  // 1 minute for task-related data
+                case 'navData':
+                case 'navDataMultiple':
+                  return 2 * 60 * 1000  // 2 minutes for navigation data
+                case 'teamMembers':
+                case 'teamMember':
+                case 'engagements':
+                  return 2 * 60 * 1000  // 2 minutes for team data
                 default:
                   return 2 * 60 * 1000  // 2 minutes default
               }
@@ -88,8 +111,10 @@ export function ReactQueryProvider({ children }: ReactQueryProviderProps) {
               }
               const queryKey = query.queryKey[0] as string
               const criticalData = [
-                'tasks', 'board', 'sprint-columns', 
-                'teamMembers', 'notifications'
+                'tasks', 'task', 'board', 'boards', 'boardColumns',
+                'sprints', 'sprint', 'sprintColumns', 
+                'teamMembers', 'teamMember', 'notifications',
+                'navData', 'navDataMultiple'
               ]
               return criticalData.includes(queryKey)
             },
@@ -102,7 +127,10 @@ export function ReactQueryProvider({ children }: ReactQueryProviderProps) {
               }
               // Always refetch critical data on mount
               const queryKey = query.queryKey[0] as string
-              const alwaysRefresh = ['tasks', 'board', 'sprint-columns']
+              const alwaysRefresh = [
+                'tasks', 'task', 'board', 'boards', 'boardColumns',
+                'sprints', 'sprint', 'sprintColumns', 'navData'
+              ]
               return alwaysRefresh.includes(queryKey) ? 'always' : true
             },
             
@@ -116,12 +144,23 @@ export function ReactQueryProvider({ children }: ReactQueryProviderProps) {
               const queryKey = query.queryKey[0] as string
               switch (queryKey) {
                 case 'tasks':
+                case 'task':
                 case 'board':
-                  return 30000 // 30 seconds for task data
-                case 'sprint-columns':
-                  return 15000 // 15 seconds for sprint columns
+                case 'boards':
+                  return 30000 // 30 seconds for task/board data
+                case 'sprints':
+                case 'sprint':
+                case 'sprintColumns':
+                case 'boardColumns':
+                  return 15000 // 15 seconds for sprint/column data
+                case 'teamMembers':
+                case 'teamMember':
+                  return 60000 // 60 seconds for team data
                 case 'notifications':
                   return 10000 // 10 seconds for notifications
+                case 'navData':
+                case 'navDataMultiple':
+                  return 120000 // 2 minutes for navigation data
                 default:
                   return false // No background refetch by default
               }

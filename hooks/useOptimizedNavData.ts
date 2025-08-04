@@ -1,5 +1,14 @@
-import useSWR from 'swr'
+import { useQuery } from '@tanstack/react-query'
 import { useMemo } from 'react'
+import { cacheKeys } from '@/lib/query-optimization'
+
+// Generic fetcher function for API requests
+const fetcher = (url: string) => fetch(url).then(res => {
+  if (!res.ok) {
+    throw new Error('Failed to fetch')
+  }
+  return res.json()
+})
 
 interface NavProject {
   id: string
@@ -39,18 +48,24 @@ interface NavOrganizationData {
 }
 
 export function useOptimizedNavData(organizationId: string | null) {
-  // Use SWR for all API calls with proper deduplication
-  const { data: projects = [], error: projectsError } = useSWR<NavProject[]>(
-    organizationId ? `/api/projects?organizationId=${organizationId}` : null
-  )
+  // Use React Query for all API calls with proper caching
+  const { data: projects = [], error: projectsError } = useQuery<NavProject[]>({
+    queryKey: cacheKeys.projects(organizationId || ''),
+    queryFn: () => fetcher(`/api/projects?organizationId=${organizationId}`),
+    enabled: !!organizationId,
+  })
 
-  const { data: allBoards = [], error: boardsError } = useSWR<NavBoard[]>(
-    organizationId ? `/api/boards?organizationId=${organizationId}` : null
-  )
+  const { data: allBoards = [], error: boardsError } = useQuery<NavBoard[]>({
+    queryKey: cacheKeys.boards(organizationId || ''),
+    queryFn: () => fetcher(`/api/boards?organizationId=${organizationId}`),
+    enabled: !!organizationId,
+  })
 
-  const { data: activeSprints = [], error: sprintsError } = useSWR<NavSprint[]>(
-    organizationId ? `/api/sprints?organizationId=${organizationId}&status=active` : null
-  )
+  const { data: activeSprints = [], error: sprintsError } = useQuery<NavSprint[]>({
+    queryKey: cacheKeys.sprints(undefined, 'active'),
+    queryFn: () => fetcher(`/api/sprints?organizationId=${organizationId}&status=active`),
+    enabled: !!organizationId,
+  })
 
   // Process data to separate standalone boards from project-linked boards
   const processedData = useMemo(() => {

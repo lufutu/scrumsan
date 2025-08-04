@@ -1,6 +1,7 @@
 "use client"
 
-import useSWR from 'swr'
+import { useQuery } from '@tanstack/react-query'
+import { cacheKeys } from '@/lib/query-optimization'
 
 interface Attachment {
   id: string
@@ -19,21 +20,25 @@ interface Attachment {
   error?: string
 }
 
-const fetcher = (url: string) => fetch(url).then(res => {
-  if (!res.ok) throw new Error('Failed to fetch')
-  return res.json()
-})
+const fetcher = async (url: string) => {
+  const response = await fetch(url)
+  if (!response.ok) {
+    throw new Error('Failed to fetch')
+  }
+  return response.json()
+}
 
 export function useAttachments(taskId: string) {
-  const { data: attachments, error, isLoading, mutate } = useSWR<Attachment[]>(
-    taskId ? `/api/tasks/${taskId}/attachments` : null,
-    fetcher
-  )
+  const { data: attachments, error, isLoading, refetch } = useQuery<Attachment[]>({
+    queryKey: cacheKeys.taskAttachments(taskId),
+    queryFn: () => fetcher(`/api/tasks/${taskId}/attachments`),
+    enabled: !!taskId,
+  })
 
   return {
     attachments: attachments || [],
     loading: isLoading,
     error,
-    mutate
+    mutate: refetch
   }
 }

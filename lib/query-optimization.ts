@@ -278,6 +278,39 @@ export function buildPaginationClause(params: PaginationParams) {
 
 // Cache key generators for consistent caching
 export const cacheKeys = {
+  // Organization data
+  organizations: () => ['organizations'],
+  organization: (organizationId: string) => ['organization', organizationId],
+  organizationLogo: (organizationId: string) => ['organizationLogo', organizationId],
+  
+  // Projects
+  projects: (organizationId: string) => ['projects', organizationId],
+  project: (projectId: string) => ['project', projectId],
+  
+  // Boards
+  boards: (organizationId?: string, projectId?: string) => 
+    ['boards', organizationId || 'all', projectId || 'all'],
+  board: (boardId: string) => ['board', boardId],
+  boardColumns: (boardId: string) => ['boardColumns', boardId],
+  
+  // Tasks
+  tasks: (boardId?: string, columnId?: string) => 
+    ['tasks', boardId || 'all', columnId || 'all'],
+  task: (taskId: string) => ['task', taskId],
+  taskAttachments: (taskId: string) => ['taskAttachments', taskId],
+  taskChecklists: (taskId: string) => ['taskChecklists', taskId],
+  
+  // Sprints
+  sprints: (boardId?: string, status?: string) => 
+    ['sprints', boardId || 'all', status || 'all'],
+  sprint: (sprintId: string) => ['sprint', sprintId],
+  sprintColumns: (sprintId: string) => ['sprintColumns', sprintId],
+  
+  // Labels
+  labels: (boardId: string) => ['labels', boardId],
+  
+  // Users and team members
+  users: (organizationId: string) => ['users', organizationId],
   teamMembers: (organizationId: string, filters?: any) => 
     ['teamMembers', organizationId, filters ? JSON.stringify(filters) : 'all'],
   teamMember: (organizationId: string, memberId: string) => 
@@ -288,8 +321,17 @@ export const cacheKeys = {
     ['customRoles', organizationId],
   memberProfile: (organizationId: string, memberId: string) => 
     ['memberProfile', organizationId, memberId],
+  
+  // Engagements
+  engagements: (organizationId: string) => ['engagements', organizationId],
   memberEngagements: (organizationId: string, memberId: string) => 
     ['memberEngagements', organizationId, memberId],
+  
+  // Navigation data (optimized)
+  navData: (organizationId: string) => ['navData', organizationId],
+  navDataMultiple: (organizationIds: string[]) => ['navDataMultiple', organizationIds.sort().join(',')],
+  
+  // Time tracking
   memberTimeOff: (organizationId: string, memberId: string) => 
     ['memberTimeOff', organizationId, memberId],
   memberTimeline: (organizationId: string, memberId: string) => 
@@ -298,6 +340,53 @@ export const cacheKeys = {
 
 // Query invalidation helpers
 export const invalidationPatterns = {
+  // Organization-wide invalidation
+  allOrganizationData: (organizationId: string) => [
+    ['organizations'],
+    ['organization', organizationId],
+    ['projects', organizationId],
+    ['boards', organizationId],
+    ['users', organizationId],
+    ['teamMembers', organizationId],
+    ['navData', organizationId],
+  ],
+  
+  // Board-related invalidation
+  boardData: (boardId: string, organizationId?: string) => [
+    ['board', boardId],
+    ['boardColumns', boardId],
+    ['tasks', boardId],
+    ['labels', boardId],
+    ...(organizationId ? [['boards', organizationId]] : []),
+    ...(organizationId ? [['navData', organizationId]] : []),
+  ],
+  
+  // Project-related invalidation  
+  projectData: (projectId: string, organizationId?: string) => [
+    ['project', projectId],
+    ...(organizationId ? [['projects', organizationId]] : []),
+    ...(organizationId ? [['boards', organizationId, projectId]] : []),
+    ...(organizationId ? [['navData', organizationId]] : []),
+  ],
+  
+  // Task-related invalidation
+  taskData: (taskId: string, boardId?: string) => [
+    ['task', taskId],
+    ['taskAttachments', taskId],
+    ['taskChecklists', taskId],
+    ...(boardId ? [['tasks', boardId]] : []),
+    ...(boardId ? [['board', boardId]] : []),
+  ],
+  
+  // Sprint-related invalidation
+  sprintData: (sprintId: string, boardId?: string) => [
+    ['sprint', sprintId],
+    ['sprintColumns', sprintId],
+    ...(boardId ? [['sprints', boardId]] : []),
+    ...(boardId ? [['board', boardId]] : []),
+  ],
+  
+  // Team data invalidation
   allTeamData: (organizationId: string) => [
     ['teamMembers', organizationId],
     ['teamMember', organizationId],
@@ -305,6 +394,7 @@ export const invalidationPatterns = {
     ['memberEngagements', organizationId],
     ['memberTimeOff', organizationId],
     ['memberTimeline', organizationId],
+    ['users', organizationId],
   ],
   memberSpecific: (organizationId: string, memberId: string) => [
     ['teamMember', organizationId, memberId],

@@ -473,7 +473,7 @@ export default function StandaloneBoardView({ board, onUpdate }: StandaloneBoard
           <div>
             <h2 className="text-2xl font-bold">{board.name}</h2>
             <p className="text-muted-foreground">
-              Standalone {board.boardType === 'scrum' ? 'Scrum' : 'Kanban'} board
+              {board.boardType === 'scrum' ? 'Scrum' : 'Kanban'} board
             </p>
           </div>
           

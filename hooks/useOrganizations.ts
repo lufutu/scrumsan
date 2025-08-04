@@ -1,9 +1,16 @@
-import useSWR from 'swr'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useCallback } from 'react'
 import { toast } from 'sonner'
+import { cacheKeys, invalidationPatterns } from '@/lib/query-optimization'
 import { Database } from '@/types/database'
 
-const fetcher = (url: string) => fetch(url).then(res => res.json())
+const fetcher = async (url: string) => {
+  const response = await fetch(url)
+  if (!response.ok) {
+    throw new Error('Failed to fetch')
+  }
+  return response.json()
+}
 
 export interface Organization {
   id: string
@@ -19,13 +26,15 @@ export interface Organization {
 }
 
 export function useOrganizations() {
-  const { data, error, isLoading, mutate } = useSWR<Organization[]>(
-    '/api/organizations',
-    fetcher
-  )
+  const queryClient = useQueryClient()
+  
+  const { data, error, isLoading, refetch } = useQuery<Organization[]>({
+    queryKey: cacheKeys.organizations(),
+    queryFn: () => fetcher('/api/organizations'),
+  })
 
-  const createOrganization = useCallback(async (data: { name: string; description?: string; logo?: string }) => {
-    try {
+  const createOrganizationMutation = useMutation({
+    mutationFn: async (data: { name: string; description?: string; logo?: string }) => {
       const response = await fetch('/api/organizations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -37,17 +46,20 @@ export function useOrganizations() {
         throw new Error(error.message || 'Failed to create organization')
       }
 
-      await mutate()
+      return response.json()
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: cacheKeys.organizations() })
       toast.success('Organization created successfully')
-    } catch (error: any) {
+    },
+    onError: (error) => {
       console.error('Failed to create organization:', error)
       toast.error(error.message || 'Failed to create organization')
-      throw error
     }
-  }, [mutate])
+  })
 
-  const updateOrganization = useCallback(async (id: string, data: Partial<Organization>) => {
-    try {
+  const updateOrganizationMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<Organization> }) => {
       const response = await fetch(`/api/organizations/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -59,17 +71,47 @@ export function useOrganizations() {
         throw new Error(error.message || 'Failed to update organization')
       }
 
-      await mutate()
-      toast.success('Organization updated successfully')
-    } catch (error: any) {
+      return response.json()
+    },
+    onMutate: async ({ id, data }) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: cacheKeys.organizations() })
+
+      // Snapshot previous value
+      const previousOrganizations = queryClient.getQueryData<Organization[]>(cacheKeys.organizations())
+
+      // Optimistically update
+      if (previousOrganizations) {
+        queryClient.setQueryData<Organization[]>(
+          cacheKeys.organizations(),
+          previousOrganizations.map(org => 
+            org.id === id ? { ...org, ...data } : org
+          )
+        )
+      }
+
+      return { previousOrganizations }
+    },
+    onError: (error, variables, context) => {
+      // Rollback on error
+      if (context?.previousOrganizations) {
+        queryClient.setQueryData(cacheKeys.organizations(), context.previousOrganizations)
+      }
       console.error('Failed to update organization:', error)
       toast.error(error.message || 'Failed to update organization')
-      throw error
+    },
+    onSuccess: (data, { id }) => {
+      // Invalidate related queries
+      const invalidations = invalidationPatterns.allOrganizationData(id)
+      invalidations.forEach(queryKey => {
+        queryClient.invalidateQueries({ queryKey })
+      })
+      toast.success('Organization updated successfully')
     }
-  }, [mutate])
+  })
 
-  const deleteOrganization = useCallback(async (id: string) => {
-    try {
+  const deleteOrganizationMutation = useMutation({
+    mutationFn: async (id: string) => {
       const response = await fetch(`/api/organizations/${id}`, {
         method: 'DELETE',
       })
@@ -79,14 +121,47 @@ export function useOrganizations() {
         throw new Error(error.message || 'Failed to delete organization')
       }
 
-      await mutate()
-      toast.success('Organization deleted successfully')
-    } catch (error: any) {
+      return true
+    },
+    onMutate: async (id) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: cacheKeys.organizations() })
+
+      // Snapshot previous value
+      const previousOrganizations = queryClient.getQueryData<Organization[]>(cacheKeys.organizations())
+
+      // Optimistically remove
+      if (previousOrganizations) {
+        queryClient.setQueryData<Organization[]>(
+          cacheKeys.organizations(),
+          previousOrganizations.filter(org => org.id !== id)
+        )
+      }
+
+      return { previousOrganizations }
+    },
+    onError: (error, variables, context) => {
+      // Rollback on error
+      if (context?.previousOrganizations) {
+        queryClient.setQueryData(cacheKeys.organizations(), context.previousOrganizations)
+      }
       console.error('Failed to delete organization:', error)
       toast.error(error.message || 'Failed to delete organization')
-      throw error
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: cacheKeys.organizations() })
+      toast.success('Organization deleted successfully')
     }
-  }, [mutate])
+  })
+
+  const createOrganization = useCallback((data: { name: string; description?: string; logo?: string }) => 
+    createOrganizationMutation.mutate(data), [createOrganizationMutation])
+  
+  const updateOrganization = useCallback((id: string, data: Partial<Organization>) => 
+    updateOrganizationMutation.mutate({ id, data }), [updateOrganizationMutation])
+  
+  const deleteOrganization = useCallback((id: string) => 
+    deleteOrganizationMutation.mutate(id), [deleteOrganizationMutation])
 
   return {
     organizations: data,
@@ -95,6 +170,6 @@ export function useOrganizations() {
     createOrganization,
     updateOrganization,
     deleteOrganization,
-    mutate,
+    mutate: refetch,
   }
-} 
+}
