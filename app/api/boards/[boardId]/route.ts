@@ -25,7 +25,8 @@ const getOptimizedBoardData = async (boardId: string, userId: string) => {
       boardType: true,
       organizationId: true,
       createdAt: true,
-      updatedAt: true
+      createdBy: true,
+      logo: true
     }
   })
 

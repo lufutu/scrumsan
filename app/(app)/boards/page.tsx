@@ -27,7 +27,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Tables } from '@/types/database'
 
-// Updated Board type to match optimized API response
+// Updated Board type to match actual Prisma schema
 type Board = {
   id: string
   name: string
@@ -36,8 +36,8 @@ type Board = {
   boardType: string | null
   organizationId: string
   createdAt: string
-  updatedAt: string
-  created_by?: string
+  createdBy?: string | null
+  logo?: string | null
   _count?: {
     tasks: number
     sprints: number
@@ -215,7 +215,7 @@ export default function BoardsPage() {
                             Open Board
                           </Link>
                         </DropdownMenuItem>
-                        {(user?.id === board.created_by || ['owner', 'admin'].includes(currentMember?.role || '')) && (
+                        {(user?.id === board.createdBy || ['owner', 'admin'].includes(currentMember?.role || '')) && (
                           <BoardEditForm
                             board={{
                               id: board.id,
@@ -232,7 +232,7 @@ export default function BoardsPage() {
                           </BoardEditForm>
                         )}
                         <DropdownMenuSeparator />
-                        {(user?.id === board.created_by || ['owner', 'admin'].includes(currentMember?.role || '')) && (
+                        {(user?.id === board.createdBy || ['owner', 'admin'].includes(currentMember?.role || '')) && (
                           <BoardDeleteDialog
                             board={{
                               id: board.id,
