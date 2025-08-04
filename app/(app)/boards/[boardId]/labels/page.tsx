@@ -1,7 +1,7 @@
 "use client"
 
 import { useParams } from 'next/navigation'
-import useSWR from 'swr'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Loader2, ArrowLeft, Plus, Clock, Target, Trash2, Edit, Search } from 'lucide-react'
@@ -24,6 +24,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { EnhancedAvatar } from '@/components/ui/enhanced-avatar'
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import {
   Dialog,
   DialogContent,
@@ -72,10 +73,15 @@ export default function LabelsPage() {
     color: '#3B82F6'
   })
 
-  const { data: labels, error, isLoading, mutate } = useSWR<LabelWithStats[]>(
-    boardId ? `/api/boards/${boardId}/labels` : null,
-    fetcher
-  )
+  const queryClient = useQueryClient()
+  
+  const { data: labels, error, isLoading } = useQuery<LabelWithStats[]>({
+    queryKey: ['labels', boardId],
+    queryFn: () => fetcher(`/api/boards/${boardId}/labels`),
+    enabled: !!boardId,
+  })
+
+  const mutate = () => queryClient.invalidateQueries({ queryKey: ['labels', boardId] })
 
   const filteredAndSortedLabels = labels ? [...labels]
     .filter(label => 

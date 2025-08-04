@@ -1,7 +1,7 @@
 "use client"
 
 import { useParams, useSearchParams } from 'next/navigation'
-import useSWR from 'swr'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Loader2, ArrowLeft, Edit, Target, Clock, CheckCircle } from 'lucide-react'
@@ -97,10 +97,15 @@ export default function LabelDetailPage() {
     color: '#3B82F6'
   })
 
-  const { data: label, error, isLoading, mutate } = useSWR<LabelDetail>(
-    boardId && labelId ? `/api/boards/${boardId}/labels/${labelId}` : null,
-    fetcher
-  )
+  const queryClient = useQueryClient()
+  
+  const { data: label, error, isLoading } = useQuery<LabelDetail>({
+    queryKey: ['label', boardId, labelId],
+    queryFn: () => fetcher(`/api/boards/${boardId}/labels/${labelId}`),
+    enabled: !!(boardId && labelId),
+  })
+
+  const mutate = () => queryClient.invalidateQueries({ queryKey: ['label', boardId, labelId] })
 
   const handleEditLabel = async () => {
     try {
