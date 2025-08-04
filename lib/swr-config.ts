@@ -35,20 +35,20 @@ const deduplicatedFetcher = (url: string) => {
   return request
 }
 
-// Optimized SWR configuration
+// Optimized SWR configuration for performance
 export const swrConfig: SWRConfiguration = {
   fetcher: deduplicatedFetcher,
   
-  // Cache configuration
-  revalidateOnFocus: true,
+  // Cache configuration - optimized for performance
+  revalidateOnFocus: false, // Disable focus revalidation to reduce API calls
   revalidateOnMount: true,
   revalidateOnReconnect: true,
   refreshWhenOffline: false,
   refreshWhenHidden: false,
   
-  // Timing configuration
-  dedupingInterval: 2000, // 2 seconds deduplication
-  focusThrottleInterval: 5000, // 5 seconds focus throttle
+  // Timing configuration - more aggressive deduplication
+  dedupingInterval: 5000, // 5 seconds deduplication (increased)
+  focusThrottleInterval: 10000, // 10 seconds focus throttle (increased)
   
   // Error retry configuration
   errorRetryInterval: 5000,
@@ -69,8 +69,8 @@ export const swrConfig: SWRConfiguration = {
   
   // Success callback for cache invalidation strategies
   onSuccess: (data, key) => {
-    // Custom success handling
-    if (process.env.NODE_ENV === 'development') {
+    // Only log in development for debugging
+    if (process.env.NODE_ENV === 'development' && process.env.DEBUG_SWR) {
       console.log(`SWR Success: ${key}`, data)
     }
   },

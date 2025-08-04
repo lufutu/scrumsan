@@ -45,6 +45,9 @@ export async function GET(req: NextRequest) {
     const url = new URL(req.url)
     const boardId = url.searchParams.get('boardId')
     const assigneeId = url.searchParams.get('assigneeId')
+    const page = parseInt(url.searchParams.get('page') || '1')
+    const limit = parseInt(url.searchParams.get('limit') || '50') // Default 50 tasks per page
+    const offset = (page - 1) * limit
     
     const whereClause: any = {}
     
@@ -94,8 +97,15 @@ export async function GET(req: NextRequest) {
       }
     }
     
+    // Get tasks with pagination and optimized includes
     const tasks = await prisma.task.findMany({
       where: whereClause,
+      take: limit,
+      skip: offset,
+      orderBy: [
+        { createdAt: 'desc' }, // Most recent first
+        { id: 'asc' } // Stable sort
+      ],
       include: {
         taskAssignees: {
           select: {
@@ -206,12 +216,13 @@ export async function GET(req: NextRequest) {
             relationsAsTarget: true
           }
         }
-      },
-      orderBy: [
-        { position: 'asc' },
-        { createdAt: 'desc' }
-      ]
+      }
     })
+    
+    // Get total count for pagination metadata (only if pagination is requested)
+    const totalCount = page > 1 || limit < 100 ? await prisma.task.count({
+      where: whereClause
+    }) : undefined
     
     // Map tasks to include the 'done' attribute based on sprint column isDone
     const tasksWithDoneStatus = tasks.map(task => ({
@@ -219,7 +230,20 @@ export async function GET(req: NextRequest) {
       done: task.sprintColumn?.isDone || false
     }))
     
-    return NextResponse.json(tasksWithDoneStatus)
+    // Return paginated response with metadata
+    const response = {
+      tasks: tasksWithDoneStatus,
+      pagination: totalCount !== undefined ? {
+        page,
+        limit,
+        total: totalCount,
+        totalPages: Math.ceil(totalCount / limit),
+        hasNext: page * limit < totalCount,
+        hasPrev: page > 1
+      } : undefined
+    }
+    
+    return NextResponse.json(response)
   } catch (error: unknown) {
     console.error('Error fetching tasks:', error)
     return NextResponse.json(

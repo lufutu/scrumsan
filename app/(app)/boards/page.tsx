@@ -5,6 +5,7 @@ import { useActiveOrg } from '@/hooks/useActiveOrg'
 import { useToast } from '@/hooks/use-toast'
 import { useSupabase } from '@/providers/supabase-provider'
 import { useOrganization } from '@/providers/organization-provider'
+import { useOptimizedBoards } from '@/hooks/useOptimizedBoards'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -26,9 +27,32 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Tables } from '@/types/database'
 
-type Board = Tables<'boards'> & {
-  tasks: { count: number }[]
-  board_columns: { count: number }[]
+// Updated Board type to match optimized API response
+type Board = {
+  id: string
+  name: string
+  description: string | null
+  color: string | null
+  boardType: string | null
+  organizationId: string
+  createdAt: string
+  updatedAt: string
+  created_by?: string
+  _count?: {
+    tasks: number
+    sprints: number
+  }
+  organization?: {
+    id: string
+    name: string
+  }
+  projectLinks?: Array<{
+    id: string
+    project: {
+      id: string
+      name: string
+    }
+  }>
 }
 
 export default function BoardsPage() {
@@ -37,57 +61,27 @@ export default function BoardsPage() {
   const router = useRouter()
   const { user } = useSupabase()
   const { currentMember } = useOrganization()
-  const [boards, setBoards] = useState<Board[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  
+  // Use optimized boards hook with caching and deduplication
+  const { boards, isLoading, error, refresh } = useOptimizedBoards(activeOrg?.id || null)
+  
+  // Local state for UI interactions
+  const [page, setPage] = useState(1)
 
-  const fetchBoardsCallback = useCallback(async () => {
-    if (!activeOrg?.id) return
-
-    try {
-      setIsLoading(true)
-      setError(null)
-
-      const response = await fetch(`/api/boards?organizationId=${activeOrg.id}`)
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch boards')
-      }
-
-      const data = await response.json()
-
-      // Transform the data to match the expected format
-      const transformedBoards = data.map((board: { boardType?: string; createdAt?: string; _count?: { tasks?: number; columns?: number } }) => ({
-        ...board,
-        board_type: board.boardType,
-        created_at: board.createdAt,
-        tasks: [{ count: board._count?.tasks || 0 }],
-        board_columns: [{ count: board._count?.columns || 0 }]
-      }))
-
-      setBoards(transformedBoards)
-    } catch (err) {
-      console.error('Error fetching boards:', err)
-      setError('Failed to load boards')
+  // Show error toast if boards fail to load
+  useEffect(() => {
+    if (error) {
       toast({
         title: "Error",
-        description: "Failed to load boards"
+        description: error
       })
-    } finally {
-      setIsLoading(false)
     }
-  }, [activeOrg?.id, toast])
-
-  useEffect(() => {
-    if (activeOrg?.id) {
-      fetchBoardsCallback()
-    }
-  }, [activeOrg?.id, fetchBoardsCallback])
+  }, [error, toast])
 
 
   const handleBoardCreated = async (newBoard?: { id?: string }) => {
-    // Refresh the boards list
-    await fetchBoardsCallback()
+    // Refresh the boards list using SWR
+    await refresh()
 
     // Redirect to the new board
     if (newBoard?.id) {
@@ -199,9 +193,9 @@ export default function BoardsPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {boards.map((board) => {
-              const BoardIcon = getBoardIcon(board.board_type)
-              const taskCount = board.tasks?.[0]?.count || 0
-              const columnCount = board.board_columns?.[0]?.count || 0
+              const BoardIcon = getBoardIcon(board.boardType)
+              const taskCount = board._count?.tasks || 0
+              const columnCount = 0 // Will be loaded separately if needed
 
               return (
                 <Card key={board.id} className="hover:shadow-lg transition-all relative group">
@@ -227,10 +221,10 @@ export default function BoardsPage() {
                               id: board.id,
                               name: board.name,
                               description: board.description,
-                              boardType: board.board_type,
+                              boardType: board.boardType,
                               color: board.color
                             }}
-                            onSuccess={fetchBoardsCallback}
+                            onSuccess={refresh}
                           >
                             <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
                               Edit Board
@@ -248,7 +242,7 @@ export default function BoardsPage() {
                                 sprints: 0 // We don't have this data in the list view
                               }
                             }}
-                            onSuccess={fetchBoardsCallback}
+                            onSuccess={refresh}
                             redirectTo={null}
                           >
                             <DropdownMenuItem
@@ -270,8 +264,8 @@ export default function BoardsPage() {
                           <BoardIcon className="h-5 w-5 text-muted-foreground" />
                           <CardTitle className="text-xl truncate">{board.name}</CardTitle>
                         </div>
-                        <Badge className={`${getBoardTypeColor(board.board_type)} border`}>
-                          {getBoardTypeLabel(board.board_type)}
+                        <Badge className={`${getBoardTypeColor(board.boardType)} border`}>
+                          {getBoardTypeLabel(board.boardType)}
                         </Badge>
                       </div>
                       {board.created_at && (

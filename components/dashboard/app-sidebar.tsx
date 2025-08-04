@@ -37,7 +37,8 @@ import { useSupabase } from "@/providers/supabase-provider"
 import { usePermissions } from "@/hooks/usePermissions"
 import NotificationBell from "@/components/notifications/notification-bell"
 
-export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+// Memoized AppSidebar to prevent unnecessary re-renders
+export const AppSidebar = React.memo(function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     const { organizations, activeOrg, isLoading } = useOrganization()
     const { user } = useSupabase()
     const { canPerformAction } = usePermissions()
@@ -52,7 +53,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         setIsProfileDialogOpen(true)
     }, [])
 
-    const navMain = [
+    // Memoize navigation items to prevent recalculation on every render
+    const navMain = React.useMemo(() => [
         {
             title: "Dashboard",
             url: "/",
@@ -71,9 +73,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             icon: Building2,
             isActive: pathname.startsWith("/organizations")
         }
-    ]
+    ], [pathname])
 
-    const navSecondary = [
+    // Memoize secondary navigation items
+    const navSecondary = React.useMemo(() => [
         {
             title: "Search",
             url: "/search",
@@ -94,13 +97,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             url: "/help",
             icon: HelpCircle,
         }
-    ]
+    ], [handleProfileClick])
 
-    const userData = {
+    // Memoize user data to prevent object recreation
+    const userData = React.useMemo(() => ({
         name: user?.user_metadata?.full_name || user?.email || "User",
         email: user?.email || "",
         avatar: user?.user_metadata?.avatar_url || "",
-    }
+    }), [user])
 
     return (
         <Sidebar collapsible="icon" {...props}>
@@ -172,4 +176,4 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             />
         </Sidebar>
     )
-}
+})

@@ -12,84 +12,83 @@ const boardUpdateSchema = z.object({
   boardType: z.enum(['kanban', 'scrum']).optional(),
 })
 
-// Cached board data fetching function
-const getCachedBoardData = unstable_cache(
-  async (boardId: string, userId: string) => {
-    // Find the board with all related data
-    const board = await prisma.board.findUnique({
-      where: { id: boardId },
+// Optimized board data fetching function - removed caching and over-fetching
+const getOptimizedBoardData = async (boardId: string, userId: string) => {
+  // First check if user has access to the board
+  const board = await prisma.board.findUnique({
+    where: { id: boardId },
+    select: {
+      id: true,
+      name: true,
+      description: true,
+      color: true,
+      boardType: true,
+      organizationId: true,
+      createdAt: true,
+      updatedAt: true
+    }
+  })
+
+  if (!board) {
+    return null
+  }
+
+  // Check if user is a member of the organization
+  const orgMember = await prisma.organizationMember.findFirst({
+    where: {
+      organizationId: board.organizationId,
+      userId: userId
+    }
+  })
+  
+  if (!orgMember) {
+    return null
+  }
+
+  // Fetch additional data in parallel for better performance
+  const [organization, projectLinks, columns, counts] = await Promise.all([
+    // Get minimal organization data (no members)
+    prisma.organization.findUnique({
+      where: { id: board.organizationId },
+      select: {
+        id: true,
+        name: true
+      }
+    }),
+    
+    // Get project links
+    prisma.projectBoardLink.findMany({
+      where: { boardId },
       include: {
-        organization: {
+        project: {
           select: {
             id: true,
-            name: true,
-            members: {
-              select: {
-                userId: true,
-                role: true,
-                user: {
-                  select: {
-                    id: true,
-                    fullName: true,
-                    avatarUrl: true,
-                    email: true
-                  }
-                }
-              }
-            }
+            name: true
           }
-        },
-        projectLinks: {
-          include: {
-            project: {
-              select: {
-                id: true,
-                name: true
-              }
-            }
+        }
+      }
+    }),
+    
+    // Get columns without tasks (tasks loaded separately)
+    prisma.boardColumn.findMany({
+      where: { boardId },
+      orderBy: { position: 'asc' },
+      select: {
+        id: true,
+        name: true,
+        position: true,
+        _count: {
+          select: {
+            tasks: true
           }
-        },
-        columns: {
-          orderBy: { position: 'asc' },
-          include: {
-            tasks: {
-              orderBy: { createdAt: 'asc' },
-              select: {
-                id: true,
-                title: true,
-                description: true,
-                taskType: true,
-                priority: true,
-                storyPoints: true,
-                dueDate: true,
-                createdAt: true,
-                updatedAt: true,
-                taskAssignees: {
-                  select: {
-                    user: {
-                      select: {
-                        id: true,
-                        fullName: true,
-                        avatarUrl: true
-                      }
-                    }
-                  }
-                },
-                taskLabels: {
-                  select: {
-                    label: {
-                      select: {
-                        id: true,
-                        name: true,
-                        color: true
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
+        }
+      }
+    }),
+    
+    // Get counts
+    prisma.board.findUnique({
+      where: { id: boardId },
+      select: {
         _count: {
           select: {
             tasks: true,
@@ -98,30 +97,19 @@ const getCachedBoardData = unstable_cache(
         }
       }
     })
+  ])
 
-    if (!board) {
-      return null
-    }
-
-    // Check if user is a member of the organization
-    const orgMember = await prisma.organizationMember.findFirst({
-      where: {
-        organizationId: board.organizationId,
-        userId: userId
-      }
-    })
-    
-    if (!orgMember) {
-      return null
-    }
-
-    return board
-  },
-  ['board-data'],
-  {
-    revalidate: 30 // Cache for 30 seconds
+  return {
+    ...board,
+    organization,
+    projectLinks,
+    columns: columns.map(col => ({
+      ...col,
+      tasks: [] // Tasks will be loaded separately via /api/tasks endpoint
+    })),
+    _count: counts?._count
   }
-)
+}
 
 export async function GET(
   req: NextRequest,
@@ -132,8 +120,8 @@ export async function GET(
     const user = await getCurrentUser(supabase)
     const { boardId } = await params
     
-    // Use cached board data
-    const board = await getCachedBoardData(boardId, user.id)
+    // Use optimized board data fetching
+    const board = await getOptimizedBoardData(boardId, user.id)
 
     if (!board) {
       return NextResponse.json(

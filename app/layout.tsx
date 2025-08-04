@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/sonner";
 import SupabaseProvider from "@/providers/supabase-provider";
 import { OrganizationProvider } from "@/providers/organization-provider";
 import { ReactQueryProvider } from "@/providers/react-query-provider";
+import { SWRProvider } from "@/providers/swr-provider";
 
 const dmSans = DM_Sans({
   variable: "--font-dm-sans",
@@ -38,12 +39,14 @@ export default function RootLayout({
         className={`${dmSans.variable} ${lora.variable} ${ibmPlexMono.variable} antialiased`}
       >
         <ReactQueryProvider>
-          <SupabaseProvider>
-            <OrganizationProvider>
-              {children}
-              <Toaster richColors/>
-            </OrganizationProvider>
-          </SupabaseProvider>
+          <SWRProvider>
+            <SupabaseProvider>
+              <OrganizationProvider>
+                {children}
+                <Toaster richColors/>
+              </OrganizationProvider>
+            </SupabaseProvider>
+          </SWRProvider>
         </ReactQueryProvider>
       </body>
     </html>
