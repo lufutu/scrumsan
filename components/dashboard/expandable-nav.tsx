@@ -66,9 +66,12 @@ export function ExpandableNav({ className }: ExpandableNavProps) {
     if (activeOrg?.id) {
       setExpandedOrgs(prev => new Set([...prev, activeOrg.id]))
     }
-    
+  }, [activeOrg?.id])
+
+  // Separate effect for route-based expansion to avoid frequent re-runs
+  useEffect(() => {
     // Auto-expand based on current route
-    if (pathname.startsWith('/boards/')) {
+    if (pathname.startsWith('/boards/') && orgData.length > 0) {
       const boardId = pathname.split('/')[2]
       if (boardId) {
         // Find which organization and project this board belongs to
@@ -84,7 +87,7 @@ export function ExpandableNav({ className }: ExpandableNavProps) {
         })
       }
     }
-  }, [activeOrg?.id, pathname, orgData])
+  }, [pathname]) // Remove orgData from dependencies to prevent frequent re-runs
 
   // Redirect handler for board creation
   const handleBoardCreatedWithRedirect = async (newBoard?: { id?: string }) => {

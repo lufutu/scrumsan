@@ -158,13 +158,18 @@ export function OrganizationProvider({ children }: OrganizationProviderProps) {
         // Active org was deleted or is no longer accessible, switch to first available
         const newActiveOrg = organizations[0]
         setActiveOrgState(newActiveOrg)
-        localStorage.setItem('activeOrgId', newActiveOrg.id)
-      } else if (currentActiveOrg && currentActiveOrg !== activeOrg) {
-        // Update the active org with latest data if it has changed
-        setActiveOrgState(currentActiveOrg)
+        try {
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('activeOrgId', newActiveOrg.id)
+          }
+        } catch (error) {
+          console.warn('Failed to update localStorage:', error)
+        }
       }
+      // Remove the object comparison that was causing infinite loops
+      // Only update if the org is missing, not if it's just a different object reference
     }
-  }, [organizations, activeOrg])
+  }, [organizations, activeOrg?.id]) // Use activeOrg?.id instead of activeOrg to prevent object reference loops
 
   // Clear active org when user logs out
   useEffect(() => {
