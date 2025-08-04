@@ -308,9 +308,14 @@ export const cacheKeys = {
   
   // Labels
   labels: (boardId: string) => ['labels', boardId],
+  boardLabels: (boardId: string) => ['labels', boardId], // Alias for consistency
+  
+  // Comments
+  taskComments: (taskId: string) => ['taskComments', taskId],
   
   // Users and team members
   users: (organizationId: string) => ['users', organizationId],
+  organizationMembers: (organizationId: string) => ['users', organizationId], // Alias for consistency
   teamMembers: (organizationId: string, filters?: any) => 
     ['teamMembers', organizationId, filters ? JSON.stringify(filters) : 'all'],
   teamMember: (organizationId: string, memberId: string) => 
