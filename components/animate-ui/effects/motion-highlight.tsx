@@ -137,10 +137,14 @@ function MotionHighlight<T extends string>({
 
   const safeSetActiveValue = React.useCallback(
     (id: T | null) => {
-      setActiveValue((prev) => (prev === id ? prev : id));
-      if (id !== activeValue) onValueChange?.(id as T);
+      setActiveValue((prev) => {
+        if (prev !== id) {
+          onValueChange?.(id as T);
+        }
+        return prev === id ? prev : id;
+      });
     },
-    [activeValue, onValueChange],
+    [onValueChange],
   );
 
   const safeSetBounds = React.useCallback(
