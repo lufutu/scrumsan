@@ -477,60 +477,61 @@ export default function StandaloneBoardView({ board, onUpdate }: StandaloneBoard
             </p>
           </div>
           
-          <div className="flex gap-2">
-            <Button 
-              onClick={() => setIsAddColumnOpen(true)}
-              className="bg-blue-600 hover:bg-blue-700"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Column
-            </Button>
-            {canEditBoard && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm">
-                    <Settings className="h-4 w-4 mr-2" />
-                    Board Settings
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <BoardEditForm
-                    board={{
-                      id: board.id,
-                      name: board.name,
-                      description: board.description,
-                      boardType: board.boardType,
-                      color: board.color
-                    }}
-                    onSuccess={onUpdate}
-                  >
-                    <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                      <Edit className="h-4 w-4 mr-2" />
-                      Edit Board
-                    </DropdownMenuItem>
-                  </BoardEditForm>
-                  <DropdownMenuSeparator />
-                  <BoardDeleteDialog
-                    board={{
-                      id: board.id,
-                      name: board.name,
-                      _count: {
-                        tasks: board.columns?.reduce((total, col) => total + col.tasks.length, 0) || 0,
-                        sprints: 0
-                      }
-                    }}
-                    onSuccess={onUpdate}
-                    redirectTo="/boards"
-                  >
-                    <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive">
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Delete Board
-                    </DropdownMenuItem>
-                  </BoardDeleteDialog>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
-          </div>
+          {canEditBoard && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <Settings className="h-4 w-4 mr-2" />
+                  Board Settings
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <BoardEditForm
+                  board={{
+                    id: board.id,
+                    name: board.name,
+                    description: board.description,
+                    boardType: board.boardType,
+                    color: board.color
+                  }}
+                  onSuccess={onUpdate}
+                >
+                  <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                    <Edit className="h-4 w-4 mr-2" />
+                    Edit Board
+                  </DropdownMenuItem>
+                </BoardEditForm>
+                <DropdownMenuSeparator />
+                <BoardDeleteDialog
+                  board={{
+                    id: board.id,
+                    name: board.name,
+                    _count: {
+                      tasks: board.columns?.reduce((total, col) => total + col.tasks.length, 0) || 0,
+                      sprints: 0
+                    }
+                  }}
+                  onSuccess={onUpdate}
+                  redirectTo="/boards"
+                >
+                  <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive">
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete Board
+                  </DropdownMenuItem>
+                </BoardDeleteDialog>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </div>
+
+        <div className="flex gap-6 mb-6">
+          <Button 
+            onClick={() => setIsAddColumnOpen(true)}
+            className="bg-blue-600 hover:bg-blue-700"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Column
+          </Button>
         </div>
 
         <div className="flex gap-6 h-full min-h-96 overflow-x-auto">
