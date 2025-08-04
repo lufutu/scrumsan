@@ -1,9 +1,14 @@
-import useSWR from 'swr'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { cacheKeys } from '@/lib/query-optimization'
+import { toast } from 'sonner'
 
-const fetcher = (url: string) => fetch(url).then(res => {
-  if (!res.ok) throw new Error('Failed to fetch')
-  return res.json()
-})
+const fetcher = async (url: string) => {
+  const response = await fetch(url)
+  if (!response.ok) {
+    throw new Error('Failed to fetch')
+  }
+  return response.json()
+}
 
 export type Label = {
   id: string
@@ -25,88 +30,120 @@ export type LabelWithStats = Label & {
 }
 
 export function useLabels(boardId: string) {
-  const { data, error, isLoading, mutate } = useSWR<LabelWithStats[]>(
-    boardId ? `/api/boards/${boardId}/labels` : null,
-    fetcher
-  )
+  const queryClient = useQueryClient()
 
-  const createLabel = async (labelData: {
-    name: string
-    description?: string
-    color?: string
-  }) => {
-    const response = await fetch(`/api/boards/${boardId}/labels`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(labelData),
-    })
+  const { data, error, isLoading, refetch } = useQuery<LabelWithStats[]>({
+    queryKey: cacheKeys.boardLabels(boardId),
+    queryFn: () => fetcher(`/api/boards/${boardId}/labels`),
+    enabled: !!boardId,
+  })
 
-    if (!response.ok) {
-      throw new Error('Failed to create label')
+  const createLabelMutation = useMutation({
+    mutationFn: async (labelData: {
+      name: string
+      description?: string
+      color?: string
+    }) => {
+      const response = await fetch(`/api/boards/${boardId}/labels`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(labelData),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to create label')
+      }
+
+      return response.json()
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: cacheKeys.boardLabels(boardId) })
+      toast.success('Label created successfully')
+    },
+    onError: (error) => {
+      toast.error(error.message || 'Failed to create label')
     }
+  })
 
-    const label = await response.json()
-    mutate()
-    return label
-  }
+  const updateLabelMutation = useMutation({
+    mutationFn: async ({ labelId, data }: { 
+      labelId: string; 
+      data: {
+        name?: string
+        description?: string
+        color?: string
+      }
+    }) => {
+      const response = await fetch(`/api/boards/${boardId}/labels/${labelId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      })
 
-  const updateLabel = async (labelId: string, labelData: {
-    name?: string
-    description?: string
-    color?: string
-  }) => {
-    const response = await fetch(`/api/boards/${boardId}/labels/${labelId}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(labelData),
-    })
+      if (!response.ok) {
+        throw new Error('Failed to update label')
+      }
 
-    if (!response.ok) {
-      throw new Error('Failed to update label')
+      return response.json()
+    },
+    onSuccess: (_, { labelId }) => {
+      queryClient.invalidateQueries({ queryKey: cacheKeys.boardLabels(boardId) })
+      queryClient.invalidateQueries({ queryKey: ['boardLabel', boardId, labelId] })
+      toast.success('Label updated successfully')
+    },
+    onError: (error) => {
+      toast.error(error.message || 'Failed to update label')
     }
+  })
 
-    const label = await response.json()
-    mutate()
-    return label
-  }
+  const deleteLabelMutation = useMutation({
+    mutationFn: async (labelId: string) => {
+      const response = await fetch(`/api/boards/${boardId}/labels/${labelId}`, {
+        method: 'DELETE',
+      })
 
-  const deleteLabel = async (labelId: string) => {
-    const response = await fetch(`/api/boards/${boardId}/labels/${labelId}`, {
-      method: 'DELETE',
-    })
+      if (!response.ok) {
+        throw new Error('Failed to delete label')
+      }
 
-    if (!response.ok) {
-      throw new Error('Failed to delete label')
+      return true
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: cacheKeys.boardLabels(boardId) })
+      toast.success('Label deleted successfully')
+    },
+    onError: (error) => {
+      toast.error(error.message || 'Failed to delete label')
     }
-
-    mutate()
-  }
+  })
 
   return {
     labels: data || [],
     loading: isLoading,
     error,
-    createLabel,
-    updateLabel,
-    deleteLabel,
-    mutate
+    createLabel: createLabelMutation.mutate,
+    updateLabel: (labelId: string, data: Parameters<typeof updateLabelMutation.mutate>[0]['data']) => 
+      updateLabelMutation.mutate({ labelId, data }),
+    deleteLabel: deleteLabelMutation.mutate,
+    mutate: refetch
   }
 }
 
 export function useLabel(boardId: string, labelId: string) {
-  const { data, error, isLoading, mutate } = useSWR(
-    boardId && labelId ? `/api/boards/${boardId}/labels/${labelId}` : null,
-    fetcher
-  )
+  const { data, error, isLoading, refetch } = useQuery({
+    queryKey: ['boardLabel', boardId, labelId],
+    queryFn: () => fetcher(`/api/boards/${boardId}/labels/${labelId}`),
+    enabled: !!boardId && !!labelId,
+  })
 
   return {
     label: data,
     loading: isLoading,
     error,
-    mutate
+    mutate: refetch
   }
 }

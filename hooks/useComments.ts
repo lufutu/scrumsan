@@ -1,8 +1,15 @@
 'use client'
 
-import useSWR from 'swr'
+import { useQuery } from '@tanstack/react-query'
+import { cacheKeys } from '@/lib/query-optimization'
 
-const fetcher = (url: string) => fetch(url).then(res => res.json())
+const fetcher = async (url: string) => {
+  const response = await fetch(url)
+  if (!response.ok) {
+    throw new Error('Failed to fetch')
+  }
+  return response.json()
+}
 
 export interface Comment {
   id: string
@@ -19,19 +26,17 @@ export interface Comment {
 }
 
 export function useComments(taskId: string | null) {
-  const { data, error, mutate } = useSWR<Comment[]>(
-    taskId ? `/api/tasks/${taskId}/comments` : null,
-    fetcher,
-    {
-      refreshInterval: 0, // Don't auto-refresh
-      revalidateOnFocus: false,
-    }
-  )
+  const { data, error, isLoading, refetch } = useQuery<Comment[]>({
+    queryKey: cacheKeys.taskComments(taskId || ''),
+    queryFn: () => fetcher(`/api/tasks/${taskId}/comments`),
+    enabled: !!taskId,
+    refetchOnWindowFocus: false,
+  })
 
   return {
     comments: data || [],
-    loading: !error && !data && taskId,
+    loading: isLoading,
     error,
-    mutate
+    mutate: refetch
   }
 }

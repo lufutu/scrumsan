@@ -1,15 +1,17 @@
 'use client'
 
-import useSWR from 'swr'
-import { useState, useEffect } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMemo } from 'react'
 import { Task, Board, Sprint } from '@/types/shared'
+import { cacheKeys } from '@/lib/query-optimization'
 
-const fetcher = (url: string) => fetch(url).then(res => {
-  if (!res.ok) {
-    throw new Error(`HTTP ${res.status}: ${res.statusText}`)
+const fetcher = async (url: string) => {
+  const response = await fetch(url)
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}: ${response.statusText}`)
   }
-  return res.json()
-})
+  return response.json()
+}
 
 export interface BoardData {
   board: Board
@@ -24,7 +26,6 @@ export interface BoardData {
 interface SprintDetail extends Sprint {
   tasks?: Task[]
 }
-
 
 interface Label {
   id: string
@@ -42,47 +43,52 @@ interface User {
 
 /**
  * Consolidated hook that fetches all board-related data efficiently
- * Reduces API calls from 6+ down to 3 by batching related requests
+ * Uses React Query for caching and parallel fetching
  */
 export const useBoardData = (boardId: string | null) => {
-  const [boardData, setBoardData] = useState<BoardData | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<Error | null>(null)
+  const queryClient = useQueryClient()
 
   // 1. Fetch board data first to get organizationId
-  const { data: board, error: boardError, isLoading: boardLoading, mutate: mutateBoard } = useSWR<Board>(
-    boardId ? `/api/boards/${boardId}` : null,
-    fetcher
-  )
+  const { data: board, error: boardError, isLoading: boardLoading } = useQuery<Board>({
+    queryKey: cacheKeys.board(boardId || ''),
+    queryFn: () => fetcher(`/api/boards/${boardId}`),
+    enabled: !!boardId,
+  })
 
-  // 2. Fetch all other data in parallel once we have board data
-  const shouldFetchDetails = board && boardId
+  // Extract organizationId from board data
   const organizationId = board?.organizationId
 
-  const { data: sprints, error: sprintsError, mutate: mutateSprints } = useSWR<Sprint[]>(
-    shouldFetchDetails ? `/api/sprints?boardId=${boardId}` : null,
-    fetcher
-  )
+  // 2. Fetch all other data in parallel once we have board data
+  const shouldFetchDetails = !!board && !!boardId
 
-  const { data: sprintDetails, error: sprintDetailsError, mutate: mutateSprintDetails } = useSWR<SprintDetail[]>(
-    shouldFetchDetails ? `/api/sprints?boardId=${boardId}&includeDetails=true` : null,
-    fetcher
-  )
+  const { data: sprints, error: sprintsError } = useQuery<Sprint[]>({
+    queryKey: cacheKeys.sprints(boardId),
+    queryFn: () => fetcher(`/api/sprints?boardId=${boardId}`),
+    enabled: shouldFetchDetails,
+  })
 
-  const { data: tasks, error: tasksError, mutate: mutateTasks } = useSWR<Task[]>(
-    shouldFetchDetails ? `/api/tasks?boardId=${boardId}` : null,
-    fetcher
-  )
+  const { data: sprintDetails, error: sprintDetailsError } = useQuery<SprintDetail[]>({
+    queryKey: ['sprintDetails', boardId],
+    queryFn: () => fetcher(`/api/sprints?boardId=${boardId}&includeDetails=true`),
+    enabled: shouldFetchDetails,
+  })
 
-  const { data: labels, error: labelsError, mutate: mutateLabels } = useSWR<Label[]>(
-    shouldFetchDetails ? `/api/boards/${boardId}/labels` : null,
-    fetcher
-  )
+  const { data: tasks, error: tasksError } = useQuery<Task[]>({
+    queryKey: cacheKeys.tasks(boardId),
+    queryFn: () => fetcher(`/api/tasks?boardId=${boardId}`),
+    enabled: shouldFetchDetails,
+  })
 
-  const { data: users, error: usersError, mutate: mutateUsers } = useSWR<User[]>(
-    organizationId ? `/api/organizations/${organizationId}` : null,
-    async (url) => {
-      const data = await fetcher(url)
+  const { data: labels, error: labelsError } = useQuery<Label[]>({
+    queryKey: cacheKeys.boardLabels(boardId || ''),
+    queryFn: () => fetcher(`/api/boards/${boardId}/labels`),
+    enabled: shouldFetchDetails,
+  })
+
+  const { data: users, error: usersError } = useQuery<User[]>({
+    queryKey: cacheKeys.organizationMembers(organizationId || ''),
+    queryFn: async () => {
+      const data = await fetcher(`/api/organizations/${organizationId}`)
       // Extract users from organization members
       return data.members ? data.members.map((member: any) => ({
         id: member.user?.id || member.userId,
@@ -91,15 +97,16 @@ export const useBoardData = (boardId: string | null) => {
         avatarUrl: member.user?.avatarUrl || member.user?.avatar_url || undefined,
         role: member.role
       })) : []
-    }
-  )
+    },
+    enabled: !!organizationId,
+  })
 
   // Compute derived data
-  useEffect(() => {
+  const boardData = useMemo<BoardData | null>(() => {
     if (board && sprints && sprintDetails && tasks && labels && users) {
       const activeSprint = sprints.find(s => s.status === 'active') || null
       
-      setBoardData({
+      return {
         board,
         sprints,
         sprintDetails,
@@ -107,39 +114,40 @@ export const useBoardData = (boardId: string | null) => {
         labels,
         users,
         activeSprint
-      })
-      setIsLoading(false)
-      setError(null)
+      }
     }
+    return null
   }, [board, sprints, sprintDetails, tasks, labels, users])
 
   // Handle errors
-  useEffect(() => {
-    const errors = [boardError, sprintsError, sprintDetailsError, tasksError, labelsError, usersError].filter(Boolean)
-    if (errors.length > 0) {
-      setError(errors[0] as Error)
-      setIsLoading(false)
-    }
-  }, [boardError, sprintsError, sprintDetailsError, tasksError, labelsError, usersError])
+  const error = boardError || sprintsError || sprintDetailsError || tasksError || labelsError || usersError
 
   // Loading state
-  const loading = boardLoading || 
+  const isLoading = boardLoading || 
     (shouldFetchDetails && (!sprints || !sprintDetails || !tasks || !labels)) ||
-    (organizationId && !users)
+    (!!organizationId && !users)
 
-  useEffect(() => {
-    setIsLoading(loading)
-  }, [loading])
-
-  // Mutation functions for cache updates
+  // Mutation function to refresh all data
   const mutateAll = () => {
-    mutateBoard()
-    mutateSprints()
-    mutateSprintDetails()
-    mutateTasks()
-    mutateLabels()
-    mutateUsers()
+    if (boardId) {
+      queryClient.invalidateQueries({ queryKey: cacheKeys.board(boardId) })
+      queryClient.invalidateQueries({ queryKey: cacheKeys.sprints(boardId) })
+      queryClient.invalidateQueries({ queryKey: ['sprintDetails', boardId] })
+      queryClient.invalidateQueries({ queryKey: cacheKeys.tasks(boardId) })
+      queryClient.invalidateQueries({ queryKey: cacheKeys.boardLabels(boardId) })
+    }
+    if (organizationId) {
+      queryClient.invalidateQueries({ queryKey: cacheKeys.organizationMembers(organizationId) })
+    }
   }
+
+  // Individual mutation functions
+  const mutateBoard = () => boardId && queryClient.invalidateQueries({ queryKey: cacheKeys.board(boardId) })
+  const mutateSprints = () => boardId && queryClient.invalidateQueries({ queryKey: cacheKeys.sprints(boardId) })
+  const mutateSprintDetails = () => boardId && queryClient.invalidateQueries({ queryKey: ['sprintDetails', boardId] })
+  const mutateTasks = () => boardId && queryClient.invalidateQueries({ queryKey: cacheKeys.tasks(boardId) })
+  const mutateLabels = () => boardId && queryClient.invalidateQueries({ queryKey: cacheKeys.boardLabels(boardId) })
+  const mutateUsers = () => organizationId && queryClient.invalidateQueries({ queryKey: cacheKeys.organizationMembers(organizationId) })
 
   return {
     data: boardData,

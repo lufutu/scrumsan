@@ -1,11 +1,15 @@
-import useSWR from 'swr'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useCallback } from 'react'
 import { toast } from 'sonner'
+import { cacheKeys, invalidationPatterns } from '@/lib/query-optimization'
 
-const fetcher = (url: string) => fetch(url).then(res => {
-  if (!res.ok) throw new Error('Failed to fetch')
-  return res.json()
-})
+const fetcher = async (url: string) => {
+  const response = await fetch(url)
+  if (!response.ok) {
+    throw new Error('Failed to fetch')
+  }
+  return response.json()
+}
 
 export interface Task {
   id: string
@@ -27,28 +31,31 @@ export interface Task {
 }
 
 export function useTasks(projectId?: string, boardId?: string, organizationId?: string) {
+  const queryClient = useQueryClient()
+  
   const params = new URLSearchParams()
   if (projectId) params.append('projectId', projectId)
   if (boardId) params.append('boardId', boardId)
   if (organizationId) params.append('organizationId', organizationId)
   
-  const { data, error, isLoading, mutate } = useSWR<Task[]>(
-    `/api/tasks?${params.toString()}`,
-    fetcher
-  )
+  const { data, error, isLoading, refetch } = useQuery<Task[]>({
+    queryKey: cacheKeys.tasks(boardId, projectId),
+    queryFn: () => fetcher(`/api/tasks?${params.toString()}`),
+    enabled: !!(projectId || boardId || organizationId),
+  })
 
-  const createTask = useCallback(async (taskData: {
-    title: string
-    description?: string
-    taskType?: string
-    priority?: string
-    storyPoints?: number
-    assigneeId?: string
-    boardId?: string
-    columnId?: string
-    projectId?: string
-  }) => {
-    try {
+  const createTaskMutation = useMutation({
+    mutationFn: async (taskData: {
+      title: string
+      description?: string
+      taskType?: string
+      priority?: string
+      storyPoints?: number
+      assigneeId?: string
+      boardId?: string
+      columnId?: string
+      projectId?: string
+    }) => {
       const response = await fetch('/api/tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -60,21 +67,30 @@ export function useTasks(projectId?: string, boardId?: string, organizationId?: 
         throw new Error(error.message || 'Failed to create task')
       }
 
-      await mutate()
+      return response.json()
+    },
+    onSuccess: (newTask) => {
+      // Invalidate related queries
+      queryClient.invalidateQueries({ queryKey: cacheKeys.tasks() })
+      if (boardId) {
+        const invalidations = invalidationPatterns.boardData(boardId)
+        invalidations.forEach(queryKey => {
+          queryClient.invalidateQueries({ queryKey })
+        })
+      }
       toast.success('Task created successfully')
-      return await response.json()
-    } catch (error: any) {
+    },
+    onError: (error) => {
       toast.error(error.message)
-      throw error
     }
-  }, [mutate])
+  })
 
-  const updateTask = useCallback(async (taskId: string, taskData: Partial<Task>) => {
-    try {
+  const updateTaskMutation = useMutation({
+    mutationFn: async ({ taskId, data }: { taskId: string; data: Partial<Task> }) => {
       const response = await fetch(`/api/tasks/${taskId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(taskData),
+        body: JSON.stringify(data),
       })
 
       if (!response.ok) {
@@ -82,16 +98,27 @@ export function useTasks(projectId?: string, boardId?: string, organizationId?: 
         throw new Error(error.message || 'Failed to update task')
       }
 
-      await mutate()
+      return response.json()
+    },
+    onSuccess: (updatedTask, { taskId }) => {
+      // Invalidate related queries
+      queryClient.invalidateQueries({ queryKey: ['task', taskId] })
+      queryClient.invalidateQueries({ queryKey: cacheKeys.tasks() })
+      if (boardId) {
+        const invalidations = invalidationPatterns.boardData(boardId)
+        invalidations.forEach(queryKey => {
+          queryClient.invalidateQueries({ queryKey })
+        })
+      }
       toast.success('Task updated successfully')
-    } catch (error: any) {
+    },
+    onError: (error) => {
       toast.error(error.message)
-      throw error
     }
-  }, [mutate])
+  })
 
-  const deleteTask = useCallback(async (taskId: string) => {
-    try {
+  const deleteTaskMutation = useMutation({
+    mutationFn: async (taskId: string) => {
       const response = await fetch(`/api/tasks/${taskId}`, {
         method: 'DELETE',
       })
@@ -101,13 +128,33 @@ export function useTasks(projectId?: string, boardId?: string, organizationId?: 
         throw new Error(error.message || 'Failed to delete task')
       }
 
-      await mutate()
+      return true
+    },
+    onSuccess: (_, taskId) => {
+      // Invalidate related queries
+      queryClient.invalidateQueries({ queryKey: ['task', taskId] })
+      queryClient.invalidateQueries({ queryKey: cacheKeys.tasks() })
+      if (boardId) {
+        const invalidations = invalidationPatterns.boardData(boardId)
+        invalidations.forEach(queryKey => {
+          queryClient.invalidateQueries({ queryKey })
+        })
+      }
       toast.success('Task deleted successfully')
-    } catch (error: any) {
+    },
+    onError: (error) => {
       toast.error(error.message)
-      throw error
     }
-  }, [mutate])
+  })
+
+  const createTask = useCallback((taskData: Parameters<typeof createTaskMutation.mutate>[0]) => 
+    createTaskMutation.mutateAsync(taskData), [createTaskMutation])
+
+  const updateTask = useCallback((taskId: string, data: Partial<Task>) => 
+    updateTaskMutation.mutate({ taskId, data }), [updateTaskMutation])
+
+  const deleteTask = useCallback((taskId: string) => 
+    deleteTaskMutation.mutate(taskId), [deleteTaskMutation])
 
   return {
     tasks: data,
@@ -116,6 +163,6 @@ export function useTasks(projectId?: string, boardId?: string, organizationId?: 
     createTask,
     updateTask,
     deleteTask,
-    mutate,
+    mutate: refetch,
   }
 }
