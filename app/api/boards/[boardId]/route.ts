@@ -58,7 +58,7 @@ const getOptimizedBoardData = async (boardId: string, userId: string) => {
     }),
     
     // Get project links
-    prisma.projectBoardLink.findMany({
+    prisma.projectBoard.findMany({
       where: { boardId },
       include: {
         project: {
