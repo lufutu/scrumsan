@@ -24,7 +24,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu'
-import { GripVertical, Plus, MoreHorizontal, Edit, Trash2 } from 'lucide-react'
+import { GripVertical, Plus, MoreHorizontal, Edit, Trash2, Settings } from 'lucide-react'
 import { TaskCardModern } from '@/components/scrum/TaskCardModern'
 import TaskCreationDialog from '@/components/common/TaskCreationDialog'
 import { ComprehensiveInlineForm } from '@/components/scrum/ComprehensiveInlineForm'
@@ -32,6 +32,10 @@ import { ItemModal } from '@/components/scrum/ItemModal'
 import { useUsers } from '@/hooks/useUsers'
 import { useLabels } from '@/hooks/useLabels'
 import { useBoardColumns } from '@/hooks/useBoardColumns'
+import { useSupabase } from '@/providers/supabase-provider'
+import { useOrganization } from '@/providers/organization-provider'
+import BoardEditForm from '@/components/boards/board-edit-form'
+import BoardDeleteDialog from '@/components/boards/board-delete-dialog'
 import { Task } from '@/types/shared'
 import { toast } from 'sonner'
 import {
@@ -50,6 +54,7 @@ type Board = {
   description: string | null
   color: string | null
   createdAt: string
+  createdBy?: string | null
   organization?: {
     id: string
     name: string
@@ -82,6 +87,8 @@ interface StandaloneBoardViewProps {
 
 export default function StandaloneBoardView({ board, onUpdate }: StandaloneBoardViewProps) {
   const { toast: uiToast } = useToast()
+  const { user } = useSupabase()
+  const { currentMember } = useOrganization()
   const [showInlineForm, setShowInlineForm] = useState<{[key: string]: boolean}>({})
   const [selectedTask, setSelectedTask] = useState<any | null>(null)
   const [isAddColumnOpen, setIsAddColumnOpen] = useState(false)
@@ -90,6 +97,9 @@ export default function StandaloneBoardView({ board, onUpdate }: StandaloneBoard
   const { users } = useUsers({ organizationId: board.organizationId })
   const { labels } = useLabels(board.id)
   const { createColumn, updateColumn, deleteColumn, mutate: mutateColumns } = useBoardColumns(board.id)
+  
+  // Check if current user can edit/delete this board
+  const canEditBoard = user?.id === board.createdBy || ['owner', 'admin'].includes(currentMember?.role || '')
   console.log("board", board, labels)
 
   // Drag and drop handlers for @hello-pangea/dnd
@@ -220,9 +230,56 @@ export default function StandaloneBoardView({ board, onUpdate }: StandaloneBoard
     return (
       <DragDropContext onDragEnd={handleDragEnd}>
         <div className="h-full">
-          <div className="mb-6">
-            <h2 className="text-2xl font-bold">{board.name}</h2>
-            <p className="text-muted-foreground">Standalone Scrum board</p>
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-2xl font-bold">{board.name}</h2>
+              <p className="text-muted-foreground">Standalone Scrum board</p>
+            </div>
+            {canEditBoard && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <Settings className="h-4 w-4 mr-2" />
+                    Board Settings
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <BoardEditForm
+                    board={{
+                      id: board.id,
+                      name: board.name,
+                      description: board.description,
+                      boardType: board.boardType,
+                      color: board.color
+                    }}
+                    onSuccess={onUpdate}
+                  >
+                    <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                      <Edit className="h-4 w-4 mr-2" />
+                      Edit Board
+                    </DropdownMenuItem>
+                  </BoardEditForm>
+                  <DropdownMenuSeparator />
+                  <BoardDeleteDialog
+                    board={{
+                      id: board.id,
+                      name: board.name,
+                      _count: {
+                        tasks: board.columns?.reduce((total, col) => total + col.tasks.length, 0) || 0,
+                        sprints: 0
+                      }
+                    }}
+                    onSuccess={onUpdate}
+                    redirectTo="/boards"
+                  >
+                    <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive">
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete Board
+                    </DropdownMenuItem>
+                  </BoardDeleteDialog>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </div>
           
           <div className="flex gap-6 h-full min-h-96 overflow-x-auto">
@@ -428,6 +485,51 @@ export default function StandaloneBoardView({ board, onUpdate }: StandaloneBoard
               <Plus className="h-4 w-4 mr-2" />
               Add Column
             </Button>
+            {canEditBoard && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <Settings className="h-4 w-4 mr-2" />
+                    Board Settings
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <BoardEditForm
+                    board={{
+                      id: board.id,
+                      name: board.name,
+                      description: board.description,
+                      boardType: board.boardType,
+                      color: board.color
+                    }}
+                    onSuccess={onUpdate}
+                  >
+                    <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                      <Edit className="h-4 w-4 mr-2" />
+                      Edit Board
+                    </DropdownMenuItem>
+                  </BoardEditForm>
+                  <DropdownMenuSeparator />
+                  <BoardDeleteDialog
+                    board={{
+                      id: board.id,
+                      name: board.name,
+                      _count: {
+                        tasks: board.columns?.reduce((total, col) => total + col.tasks.length, 0) || 0,
+                        sprints: 0
+                      }
+                    }}
+                    onSuccess={onUpdate}
+                    redirectTo="/boards"
+                  >
+                    <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive">
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete Board
+                    </DropdownMenuItem>
+                  </BoardDeleteDialog>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </div>
         </div>
 
