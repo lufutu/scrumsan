@@ -129,7 +129,7 @@ export function AppHeader({
         <Separator orientation="vertical" className="mx-2 h-6" />
         
         {/* Breadcrumbs */}
-        <div className="flex items-center flex-1 min-w-0">
+        <div className="flex items-center min-w-0">
           <nav aria-label="Breadcrumb" className="flex items-center space-x-1 text-sm text-muted-foreground">
             {breadcrumbs.map((item, index) => (
               <React.Fragment key={index}>
