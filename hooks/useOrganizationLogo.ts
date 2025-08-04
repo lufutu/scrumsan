@@ -1,120 +1,94 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import useSWR from 'swr'
 
 /**
  * Hook to get the logo URL for an organization
- * Uses signed URLs from the API for secure access
+ * Uses SWR for caching and deduplication to prevent duplicate API calls
  */
 export function useOrganizationLogo(organizationId: string, logoFilename: string | null) {
-  const [logoUrl, setLogoUrl] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  // If no logo filename or organization ID, don't make API call
+  const shouldFetch = logoFilename && organizationId && !logoFilename.startsWith('http')
 
-  useEffect(() => {
-    if (!logoFilename || !organizationId) {
-      setLogoUrl(null)
-      setError(null)
-      return
-    }
-
-    // Check if it's already a full URL (for backward compatibility)
-    if (logoFilename.startsWith('http')) {
-      setLogoUrl(logoFilename)
-      setError(null)
-      return
-    }
-
-    const fetchSignedUrl = async () => {
-      try {
-        setIsLoading(true)
-        setError(null)
-        
-        // Get signed URL from API
-        const response = await fetch(`/api/organizations/${organizationId}/logo/url`)
-        
-        if (!response.ok) {
-          if (response.status === 404) {
-            // No logo found
-            setLogoUrl(null)
-            return
-          }
-          throw new Error('Failed to get logo URL')
+  const { data, error, isLoading } = useSWR(
+    shouldFetch ? `/api/organizations/${organizationId}/logo/url` : null,
+    {
+      // Logo URLs don't change frequently, cache for longer
+      refreshInterval: 0,
+      revalidateOnFocus: false,
+      revalidateOnMount: true,
+      dedupingInterval: 30000, // 30 seconds deduplication for logo URLs
+      onError: (error, key) => {
+        // Don't log 404 errors for missing logos
+        if (error.status !== 404) {
+          console.error('Error fetching logo URL:', error)
         }
-        
-        const data = await response.json()
-        setLogoUrl(data.url)
-        
-      } catch (err) {
-        console.error('Error fetching logo URL:', err)
-        setError(err instanceof Error ? err.message : 'Failed to load logo')
-        setLogoUrl(null)
-      } finally {
-        setIsLoading(false)
       }
     }
+  )
 
-    fetchSignedUrl()
-  }, [organizationId, logoFilename])
+  // Handle different scenarios
+  if (!logoFilename || !organizationId) {
+    return { logoUrl: null, isLoading: false, error: null }
+  }
 
-  return { logoUrl, isLoading, error }
+  // Check if it's already a full URL (for backward compatibility)
+  if (logoFilename.startsWith('http')) {
+    return { logoUrl: logoFilename, isLoading: false, error: null }
+  }
+
+  return {
+    logoUrl: data?.url || null,
+    isLoading,
+    error: error && error.status !== 404 ? (error.message || 'Failed to load logo') : null
+  }
 }
 
 /**
  * Hook to get logo URLs for multiple organizations
- * Uses signed URLs from the API for secure access
+ * Uses SWR for efficient caching and deduplication
  */
 export function useOrganizationLogos(organizations: Array<{ id: string; logo: string | null }>) {
-  const [logoUrls, setLogoUrls] = useState<Record<string, string | null>>({})
-  const [isLoading, setIsLoading] = useState(false)
-
-  useEffect(() => {
-    const fetchAllLogoUrls = async () => {
-      setIsLoading(true)
-      const newLogoUrls: Record<string, string | null> = {}
-
-      // Process organizations in parallel
-      const promises = organizations.map(async (org) => {
-        if (!org.logo) {
-          newLogoUrls[org.id] = null
-          return
-        }
-
-        // Check if it's already a full URL (for backward compatibility)
-        if (org.logo.startsWith('http')) {
-          newLogoUrls[org.id] = org.logo
-          return
-        }
-
-        try {
-          // Get signed URL from API
-          const response = await fetch(`/api/organizations/${org.id}/logo/url`)
-          
-          if (response.ok) {
-            const data = await response.json()
-            newLogoUrls[org.id] = data.url
-          } else {
-            // If 404, no logo exists
-            newLogoUrls[org.id] = null
+  // Create individual SWR calls for each organization that needs a logo URL
+  const logoResults = organizations.map(org => {
+    const shouldFetch = org.logo && !org.logo.startsWith('http')
+    
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    const { data, error, isLoading } = useSWR(
+      shouldFetch ? `/api/organizations/${org.id}/logo/url` : null,
+      {
+        refreshInterval: 0,
+        revalidateOnFocus: false,
+        revalidateOnMount: true,
+        dedupingInterval: 30000, // 30 seconds deduplication
+        onError: (error) => {
+          // Don't log 404 errors for missing logos
+          if (error.status !== 404) {
+            console.error(`Error fetching logo URL for org ${org.id}:`, error)
           }
-        } catch (err) {
-          console.error(`Error fetching logo URL for org ${org.id}:`, err)
-          newLogoUrls[org.id] = null
         }
-      })
+      }
+    )
 
-      await Promise.all(promises)
-      setLogoUrls(newLogoUrls)
-      setIsLoading(false)
+    return {
+      orgId: org.id,
+      logoUrl: org.logo?.startsWith('http') ? org.logo : (data?.url || null),
+      isLoading: shouldFetch ? isLoading : false,
+      error: error && error.status !== 404 ? error : null
     }
+  })
 
-    if (organizations.length > 0) {
-      fetchAllLogoUrls()
-    } else {
-      setLogoUrls({})
-      setIsLoading(false)
-    }
-  }, [organizations])
+  // Combine results into the expected format
+  const logoUrls: Record<string, string | null> = {}
+  let hasLoading = false
 
-  return { logoUrls, isLoading }
+  logoResults.forEach(result => {
+    logoUrls[result.orgId] = result.logoUrl
+    if (result.isLoading) hasLoading = true
+  })
+
+  return { 
+    logoUrls, 
+    isLoading: hasLoading 
+  }
 } 

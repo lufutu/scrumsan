@@ -2,13 +2,7 @@ import useSWR from 'swr'
 import { useCallback } from 'react'
 import { toast } from 'sonner'
 
-const fetcher = (url: string) => fetch(url).then(res => {
-  if (!res.ok) {
-    console.error('Fetch failed:', res.status, res.statusText, url)
-    throw new Error('Failed to fetch')
-  }
-  return res.json()
-})
+// Remove custom fetcher to use global SWR configuration with deduplication
 
 export interface Project {
   id: string
@@ -51,8 +45,8 @@ export function useProjects(organizationId?: string) {
   if (organizationId) params.append('organizationId', organizationId)
   
   const { data, error, isLoading, mutate } = useSWR<Project[]>(
-    `/api/projects?${params.toString()}`,
-    fetcher
+    `/api/projects?${params.toString()}`
+    // Uses global SWR configuration with deduplication
   )
 
   const createProject = useCallback(async (projectData: {
@@ -138,8 +132,8 @@ export function useProjects(organizationId?: string) {
 
 export function useProject(projectId: string) {
   const { data, error, isLoading, mutate } = useSWR<Project>(
-    projectId ? `/api/projects/${projectId}` : null,
-    fetcher
+    projectId ? `/api/projects/${projectId}` : null
+    // Uses global SWR configuration with deduplication
   )
 
   return {

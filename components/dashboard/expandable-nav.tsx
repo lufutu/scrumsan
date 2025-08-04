@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useOrganization } from '@/providers/organization-provider'
+import { useOptimizedNavDataMultiple } from '@/hooks/useOptimizedNavData'
 import { ChevronRight, Building2, FolderOpen, Kanban, Calendar, Plus, Zap, Users } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
@@ -54,26 +55,11 @@ export function ExpandableNav({ className }: ExpandableNavProps) {
   const router = useRouter()
   const [expandedOrgs, setExpandedOrgs] = useState<Set<string>>(new Set())
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set())
-  const [orgData, setOrgData] = useState<Organization[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  // Use optimized SWR-based data fetching instead of manual fetch calls
+  const organizationIds = organizations.map(org => org.id)
+  const { data: orgData, isLoading } = useOptimizedNavDataMultiple(organizationIds)
 
-  useEffect(() => {
-    if (organizations.length > 0) {
-      fetchOrgData()
-    }
-  }, [organizations])
-
-  useEffect(() => {
-    // Refresh sidebar data when navigating to boards page or when boards are created
-    if (pathname === '/boards' || pathname.startsWith('/boards/')) {
-      // Small delay to allow for board creation to complete
-      const timer = setTimeout(() => {
-        fetchOrgData()
-      }, 500)
-      
-      return () => clearTimeout(timer)
-    }
-  }, [pathname])
+  // SWR handles data fetching automatically, no need for manual effects
 
   useEffect(() => {
     // Auto-expand active organization
@@ -103,7 +89,7 @@ export function ExpandableNav({ className }: ExpandableNavProps) {
   // Redirect handler for board creation
   const handleBoardCreatedWithRedirect = async (newBoard?: { id?: string }) => {
     // Refresh the data first
-    await fetchOrgData()
+    // SWR will automatically revalidate data
     
     // Then redirect to the new board
     if (newBoard?.id) {
@@ -111,51 +97,7 @@ export function ExpandableNav({ className }: ExpandableNavProps) {
     }
   }
 
-  const fetchOrgData = async () => {
-    try {
-      setIsLoading(true)
-      
-      const enrichedOrgs = await Promise.all(
-        organizations.map(async (org) => {
-          try {
-            // Fetch projects with their boards using API
-            const projectsResponse = await fetch(`/api/projects?organizationId=${org.id}`)
-            const projects = projectsResponse.ok ? await projectsResponse.json() : []
-
-            // Fetch all boards for this organization
-            const boardsResponse = await fetch(`/api/boards?organizationId=${org.id}`)
-            const allBoards = boardsResponse.ok ? await boardsResponse.json() : []
-            
-            // Filter out boards that are linked to projects to get standalone boards
-            const projectLinkedBoardIds = new Set(
-              projects.flatMap(p => p.boardLinks?.map(link => link.board.id) || [])
-            )
-            const standaloneBoards = allBoards.filter(board => !projectLinkedBoardIds.has(board.id))
-
-            // Fetch active sprints for this organization
-            const sprintsResponse = await fetch(`/api/sprints?organizationId=${org.id}&status=active`)
-            const activeSprints = sprintsResponse.ok ? await sprintsResponse.json() : []
-
-            return {
-              ...org,
-              projects: projects || [],
-              boards: standaloneBoards || [],
-              activeSprints: activeSprints || []
-            }
-          } catch (error) {
-            console.error(`Error fetching data for org ${org.id}:`, error)
-            return { ...org, projects: [], boards: [], activeSprints: [] }
-          }
-        })
-      )
-
-      setOrgData(enrichedOrgs as any)
-    } catch (err) {
-      console.error('Error fetching organization data:', err)
-    } finally {
-      setIsLoading(false)
-    }
-  }
+  // fetchOrgData function removed - now using SWR-based useOptimizedNavDataMultiple
 
   const toggleOrgExpansion = (orgId: string) => {
     setExpandedOrgs(prev => {

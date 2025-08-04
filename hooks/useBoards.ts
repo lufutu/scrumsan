@@ -2,13 +2,7 @@ import useSWR from 'swr'
 import { useCallback } from 'react'
 import { toast } from 'sonner'
 
-const fetcher = (url: string) => fetch(url).then(res => {
-  if (!res.ok) {
-    console.error('Fetch failed:', res.status, res.statusText, url)
-    throw new Error('Failed to fetch')
-  }
-  return res.json()
-})
+// Remove custom fetcher to use global SWR configuration with deduplication
 
 export interface Board {
   id: string
@@ -57,8 +51,8 @@ export function useBoards(organizationId?: string, projectId?: string) {
   if (projectId) params.append('projectId', projectId)
   
   const { data, error, isLoading, mutate } = useSWR<Board[]>(
-    `/api/boards?${params.toString()}`,
-    fetcher
+    `/api/boards?${params.toString()}`
+    // Uses global SWR configuration with deduplication
   )
 
   const createBoard = useCallback(async (boardData: {
@@ -102,8 +96,8 @@ export function useBoards(organizationId?: string, projectId?: string) {
 
 export function useBoard(boardId: string) {
   const { data, error, isLoading, mutate } = useSWR<Board>(
-    boardId ? `/api/boards/${boardId}` : null,
-    fetcher
+    boardId ? `/api/boards/${boardId}` : null
+    // Uses global SWR configuration with deduplication
   )
 
   return {
