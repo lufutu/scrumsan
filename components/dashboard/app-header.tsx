@@ -122,7 +122,7 @@ export function AppHeader({
         className
       )}
     >
-      <div className="container flex h-14 max-w-screen-2xl items-center px-2">
+      <div className="flex h-14 items-center px-2">
         {/* Sidebar Trigger */}
         <SidebarTrigger className="-ml-1" />
         
