@@ -1,10 +1,12 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import useSWR, { mutate } from 'swr'
+import { useState, useCallback } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useSupabase } from '@/providers/supabase-provider'
 import { useBoardRealtime } from '@/hooks/useSupabaseRealtime'
 import { Task, Sprint } from '@/types/shared'
+import { cacheKeys, invalidationPatterns } from '@/lib/query-optimization'
+import { toast } from 'sonner'
 
 const fetcher = async (url: string) => {
   const response = await fetch(url)
@@ -16,6 +18,7 @@ const fetcher = async (url: string) => {
 
 export function useScrumBoard(boardId: string, projectId?: string) {
   const { user } = useSupabase()
+  const queryClient = useQueryClient()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -23,51 +26,49 @@ export function useScrumBoard(boardId: string, projectId?: string) {
   useBoardRealtime(
     boardId,
     {
-      onTaskCreated: (newTask) => {
-        mutateTasks()
+      onTaskCreated: () => {
+        queryClient.invalidateQueries({ queryKey: cacheKeys.tasks(boardId) })
       },
-      onTaskUpdated: (updatedTask) => {
-        mutateTasks()
+      onTaskUpdated: () => {
+        queryClient.invalidateQueries({ queryKey: cacheKeys.tasks(boardId) })
       },
-      onTaskDeleted: (taskId: string) => {
-        mutateTasks()
+      onTaskDeleted: () => {
+        queryClient.invalidateQueries({ queryKey: cacheKeys.tasks(boardId) })
       },
-      onTaskMoved: (data: { taskId: string; fromStatus: string; toStatus: string }) => {
-        mutateTasks()
+      onTaskMoved: () => {
+        queryClient.invalidateQueries({ queryKey: cacheKeys.tasks(boardId) })
       }
     },
     !!boardId
   )
 
   // Fetch tasks for the board
-  const { data: tasks, error: tasksError, mutate: mutateTasks } = useSWR<Task[]>(
-    boardId ? `/api/tasks?boardId=${boardId}` : null,
-    fetcher
-  )
+  const { data: tasks, error: tasksError } = useQuery<Task[]>({
+    queryKey: cacheKeys.tasks(boardId),
+    queryFn: () => fetcher(`/api/tasks?boardId=${boardId}`),
+    enabled: !!boardId,
+  })
 
   // Fetch sprints for the board/project
-  const { data: sprints, error: sprintsError, mutate: mutateSprints } = useSWR<Sprint[]>(
-    boardId ? `/api/sprints?boardId=${boardId}` : null,
-    fetcher
-  )
+  const { data: sprints, error: sprintsError } = useQuery<Sprint[]>({
+    queryKey: cacheKeys.sprints(boardId),
+    queryFn: () => fetcher(`/api/sprints?boardId=${boardId}`),
+    enabled: !!boardId,
+  })
 
+  // Create task mutation
+  const createTaskMutation = useMutation({
+    mutationFn: async (taskData: Partial<Task> & {
+      effortUnits?: number
+      estimationType?: 'story_points' | 'effort_units'
+      itemValue?: string
+      assignees?: Array<{ id: string; fullName: string; email: string }>
+      reviewers?: Array<{ id: string; fullName: string; email: string }>
+      labels?: Array<{ id: string; name: string; color: string }>
+      customFieldValues?: Array<{ customFieldId: string; value: string }>
+    }) => {
+      if (!user) throw new Error('User not authenticated')
 
-  // Create a new task
-  const createTask = useCallback(async (taskData: Partial<Task> & {
-    effortUnits?: number
-    estimationType?: 'story_points' | 'effort_units'
-    itemValue?: string
-    assignees?: Array<{ id: string; fullName: string; email: string }>
-    reviewers?: Array<{ id: string; fullName: string; email: string }>
-    labels?: Array<{ id: string; name: string; color: string }>
-    customFieldValues?: Array<{ customFieldId: string; value: string }>
-  }) => {
-    if (!user) return
-
-    setLoading(true)
-    setError(null)
-
-    try {
       // Generate item code (SPDR-1, SPDR-2, etc.)
       const taskCount = tasks?.length || 0
       const itemCode = `SPDR-${taskCount + 1}`
@@ -90,25 +91,24 @@ export function useScrumBoard(boardId: string, projectId?: string) {
         throw new Error('Failed to create task')
       }
 
-      const newTask = await response.json()
-      mutateTasks()
-      return newTask
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create task')
-      throw err
-    } finally {
-      setLoading(false)
+      return response.json()
+    },
+    onSuccess: () => {
+      const invalidations = invalidationPatterns.boardData(boardId)
+      invalidations.forEach(queryKey => {
+        queryClient.invalidateQueries({ queryKey })
+      })
+      toast.success('Task created successfully')
+    },
+    onError: (error) => {
+      setError(error.message)
+      toast.error(error.message || 'Failed to create task')
     }
-  }, [user, boardId, projectId, mutateTasks, tasks])
+  })
 
-  // Update a task
-  const updateTask = useCallback(async (taskId: string, updates: Partial<Task>) => {
-    if (!user) return
-
-    setLoading(true)
-    setError(null)
-
-    try {
+  // Update task mutation
+  const updateTaskMutation = useMutation({
+    mutationFn: async ({ taskId, updates }: { taskId: string; updates: Partial<Task> }) => {
       const response = await fetch(`/api/tasks/${taskId}`, {
         method: 'PATCH',
         headers: {
@@ -121,25 +121,22 @@ export function useScrumBoard(boardId: string, projectId?: string) {
         throw new Error('Failed to update task')
       }
 
-      const updatedTask = await response.json()
-      mutateTasks()
-      return updatedTask
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update task')
-      throw err
-    } finally {
-      setLoading(false)
+      return response.json()
+    },
+    onSuccess: (_, { taskId }) => {
+      queryClient.invalidateQueries({ queryKey: ['task', taskId] })
+      queryClient.invalidateQueries({ queryKey: cacheKeys.tasks(boardId) })
+      toast.success('Task updated successfully')
+    },
+    onError: (error) => {
+      setError(error.message)
+      toast.error(error.message || 'Failed to update task')
     }
-  }, [user, mutateTasks])
+  })
 
-  // Delete a task
-  const deleteTask = useCallback(async (taskId: string) => {
-    if (!user) return
-
-    setLoading(true)
-    setError(null)
-
-    try {
+  // Delete task mutation
+  const deleteTaskMutation = useMutation({
+    mutationFn: async (taskId: string) => {
       const response = await fetch(`/api/tasks/${taskId}`, {
         method: 'DELETE',
       })
@@ -148,121 +145,92 @@ export function useScrumBoard(boardId: string, projectId?: string) {
         throw new Error('Failed to delete task')
       }
 
-      mutateTasks()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete task')
-      throw err
-    } finally {
-      setLoading(false)
+      return true
+    },
+    onSuccess: () => {
+      const invalidations = invalidationPatterns.boardData(boardId)
+      invalidations.forEach(queryKey => {
+        queryClient.invalidateQueries({ queryKey })
+      })
+      toast.success('Task deleted successfully')
+    },
+    onError: (error) => {
+      setError(error.message)
+      toast.error(error.message || 'Failed to delete task')
     }
-  }, [user, mutateTasks])
+  })
 
-  // Move task between columns (using column placement instead of status)
-  const moveTask = useCallback(async (taskId: string, targetLocation: 'backlog' | 'sprint' | 'followup', sprintId?: string) => {
-    if (!user) return
-
-    setLoading(true)
-    setError(null)
-
-    try {
-      // Get current task for optimistic update
-      const currentTask = tasks?.find(t => t.id === taskId)
-      if (!currentTask) {
-        throw new Error('Task not found')
-      }
-
-      // Prepare update data based on target location
-      let updateData: any = {}
-      let optimisticTask: any = { ...currentTask }
-      
-      if (targetLocation === 'backlog') {
-        // Backlog items have no column assignment and remove followup/sprint labels
-        const backlogLabels = (currentTask.labels || []).filter(label => label !== '__followup__' && label !== '__sprint__')
-        updateData = { columnId: null, sprintColumnId: null, sprintId: null, labels: backlogLabels }
-        optimisticTask = { ...currentTask, columnId: null, sprintColumnId: null, sprintId: null, labels: backlogLabels }
-      } else if (targetLocation === 'sprint') {
-        // Sprint items need to be assigned to a sprint column and remove followup label
-        const sprintLabels = (currentTask.labels || []).filter(label => label !== '__followup__')
-        // Set sprintId if provided, otherwise clear column assignments but mark as sprint item
-        if (sprintId) {
-          updateData = { columnId: null, sprintColumnId: null, sprintId: sprintId, labels: sprintLabels }
-          optimisticTask = { ...currentTask, columnId: null, sprintColumnId: null, sprintId: sprintId, labels: sprintLabels }
-        } else {
-          // No active sprint, but still move to sprint column by adding a special label
-          const sprintLabelsWithMarker = [...sprintLabels, '__sprint__']
-          updateData = { columnId: null, sprintColumnId: null, labels: sprintLabelsWithMarker }
-          optimisticTask = { ...currentTask, columnId: null, sprintColumnId: null, labels: sprintLabelsWithMarker }
-        }
-      } else if (targetLocation === 'followup') {
-        // Followup items - use labels array to mark as followup, remove sprint marker
-        const cleanLabels = (currentTask.labels || []).filter(label => label !== '__sprint__')
-        const followupLabels = cleanLabels.includes('__followup__') 
-          ? cleanLabels 
-          : [...cleanLabels, '__followup__']
-        updateData = { columnId: null, sprintColumnId: null, sprintId: null, labels: followupLabels }
-        optimisticTask = { ...currentTask, columnId: null, sprintColumnId: null, sprintId: null, labels: followupLabels }
-      }
-
-      // Optimistic update for smooth UI
-      mutateTasks((currentTasks: Task[] = []) => {
-        return currentTasks.map(task => 
-          task.id === taskId ? optimisticTask : task
-        )
-      }, false)
-
-      // Update task in database
-      const response = await fetch(`/api/tasks/${taskId}`, {
+  // Move task mutation
+  const moveTaskMutation = useMutation({
+    mutationFn: async ({ 
+      taskId, 
+      targetColumn, 
+      targetSprint,
+      position 
+    }: { 
+      taskId: string
+      targetColumn?: string | null
+      targetSprint?: string | null
+      position?: number
+    }) => {
+      const response = await fetch(`/api/tasks/${taskId}/move`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(updateData),
+        body: JSON.stringify({
+          columnId: targetColumn,
+          sprintColumnId: targetSprint,
+          position,
+        }),
       })
 
       if (!response.ok) {
-        const errorData = await response.text()
-        console.error('Task update failed:', response.status, errorData)
-        throw new Error(`Failed to update task: ${response.status} - ${errorData}`)
+        throw new Error('Failed to move task')
       }
 
-      // If moving to sprint, add to sprint relationship
-      if (targetLocation === 'sprint' && sprintId) {
-        const sprintResponse = await fetch(`/api/sprints/${sprintId}/tasks`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ taskId }),
-        })
+      return response.json()
+    },
+    onMutate: async ({ taskId, targetColumn, targetSprint }) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: cacheKeys.tasks(boardId) })
 
-        if (!sprintResponse.ok) {
-          const sprintErrorData = await sprintResponse.text()
-          console.error('Sprint API failed:', sprintResponse.status, sprintErrorData)
-          console.warn('Failed to add task to sprint, but task moved')
-        }
+      // Snapshot previous value
+      const previousTasks = queryClient.getQueryData<Task[]>(cacheKeys.tasks(boardId))
+
+      // Optimistically update
+      if (previousTasks) {
+        queryClient.setQueryData<Task[]>(
+          cacheKeys.tasks(boardId),
+          previousTasks.map(task => 
+            task.id === taskId 
+              ? { ...task, columnId: targetColumn, sprintColumnId: targetSprint }
+              : task
+          )
+        )
       }
 
-      // Final revalidation to get fresh data
-      await mutateTasks()
-      await mutateSprints()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to move task')
-      // Revert optimistic update on error
-      await mutateTasks()
-      throw err
-    } finally {
-      setLoading(false)
+      return { previousTasks }
+    },
+    onError: (error, variables, context) => {
+      // Rollback on error
+      if (context?.previousTasks) {
+        queryClient.setQueryData(cacheKeys.tasks(boardId), context.previousTasks)
+      }
+      setError(error.message)
+      toast.error(error.message || 'Failed to move task')
+    },
+    onSuccess: () => {
+      const invalidations = invalidationPatterns.boardData(boardId)
+      invalidations.forEach(queryKey => {
+        queryClient.invalidateQueries({ queryKey })
+      })
     }
-  }, [user, mutateTasks, mutateSprints])
+  })
 
-  // Create a new sprint
-  const createSprint = useCallback(async (sprintData: Partial<ScrumSprint>) => {
-    if (!user) return
-
-    setLoading(true)
-    setError(null)
-
-    try {
+  // Create sprint mutation
+  const createSprintMutation = useMutation({
+    mutationFn: async (sprintData: Partial<Sprint>) => {
       const response = await fetch('/api/sprints', {
         method: 'POST',
         headers: {
@@ -279,228 +247,74 @@ export function useScrumBoard(boardId: string, projectId?: string) {
         throw new Error('Failed to create sprint')
       }
 
-      const newSprint = await response.json()
-      mutateSprints()
-      return newSprint
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create sprint')
-      throw err
-    } finally {
-      setLoading(false)
+      return response.json()
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: cacheKeys.sprints(boardId) })
+      toast.success('Sprint created successfully')
+    },
+    onError: (error) => {
+      setError(error.message)
+      toast.error(error.message || 'Failed to create sprint')
     }
-  }, [user, boardId, projectId, mutateSprints])
+  })
 
-  // Start a sprint
-  const startSprint = useCallback(async (sprintId: string) => {
-    if (!user) return
-
+  // Callback functions
+  const createTask = useCallback((taskData: Parameters<typeof createTaskMutation.mutate>[0]) => {
     setLoading(true)
     setError(null)
+    return createTaskMutation.mutateAsync(taskData).finally(() => setLoading(false))
+  }, [createTaskMutation])
 
-    try {
-      const response = await fetch(`/api/sprints/${sprintId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          status: 'active',
-          startDate: new Date().toISOString().split('T')[0],
-        }),
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to start sprint')
-      }
-
-      mutateSprints()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to start sprint')
-      throw err
-    } finally {
-      setLoading(false)
-    }
-  }, [user, mutateSprints])
-
-  // Filter tasks by status (derived from column placement)
-  const getTasksByStatus = useCallback((status: 'backlog' | 'sprint' | 'followup') => {
-    return tasks?.filter(task => {
-      if (status === 'backlog') {
-        // Backlog items have no column assignment and no followup/sprint labels
-        return !task.columnId && !task.sprintColumnId && !task.taskLabels?.some(tl => tl.label.name === '__followup__') && !task.taskLabels?.some(tl => tl.label.name === '__sprint__')
-      } else if (status === 'sprint') {
-        // Sprint items have sprintColumnId assigned, are in sprint tasks, or have sprint marker
-        return task.sprintColumnId || task.sprintId || task.taskLabels?.some(tl => tl.label.name === '__sprint__')
-      } else if (status === 'followup') {
-        // Followup items have no column assignment but have followup label
-        return !task.columnId && !task.sprintColumnId && task.taskLabels?.some(tl => tl.label.name === '__followup__')
-      }
-      return false
-    }) || []
-  }, [tasks])
-
-  // Clone a task
-  const cloneTask = useCallback(async (taskId: string) => {
-    if (!user) return
-
+  const updateTask = useCallback(async (taskId: string, updates: Partial<Task>) => {
     setLoading(true)
     setError(null)
+    return updateTaskMutation.mutateAsync({ taskId, updates }).finally(() => setLoading(false))
+  }, [updateTaskMutation])
 
-    try {
-      const response = await fetch(`/api/tasks/${taskId}/clone`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to clone task')
-      }
-
-      const clonedTask = await response.json()
-      mutateTasks()
-      return clonedTask
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to clone task')
-      throw err
-    } finally {
-      setLoading(false)
-    }
-  }, [user, mutateTasks])
-
-  // Share task (get shareable link)
-  const shareTask = useCallback(async (taskId: string) => {
-    try {
-      const task = tasks?.find(t => t.id === taskId)
-      const itemCode = task?.id || taskId
-      const link = `${window.location.origin}/items/${taskId}`
-      
-      await navigator.clipboard.writeText(link)
-      return { link, itemCode }
-    } catch (err) {
-      throw new Error('Failed to share task')
-    }
-  }, [tasks])
-
-  // Move task to top of column
-  const moveTaskToTop = useCallback(async (taskId: string) => {
-    if (!user) return
-
+  const deleteTask = useCallback(async (taskId: string) => {
     setLoading(true)
     setError(null)
+    return deleteTaskMutation.mutateAsync(taskId).finally(() => setLoading(false))
+  }, [deleteTaskMutation])
 
-    try {
-      const response = await fetch(`/api/tasks/${taskId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ position: 0 }),
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to move task to top')
-      }
-
-      mutateTasks()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to move task to top')
-      throw err
-    } finally {
-      setLoading(false)
-    }
-  }, [user, mutateTasks])
-
-  // Add task to predefined items
-  const addToPredefined = useCallback(async (taskId: string) => {
-    if (!user || !boardId) return
-
+  const moveTask = useCallback(async (
+    taskId: string,
+    targetColumn?: string | null,
+    targetSprint?: string | null,
+    position?: number
+  ) => {
     setLoading(true)
     setError(null)
+    return moveTaskMutation.mutateAsync({ 
+      taskId, 
+      targetColumn, 
+      targetSprint, 
+      position 
+    }).finally(() => setLoading(false))
+  }, [moveTaskMutation])
 
-    try {
-      const response = await fetch(`/api/boards/${boardId}/predefined`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ taskId }),
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to add to predefined items')
-      }
-
-      return await response.json()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to add to predefined items')
-      throw err
-    } finally {
-      setLoading(false)
-    }
-  }, [user, boardId])
-
-  // Mirror task to another board
-  const mirrorTask = useCallback(async (taskId: string, targetBoardId: string) => {
-    if (!user) return
-
+  const createSprint = useCallback(async (sprintData: Partial<Sprint>) => {
     setLoading(true)
     setError(null)
+    return createSprintMutation.mutateAsync(sprintData).finally(() => setLoading(false))
+  }, [createSprintMutation])
 
-    try {
-      const response = await fetch(`/api/tasks/${taskId}/mirror`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ targetBoardId }),
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to mirror task')
-      }
-
-      return await response.json()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to mirror task')
-      throw err
-    } finally {
-      setLoading(false)
-    }
-  }, [user])
-
-  // Get active sprint
-  const activeSprint = sprints?.find(sprint => sprint.status === 'active')
+  const refetchAll = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: cacheKeys.tasks(boardId) })
+    queryClient.invalidateQueries({ queryKey: cacheKeys.sprints(boardId) })
+  }, [boardId, queryClient])
 
   return {
-    // Data
     tasks: tasks || [],
     sprints: sprints || [],
-    activeSprint,
-    
-    // State
-    loading,
-    error: error || tasksError || sprintsError,
-    
-    // Actions
+    loading: loading || !tasks || !sprints,
+    error: error || tasksError?.message || sprintsError?.message || null,
     createTask,
     updateTask,
     deleteTask,
     moveTask,
-    cloneTask,
-    shareTask,
-    moveTaskToTop,
-    addToPredefined,
-    mirrorTask,
     createSprint,
-    startSprint,
-    
-    // Utilities
-    getTasksByStatus,
-    
-    // Mutations
-    mutateTasks,
-    mutateSprints,
+    refetch: refetchAll,
   }
 }

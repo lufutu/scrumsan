@@ -1,4 +1,5 @@
-import useSWR from 'swr'
+import { useQuery } from '@tanstack/react-query'
+import { cacheKeys } from '@/lib/query-optimization'
 
 interface Board {
   id: string
@@ -36,64 +37,69 @@ interface BoardsResponse {
   }
 }
 
+const fetcher = async (url: string) => {
+  const response = await fetch(url)
+  if (!response.ok) {
+    throw new Error('Failed to fetch')
+  }
+  return response.json()
+}
+
 // High-performance boards hook with pagination and caching
 export function useOptimizedBoards(organizationId: string | null, page = 1, limit = 20) {
-  const { data, error, mutate } = useSWR<BoardsResponse>(
-    organizationId ? `/api/boards?organizationId=${organizationId}&page=${page}&limit=${limit}` : null,
-    {
-      refreshInterval: 0, // No auto-refresh for boards
-      revalidateOnFocus: false,
-      revalidateOnMount: true,
-      dedupingInterval: 8000, // 8 seconds deduplication
-    }
-  )
+  const { data, error, isLoading, refetch } = useQuery<BoardsResponse>({
+    queryKey: ['boards', organizationId, page, limit],
+    queryFn: () => fetcher(`/api/boards?organizationId=${organizationId}&page=${page}&limit=${limit}`),
+    enabled: !!organizationId,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes
+    refetchOnWindowFocus: false,
+  })
 
   return {
     boards: data?.boards || [],
     pagination: data?.pagination,
-    isLoading: organizationId ? (!error && !data) : false,
+    isLoading,
     error: error?.message || null,
-    refresh: mutate
+    refresh: refetch
   }
 }
 
 // Hook for single board with optimized data fetching
 export function useOptimizedBoard(boardId: string | null) {
-  const { data: board, error, mutate } = useSWR<Board>(
-    boardId ? `/api/boards/${boardId}` : null,
-    {
-      refreshInterval: 0,
-      revalidateOnFocus: false,
-      revalidateOnMount: true,
-      dedupingInterval: 10000, // 10 seconds for single board
-    }
-  )
+  const { data: board, error, isLoading, refetch } = useQuery<Board>({
+    queryKey: cacheKeys.board(boardId || ''),
+    queryFn: () => fetcher(`/api/boards/${boardId}`),
+    enabled: !!boardId,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes
+    refetchOnWindowFocus: false,
+  })
 
   return {
     board: board || null,
-    isLoading: boardId ? (!error && !board) : false,
+    isLoading,
     error: error?.message || null,
-    refresh: mutate
+    refresh: refetch
   }
 }
 
 // Hook for board tasks with pagination
 export function useOptimizedBoardTasks(boardId: string | null, page = 1, limit = 50) {
-  const { data, error, mutate } = useSWR(
-    boardId ? `/api/tasks?boardId=${boardId}&page=${page}&limit=${limit}` : null,
-    {
-      refreshInterval: 0,
-      revalidateOnFocus: false,
-      revalidateOnMount: true,
-      dedupingInterval: 5000, // 5 seconds for tasks (more dynamic)
-    }
-  )
+  const { data, error, isLoading, refetch } = useQuery({
+    queryKey: ['tasks', boardId, page, limit],
+    queryFn: () => fetcher(`/api/tasks?boardId=${boardId}&page=${page}&limit=${limit}`),
+    enabled: !!boardId,
+    staleTime: 2 * 60 * 1000, // 2 minutes (more dynamic data)
+    gcTime: 5 * 60 * 1000, // 5 minutes
+    refetchOnWindowFocus: false,
+  })
 
   return {
     tasks: data?.tasks || [],
     pagination: data?.pagination,
-    isLoading: boardId ? (!error && !data) : false,
+    isLoading,
     error: error?.message || null,
-    refresh: mutate
+    refresh: refetch
   }
 }

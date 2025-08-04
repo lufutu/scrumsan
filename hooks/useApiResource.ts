@@ -1,9 +1,9 @@
 import { useCallback } from 'react'
-import useSWR, { mutate as globalMutate } from 'swr'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 
 /**
- * Generic API resource hook that provides CRUD operations with SWR
+ * Generic API resource hook that provides CRUD operations with React Query
  */
 
 const fetcher = async (url: string) => {
@@ -16,9 +16,10 @@ const fetcher = async (url: string) => {
 }
 
 interface UseApiResourceOptions {
-  revalidateOnFocus?: boolean
-  revalidateOnReconnect?: boolean
-  refreshInterval?: number
+  refetchOnWindowFocus?: boolean
+  refetchInterval?: number
+  staleTime?: number
+  gcTime?: number
 }
 
 export function useApiResource<T = any>(
@@ -26,24 +27,26 @@ export function useApiResource<T = any>(
   resourceName: string,
   options: UseApiResourceOptions = {}
 ) {
+  const queryClient = useQueryClient()
   const {
-    revalidateOnFocus = false,
-    revalidateOnReconnect = true,
-    refreshInterval = 0
+    refetchOnWindowFocus = false,
+    refetchInterval = 0,
+    staleTime = 5 * 60 * 1000, // 5 minutes
+    gcTime = 10 * 60 * 1000, // 10 minutes
   } = options
 
-  const { data, error, isLoading, mutate } = useSWR<T[]>(
-    endpoint,
-    fetcher,
-    {
-      revalidateOnFocus,
-      revalidateOnReconnect,
-      refreshInterval,
-      onError: (error) => {
-        console.error(`Error fetching ${resourceName}:`, error)
-      }
+  const { data, error, isLoading, refetch } = useQuery<T[]>({
+    queryKey: [endpoint],
+    queryFn: () => fetcher(endpoint!),
+    enabled: !!endpoint,
+    refetchOnWindowFocus,
+    refetchInterval,
+    staleTime,
+    gcTime,
+    meta: {
+      errorMessage: `Error fetching ${resourceName}`
     }
-  )
+  })
 
   const performMutation = useCallback(async (
     method: 'POST' | 'PATCH' | 'PUT' | 'DELETE',
@@ -51,95 +54,153 @@ export function useApiResource<T = any>(
     data?: any,
     successMessage?: string
   ) => {
-    try {
-      const options: RequestInit = {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      }
-
-      if (data) {
-        options.body = JSON.stringify(data)
-      }
-
-      const response = await fetch(url, options)
-      
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.message || `Failed to ${method.toLowerCase()} ${resourceName}`)
-      }
-
-      const result = method !== 'DELETE' ? await response.json() : null
-
-      // Revalidate the data
-      await mutate()
-      
-      // Also revalidate any related endpoints that might be affected
-      if (endpoint) {
-        await globalMutate(key => typeof key === 'string' && key.startsWith(endpoint.split('?')[0]))
-      }
-
-      if (successMessage) {
-        toast.success(successMessage)
-      }
-
-      return result
-    } catch (error: any) {
-      const message = error.message || `Failed to ${method.toLowerCase()} ${resourceName}`
-      toast.error(message)
-      throw error
+    const options: RequestInit = {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+      },
     }
-  }, [mutate, endpoint, resourceName])
+
+    if (data) {
+      options.body = JSON.stringify(data)
+    }
+
+    const response = await fetch(url, options)
+    
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(errorData.message || `Failed to ${method.toLowerCase()} ${resourceName}`)
+    }
+
+    const result = method !== 'DELETE' ? await response.json() : null
+
+    if (successMessage) {
+      toast.success(successMessage)
+    }
+
+    return result
+  }, [resourceName])
+
+  const createMutation = useMutation({
+    mutationFn: async (data: Partial<T>) => {
+      if (!endpoint) throw new Error('No endpoint provided')
+      return performMutation('POST', endpoint, data)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [endpoint] })
+      if (endpoint) {
+        // Invalidate related queries
+        queryClient.invalidateQueries({ 
+          predicate: (query) => {
+            const key = query.queryKey[0]
+            return typeof key === 'string' && key.startsWith(endpoint.split('?')[0])
+          }
+        })
+      }
+    },
+    onError: (error) => {
+      toast.error(error.message || `Failed to create ${resourceName}`)
+    }
+  })
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<T> }) => {
+      if (!endpoint) throw new Error('No endpoint provided')
+      const url = `${endpoint}/${id}`
+      return performMutation('PATCH', url, data)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [endpoint] })
+      if (endpoint) {
+        queryClient.invalidateQueries({ 
+          predicate: (query) => {
+            const key = query.queryKey[0]
+            return typeof key === 'string' && key.startsWith(endpoint.split('?')[0])
+          }
+        })
+      }
+    },
+    onError: (error) => {
+      toast.error(error.message || `Failed to update ${resourceName}`)
+    }
+  })
+
+  const removeMutation = useMutation({
+    mutationFn: async (id: string) => {
+      if (!endpoint) throw new Error('No endpoint provided')
+      const url = `${endpoint}/${id}`
+      return performMutation('DELETE', url)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [endpoint] })
+      if (endpoint) {
+        queryClient.invalidateQueries({ 
+          predicate: (query) => {
+            const key = query.queryKey[0]
+            return typeof key === 'string' && key.startsWith(endpoint.split('?')[0])
+          }
+        })
+      }
+    },
+    onError: (error) => {
+      toast.error(error.message || `Failed to delete ${resourceName}`)
+    }
+  })
 
   const create = useCallback(async (data: Partial<T>, customSuccessMessage?: string) => {
-    if (!endpoint) throw new Error('No endpoint provided')
-    
-    const successMessage = customSuccessMessage || `${resourceName} created successfully`
-    return performMutation('POST', endpoint, data, successMessage)
-  }, [endpoint, performMutation, resourceName])
+    const result = await createMutation.mutateAsync(data)
+    if (customSuccessMessage) {
+      toast.success(customSuccessMessage)
+    } else {
+      toast.success(`${resourceName} created successfully`)
+    }
+    return result
+  }, [createMutation, resourceName])
 
   const update = useCallback(async (id: string, data: Partial<T>, customSuccessMessage?: string) => {
-    if (!endpoint) throw new Error('No endpoint provided')
-    
-    const successMessage = customSuccessMessage || `${resourceName} updated successfully`
-    const url = `${endpoint}/${id}`
-    return performMutation('PATCH', url, data, successMessage)
-  }, [endpoint, performMutation, resourceName])
+    const result = await updateMutation.mutateAsync({ id, data })
+    if (customSuccessMessage) {
+      toast.success(customSuccessMessage)
+    } else {
+      toast.success(`${resourceName} updated successfully`)
+    }
+    return result
+  }, [updateMutation, resourceName])
 
   const remove = useCallback(async (id: string, customSuccessMessage?: string) => {
-    if (!endpoint) throw new Error('No endpoint provided')
-    
-    const successMessage = customSuccessMessage || `${resourceName} deleted successfully`
-    const url = `${endpoint}/${id}`
-    return performMutation('DELETE', url, undefined, successMessage)
-  }, [endpoint, performMutation, resourceName])
-
-  const refresh = useCallback(async () => {
-    await mutate()
-  }, [mutate])
+    const result = await removeMutation.mutateAsync(id)
+    if (customSuccessMessage) {
+      toast.success(customSuccessMessage)
+    } else {
+      toast.success(`${resourceName} deleted successfully`)
+    }
+    return result
+  }, [removeMutation, resourceName])
 
   const optimisticUpdate = useCallback(async (
     updateFn: (currentData: T[] | undefined) => T[] | undefined,
     operation: () => Promise<any>
   ) => {
+    // Cancel outgoing refetches
+    await queryClient.cancelQueries({ queryKey: [endpoint] })
+
+    // Snapshot previous value
+    const previousData = queryClient.getQueryData<T[]>([endpoint])
+
+    // Optimistically update
+    queryClient.setQueryData([endpoint], updateFn)
+
     try {
-      // Optimistically update the data
-      await mutate(updateFn, false)
-      
-      // Perform the actual operation
       const result = await operation()
-      
       // Revalidate to ensure consistency
-      await mutate()
-      
+      await queryClient.invalidateQueries({ queryKey: [endpoint] })
       return result
     } catch (error) {
-      // Revert optimistic update on error
-      await mutate()
+      // Revert on error
+      queryClient.setQueryData([endpoint], previousData)
       throw error
     }
-  }, [mutate])
+  }, [endpoint, queryClient])
 
   return {
     // Data
@@ -152,11 +213,13 @@ export function useApiResource<T = any>(
     create,
     update,
     remove,
-    refresh,
+    refresh: refetch,
     optimisticUpdate,
     
-    // Direct access to SWR mutate for advanced usage
-    mutate,
+    // Direct access to mutations for advanced usage
+    createMutation,
+    updateMutation,
+    removeMutation,
   }
 }
 
@@ -168,84 +231,96 @@ export function useApiItem<T = any>(
   resourceName: string,
   options: UseApiResourceOptions = {}
 ) {
+  const queryClient = useQueryClient()
   const {
-    revalidateOnFocus = false,
-    revalidateOnReconnect = true,
-    refreshInterval = 0
+    refetchOnWindowFocus = false,
+    refetchInterval = 0,
+    staleTime = 5 * 60 * 1000,
+    gcTime = 10 * 60 * 1000,
   } = options
 
-  const { data, error, isLoading, mutate } = useSWR<T>(
-    endpoint,
-    fetcher,
-    {
-      revalidateOnFocus,
-      revalidateOnReconnect,
-      refreshInterval,
-      onError: (error) => {
-        console.error(`Error fetching ${resourceName}:`, error)
-      }
+  const { data, error, isLoading, refetch } = useQuery<T>({
+    queryKey: [endpoint],
+    queryFn: () => fetcher(endpoint!),
+    enabled: !!endpoint,
+    refetchOnWindowFocus,
+    refetchInterval,
+    staleTime,
+    gcTime,
+    meta: {
+      errorMessage: `Error fetching ${resourceName}`
     }
-  )
+  })
 
   const performMutation = useCallback(async (
     method: 'POST' | 'PATCH' | 'PUT' | 'DELETE',
     url: string,
-    data?: any,
-    successMessage?: string
+    data?: any
   ) => {
-    try {
-      const options: RequestInit = {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      }
-
-      if (data) {
-        options.body = JSON.stringify(data)
-      }
-
-      const response = await fetch(url, options)
-      
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.message || `Failed to ${method.toLowerCase()} ${resourceName}`)
-      }
-
-      const result = method !== 'DELETE' ? await response.json() : null
-
-      // Revalidate the data
-      await mutate()
-
-      if (successMessage) {
-        toast.success(successMessage)
-      }
-
-      return result
-    } catch (error: any) {
-      const message = error.message || `Failed to ${method.toLowerCase()} ${resourceName}`
-      toast.error(message)
-      throw error
+    const options: RequestInit = {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+      },
     }
-  }, [mutate, resourceName])
+
+    if (data) {
+      options.body = JSON.stringify(data)
+    }
+
+    const response = await fetch(url, options)
+    
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(errorData.message || `Failed to ${method.toLowerCase()} ${resourceName}`)
+    }
+
+    return method !== 'DELETE' ? await response.json() : null
+  }, [resourceName])
+
+  const updateMutation = useMutation({
+    mutationFn: async (data: Partial<T>) => {
+      if (!endpoint) throw new Error('No endpoint provided')
+      return performMutation('PATCH', endpoint, data)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [endpoint] })
+      toast.success(`${resourceName} updated successfully`)
+    },
+    onError: (error) => {
+      toast.error(error.message || `Failed to update ${resourceName}`)
+    }
+  })
+
+  const removeMutation = useMutation({
+    mutationFn: async () => {
+      if (!endpoint) throw new Error('No endpoint provided')
+      return performMutation('DELETE', endpoint)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [endpoint] })
+      toast.success(`${resourceName} deleted successfully`)
+    },
+    onError: (error) => {
+      toast.error(error.message || `Failed to delete ${resourceName}`)
+    }
+  })
 
   const update = useCallback(async (data: Partial<T>, customSuccessMessage?: string) => {
-    if (!endpoint) throw new Error('No endpoint provided')
-    
-    const successMessage = customSuccessMessage || `${resourceName} updated successfully`
-    return performMutation('PATCH', endpoint, data, successMessage)
-  }, [endpoint, performMutation, resourceName])
+    const result = await updateMutation.mutateAsync(data)
+    if (customSuccessMessage) {
+      toast.success(customSuccessMessage)
+    }
+    return result
+  }, [updateMutation])
 
   const remove = useCallback(async (customSuccessMessage?: string) => {
-    if (!endpoint) throw new Error('No endpoint provided')
-    
-    const successMessage = customSuccessMessage || `${resourceName} deleted successfully`
-    return performMutation('DELETE', endpoint, undefined, successMessage)
-  }, [endpoint, performMutation, resourceName])
-
-  const refresh = useCallback(async () => {
-    await mutate()
-  }, [mutate])
+    const result = await removeMutation.mutateAsync()
+    if (customSuccessMessage) {
+      toast.success(customSuccessMessage)
+    }
+    return result
+  }, [removeMutation])
 
   return {
     // Data
@@ -256,10 +331,11 @@ export function useApiItem<T = any>(
     // Operations
     update,
     remove,
-    refresh,
+    refresh: refetch,
     
-    // Direct access to SWR mutate for advanced usage
-    mutate,
+    // Direct access to mutations for advanced usage
+    updateMutation,
+    removeMutation,
   }
 }
 

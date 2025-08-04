@@ -1,43 +1,48 @@
-import useSWR from 'swr'
+import { useQuery } from '@tanstack/react-query'
+import { cacheKeys } from '@/lib/query-optimization'
 import { Organization } from '@/hooks/useOrganizations'
 
-// Optimized organizations hook using SWR for caching and deduplication
+const fetcher = async (url: string) => {
+  const response = await fetch(url)
+  if (!response.ok) {
+    throw new Error('Failed to fetch')
+  }
+  return response.json()
+}
+
+// Optimized organizations hook using React Query for caching and deduplication
 export function useOptimizedOrganizations() {
-  const { data: organizations, error, mutate } = useSWR<Organization[]>(
-    '/api/organizations',
-    {
-      // Organizations don't change frequently, so cache for longer
-      refreshInterval: 0, // Disable automatic refresh
-      revalidateOnFocus: false, // Don't refetch when window gains focus
-      revalidateOnMount: true, // Only fetch on mount
-      dedupingInterval: 10000, // 10 seconds deduplication
-    }
-  )
+  const { data: organizations, error, isLoading, refetch } = useQuery<Organization[]>({
+    queryKey: cacheKeys.organizations(),
+    queryFn: () => fetcher('/api/organizations'),
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes
+    refetchOnWindowFocus: false,
+  })
 
   return {
     organizations: organizations || [],
-    isLoading: !error && !organizations,
+    isLoading,
     error: error?.message || null,
-    refresh: mutate
+    refresh: refetch
   }
 }
 
 // Hook for getting organization details with caching
 export function useOptimizedOrganization(orgId: string | null) {
-  const { data: organization, error, mutate } = useSWR<Organization>(
-    orgId ? `/api/organizations/${orgId}` : null,
-    {
-      refreshInterval: 0,
-      revalidateOnFocus: false,
-      revalidateOnMount: true,
-      dedupingInterval: 15000, // 15 seconds for single org
-    }
-  )
+  const { data: organization, error, isLoading, refetch } = useQuery<Organization>({
+    queryKey: cacheKeys.organization(orgId || ''),
+    queryFn: () => fetcher(`/api/organizations/${orgId}`),
+    enabled: !!orgId,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes
+    refetchOnWindowFocus: false,
+  })
 
   return {
     organization: organization || null,
-    isLoading: orgId ? (!error && !organization) : false,
+    isLoading,
     error: error?.message || null,
-    refresh: mutate
+    refresh: refetch
   }
 }
