@@ -16,6 +16,9 @@ export function ReactQueryProvider({ children }: ReactQueryProviderProps) {
           queries: {
             // Optimized cache timing based on data type
             staleTime: (query) => {
+              if (!query?.queryKey || query.queryKey.length === 0) {
+                return 2 * 60 * 1000 // 2 minutes default
+              }
               const queryKey = query.queryKey[0] as string
               switch (queryKey) {
                 case 'user':
@@ -33,6 +36,9 @@ export function ReactQueryProvider({ children }: ReactQueryProviderProps) {
             
             // Garbage collection timing
             gcTime: (query) => {
+              if (!query?.queryKey || query.queryKey.length === 0) {
+                return 10 * 60 * 1000 // 10 minutes default
+              }
               const queryKey = query.queryKey[0] as string
               switch (queryKey) {
                 case 'user':
@@ -77,6 +83,9 @@ export function ReactQueryProvider({ children }: ReactQueryProviderProps) {
             
             // Smart refetch on window focus
             refetchOnWindowFocus: (query) => {
+              if (!query?.queryKey || query.queryKey.length === 0) {
+                return false
+              }
               const queryKey = query.queryKey[0] as string
               const criticalData = [
                 'tasks', 'board', 'sprint-columns', 
@@ -88,6 +97,9 @@ export function ReactQueryProvider({ children }: ReactQueryProviderProps) {
             // Refetch behavior
             refetchOnReconnect: 'always',
             refetchOnMount: (query) => {
+              if (!query?.queryKey || query.queryKey.length === 0) {
+                return true
+              }
               // Always refetch critical data on mount
               const queryKey = query.queryKey[0] as string
               const alwaysRefresh = ['tasks', 'board', 'sprint-columns']
@@ -97,6 +109,9 @@ export function ReactQueryProvider({ children }: ReactQueryProviderProps) {
             // Background refetch intervals for real-time data
             refetchInterval: (data, query) => {
               if (!data) return false
+              if (!query?.queryKey || query.queryKey.length === 0) {
+                return false
+              }
               
               const queryKey = query.queryKey[0] as string
               switch (queryKey) {
@@ -121,6 +136,12 @@ export function ReactQueryProvider({ children }: ReactQueryProviderProps) {
             // Structured error handling
             throwOnError: (error: unknown, query) => {
               const errorWithStatus = error as { status?: number }
+              
+              if (!query?.queryKey || query.queryKey.length === 0) {
+                // Default error handling when queryKey is unavailable
+                return errorWithStatus?.status >= 500
+              }
+              
               const queryKey = query.queryKey[0] as string
               
               // Always throw errors for critical operations
