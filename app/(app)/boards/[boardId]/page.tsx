@@ -205,7 +205,8 @@ function BoardContent() {
     tasksIsArray: Array.isArray(boardData?.tasks),
     tasksLength: boardData?.tasks?.length,
     tasks: boardData?.tasks,
-    columns: board.columns?.map(col => ({ id: col.id, name: col.name }))
+    columns: board.columns?.map(col => ({ id: col.id, name: col.name })),
+    fullBoardData: boardData
   })
 
   // Merge tasks with columns for Kanban boards

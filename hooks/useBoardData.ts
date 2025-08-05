@@ -75,8 +75,22 @@ export const useBoardData = (boardId: string | null) => {
 
   const { data: tasks, error: tasksError } = useQuery<Task[]>({
     queryKey: cacheKeys.tasks(boardId),
-    queryFn: () => fetcher(`/api/tasks?boardId=${boardId}`),
+    queryFn: async () => {
+      console.log('Fetching tasks for boardId:', boardId)
+      const response = await fetcher(`/api/tasks?boardId=${boardId}`)
+      // Tasks API returns { tasks: [...], pagination: {...} }
+      return response.tasks || []
+    },
     enabled: shouldFetchDetails,
+  })
+
+  // Debug tasks query
+  console.log('Tasks query debug:', {
+    shouldFetchDetails,
+    boardId,
+    tasks,
+    tasksError,
+    tasksLength: tasks?.length
   })
 
   const { data: labels, error: labelsError } = useQuery<Label[]>({
