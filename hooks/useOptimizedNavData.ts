@@ -13,11 +13,13 @@ const fetcher = (url: string) => fetch(url).then(res => {
 interface NavProject {
   id: string
   name: string
+  slug: string | null
   organizationId: string
   boardLinks?: Array<{
     board: {
       id: string
       name: string
+      slug: string | null
       boardType: string | null
     }
   }>
@@ -26,6 +28,7 @@ interface NavProject {
 interface NavBoard {
   id: string
   name: string
+  slug: string | null
   boardType: string | null
   organizationId: string
 }
@@ -42,6 +45,7 @@ interface NavSprint {
 interface NavOrganizationData {
   id: string
   name: string
+  slug: string | null
   projects: NavProject[]
   boards: NavBoard[] // standalone boards
   activeSprints: NavSprint[]
@@ -49,6 +53,12 @@ interface NavOrganizationData {
 
 export function useOptimizedNavData(organizationId: string | null) {
   // Use React Query for all API calls with proper caching
+  const { data: organization, error: orgError } = useQuery<{ id: string; name: string; slug: string | null }>({
+    queryKey: cacheKeys.organizations(organizationId || ''),
+    queryFn: () => fetcher(`/api/organizations/${organizationId}`),
+    enabled: !!organizationId,
+  })
+
   const { data: projects = [], error: projectsError } = useQuery<NavProject[]>({
     queryKey: cacheKeys.projects(organizationId || ''),
     queryFn: () => fetcher(`/api/projects?organizationId=${organizationId}`),
@@ -69,7 +79,7 @@ export function useOptimizedNavData(organizationId: string | null) {
 
   // Process data to separate standalone boards from project-linked boards
   const processedData = useMemo(() => {
-    if (!organizationId) return null
+    if (!organizationId || !organization) return null
 
     // Get IDs of boards that are linked to projects
     const projectLinkedBoardIds = new Set(
@@ -83,18 +93,21 @@ export function useOptimizedNavData(organizationId: string | null) {
 
     return {
       id: organizationId,
+      name: organization.name,
+      slug: organization.slug,
       projects: projects || [],
       boards: standaloneBoards || [],
       activeSprints: activeSprints || []
     }
-  }, [organizationId, projects, allBoards, activeSprints])
+  }, [organizationId, organization, projects, allBoards, activeSprints])
 
   const isLoading = !organizationId || 
+    (!organization && !orgError) ||
     (!projects && !projectsError) || 
     (!allBoards && !boardsError) || 
     (!activeSprints && !sprintsError)
 
-  const error = projectsError || boardsError || sprintsError
+  const error = orgError || projectsError || boardsError || sprintsError
 
   return {
     data: processedData,

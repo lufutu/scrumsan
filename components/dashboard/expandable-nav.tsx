@@ -227,14 +227,17 @@ export function ExpandableNav({ className }: ExpandableNavProps) {
                                     <SidebarMenuSub>
                                       {projectBoards.map((board) => {
                                         const BoardIcon = getBoardIcon(board.boardType)
-                                        const boardPath = `/boards/${board.id}`
+                                        // Use slug-based URL when both board and org have slugs, fallback to UUID
+                                        const boardPath = board.slug && org.slug 
+                                          ? `/orgs/${org.slug}/boards/${board.slug}` 
+                                          : `/boards/${board.id}`
                                         
                                         return (
                                           <SidebarMenuSubItem key={board.id}>
                                             <SidebarMenuSubButton
                                               asChild
                                               className={cn(
-                                                pathname === boardPath && 
+                                                (pathname === boardPath || pathname === `/boards/${board.id}`) && 
                                                 "bg-sidebar-accent text-sidebar-accent-foreground"
                                               )}
                                             >
@@ -274,14 +277,17 @@ export function ExpandableNav({ className }: ExpandableNavProps) {
                       {/* Standalone Boards */}
                       {org.boards?.map((board) => {
                         const BoardIcon = getBoardIcon(board.boardType)
-                        const boardPath = `/boards/${board.id}`
+                        // Use slug-based URL when both board and org have slugs, fallback to UUID
+                        const boardPath = board.slug && org.slug 
+                          ? `/orgs/${org.slug}/boards/${board.slug}` 
+                          : `/boards/${board.id}`
                         
                         return (
                           <SidebarMenuSubItem key={board.id}>
                             <SidebarMenuSubButton
                               asChild
                               className={cn(
-                                pathname === boardPath && 
+                                (pathname === boardPath || pathname === `/boards/${board.id}`) && 
                                 "bg-sidebar-accent text-sidebar-accent-foreground"
                               )}
                             >
