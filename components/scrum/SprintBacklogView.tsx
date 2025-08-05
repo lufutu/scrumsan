@@ -952,7 +952,7 @@ export default function SprintBacklogView({
             <div className="flex items-start gap-2">
               <Target className="h-5 w-5 text-blue-600 mt-0.5" />
               <div>
-                <h3 className="font-semibold text-blue-900 flex items-center gap-2">Sprint Goal: <p className="text-blue-800">{sprint.goal}</p></h3>
+                <h3 className="font-semibold text-blue-900 flex items-center gap-2">Sprint Goal: <span className="text-blue-800">{sprint.goal}</span></h3>
               </div>
             </div>
           </CardContent>

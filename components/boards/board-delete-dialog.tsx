@@ -102,15 +102,15 @@ export default function BoardDeleteDialog({
             Delete Board: {board.name}
           </AlertDialogTitle>
           <AlertDialogDescription className="space-y-3">
-            <p>
+            <span>
               Are you sure you want to delete this board? This action cannot be undone.
-            </p>
+            </span>
             
             {hasContent && (
               <div className="bg-red-50 border border-red-200 rounded-md p-3">
-                <p className="text-sm text-red-800 font-medium">
+                <div className="text-sm text-red-800 font-medium">
                   Warning: This board contains content
-                </p>
+                </div>
                 <ul className="text-sm text-red-700 mt-1 ml-4 list-disc">
                   {board._count?.tasks ? (
                     <li>{board._count.tasks} task{board._count.tasks !== 1 ? 's' : ''}</li>
@@ -119,17 +119,17 @@ export default function BoardDeleteDialog({
                     <li>{board._count.sprints} sprint{board._count.sprints !== 1 ? 's' : ''}</li>
                   ) : null}
                 </ul>
-                <p className="text-sm text-red-700 mt-2">
+                <div className="text-sm text-red-700 mt-2">
                   Please delete or move all content before deleting the board.
-                </p>
+                </div>
               </div>
             )}
             
             {!hasContent && (
               <div className="bg-amber-50 border border-amber-200 rounded-md p-3">
-                <p className="text-sm text-amber-800">
+                <div className="text-sm text-amber-800">
                   All columns, settings, and configurations associated with this board will be permanently deleted.
-                </p>
+                </div>
               </div>
             )}
           </AlertDialogDescription>
