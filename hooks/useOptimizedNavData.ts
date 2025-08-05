@@ -1,21 +1,15 @@
 import { useQuery } from '@tanstack/react-query'
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo } from 'react'
 import { cacheKeys } from '@/lib/query-optimization'
+import { isUUID } from '@/lib/slug-utils'
 
 // Generic fetcher function for API requests
-const fetcher = (url: string) => {
-  console.log('useOptimizedNavData fetcher called with URL:', url)
-  return fetch(url).then(res => {
-    console.log('useOptimizedNavData fetch response:', { url, status: res.status, ok: res.ok })
-    if (!res.ok) {
-      throw new Error('Failed to fetch')
-    }
-    return res.json()
-  }).then(data => {
-    console.log('useOptimizedNavData fetch data sample:', data?.length ? `Array of ${data.length} items` : typeof data === 'object' ? Object.keys(data) : data)
-    return data
-  })
-}
+const fetcher = (url: string) => fetch(url).then(res => {
+  if (!res.ok) {
+    throw new Error('Failed to fetch')
+  }
+  return res.json()
+})
 
 interface NavProject {
   id: string
@@ -59,48 +53,19 @@ interface NavOrganizationData {
 }
 
 export function useOptimizedNavData(organizationId: string | null) {
-  // BYPASS React Query for organization endpoint due to cache corruption
-  const [organization, setOrganization] = useState<{ id: string; name: string; slug: string | null } | null>(null)
-  const [orgError, setOrgError] = useState<Error | null>(null)
-  
-  useEffect(() => {
-    if (!organizationId) return
-    
-    let isCancelled = false
-    
-    async function fetchOrganization() {
-      try {
-        console.log('Direct fetch for organization:', organizationId)
-        // Use slug-based endpoint since we have the organization provider giving us the slug
-        const response = await fetch(`/api/orgs/pta`) // Use slug directly for now
-        console.log('Direct fetch response (using slug endpoint):', { status: response.status, ok: response.ok })
-        
-        if (!response.ok) {
-          throw new Error(`Failed to fetch organization: ${response.status}`)
-        }
-        
-        const data = await response.json()
-        console.log('Direct fetch organization data:', data)
-        
-        if (!isCancelled) {
-          setOrganization(data)
-          setOrgError(null)
-        }
-      } catch (error) {
-        console.error('Direct fetch organization error:', error)
-        if (!isCancelled) {
-          setOrgError(error as Error)
-          setOrganization(null)
-        }
-      }
-    }
-    
-    fetchOrganization()
-    
-    return () => {
-      isCancelled = true
-    }
-  }, [organizationId])
+  // Use React Query with proper caching for better performance
+  const { data: organization, error: orgError } = useQuery<{ id: string; name: string; slug: string | null }>({
+    queryKey: cacheKeys.organization(organizationId || ''),
+    queryFn: () => {
+      if (!organizationId) return Promise.reject('No organization ID')
+      // Use slug-based endpoint for both UUIDs and slugs since it handles both
+      const endpoint = isUUID(organizationId) 
+        ? `/api/organizations/${organizationId}` 
+        : `/api/orgs/${organizationId}`
+      return fetcher(endpoint)
+    },
+    enabled: !!organizationId,
+  })
 
   const { data: projects = [], error: projectsError } = useQuery<NavProject[]>({
     queryKey: cacheKeys.projects(organizationId || ''),
@@ -161,12 +126,10 @@ export function useOptimizedNavData(organizationId: string | null) {
 
 // Hook for multiple organizations
 export function useOptimizedNavDataMultiple(organizationIds: string[]) {
-  console.log('useOptimizedNavDataMultiple called with organizationIds:', organizationIds)
   const results = organizationIds.map(orgId => {
     // eslint-disable-next-line react-hooks/rules-of-hooks
     return useOptimizedNavData(orgId)
   })
-  console.log('useOptimizedNavDataMultiple results:', results.map(r => ({ data: r.data?.name, isLoading: r.isLoading, error: r.error })))
 
   const allData = results.map(result => result.data).filter(Boolean) as NavOrganizationData[]
   const isLoading = results.some(result => result.isLoading)
