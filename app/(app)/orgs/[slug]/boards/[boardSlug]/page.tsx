@@ -35,8 +35,6 @@ export default function SlugBasedBoardPage() {
         setIsLoading(true)
         setError(null)
 
-        // For now, redirect to the UUID-based route which already exists
-        // This is a temporary solution until we fully implement slug-based board pages
         const response = await fetch(`/api/orgs/${orgSlug}/boards/${boardSlug}`)
         
         if (response.status === 404) {
@@ -51,9 +49,6 @@ export default function SlugBasedBoardPage() {
         const boardData = await response.json()
         setBoard(boardData)
 
-        // For now, redirect to the existing UUID-based board page
-        router.replace(`/boards/${boardData.id}`)
-
       } catch (err) {
         console.error('Error fetching board:', err)
         setError(err instanceof Error ? err.message : 'Failed to load board')
@@ -63,7 +58,7 @@ export default function SlugBasedBoardPage() {
     }
 
     fetchBoard()
-  }, [orgSlug, boardSlug, router])
+  }, [orgSlug, boardSlug])
 
   if (isLoading) {
     return <PageLoadingState message="Loading board..." />
@@ -76,6 +71,13 @@ export default function SlugBasedBoardPage() {
     return <PageErrorState error={error} onRetry={() => window.location.reload()} />
   }
 
-  // This shouldn't render since we redirect above
-  return <PageLoadingState message="Redirecting..." />
+  if (!board) {
+    return <PageLoadingState message="Loading board data..." />
+  }
+
+  // Redirect to the UUID-based route for now, since that has the full implementation
+  // TODO: Eventually implement the full board component here to eliminate UUID routes
+  router.replace(`/boards/${board.id}`)
+  
+  return <PageLoadingState message="Redirecting to board..." />
 }
