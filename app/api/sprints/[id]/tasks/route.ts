@@ -84,17 +84,47 @@ export async function POST(
       }
       
       // Get first sprint column to assign task to
-      const firstSprintColumn = await prisma.sprintColumn.findFirst({
+      let firstSprintColumn = await prisma.sprintColumn.findFirst({
         where: { sprintId: id },
         orderBy: { position: 'asc' }
       })
 
+      // If no columns exist, create default columns
+      if (!firstSprintColumn) {
+        console.log('🔧 No sprint columns found, creating default columns for sprint:', id)
+        
+        const defaultColumns = [
+          { name: 'To Do', position: 0, isDone: false },
+          { name: 'In Progress', position: 1, isDone: false },
+          { name: 'Done', position: 2, isDone: true }
+        ]
+
+        // Create columns in transaction
+        await prisma.$transaction(async (tx) => {
+          for (const column of defaultColumns) {
+            await tx.sprintColumn.create({
+              data: {
+                ...column,
+                sprintId: id
+              }
+            })
+          }
+        })
+
+        // Get the first column after creation
+        firstSprintColumn = await prisma.sprintColumn.findFirst({
+          where: { sprintId: id },
+          orderBy: { position: 'asc' }
+        })
+      }
+
       // Add task to sprint by updating task.sprintId and sprintColumnId
+      // This should never be null now since we created columns if they didn't exist
       await prisma.task.update({
         where: { id: validatedData.taskId },
         data: {
           sprintId: id,
-          sprintColumnId: firstSprintColumn?.id || null
+          sprintColumnId: firstSprintColumn!.id // Use ! since we guarantee columns exist
         }
       })
     } else if (validatedData.taskIds) {
@@ -120,10 +150,39 @@ export async function POST(
       }
       
       // Get first sprint column to assign tasks to
-      const firstSprintColumn = await prisma.sprintColumn.findFirst({
+      let firstSprintColumn = await prisma.sprintColumn.findFirst({
         where: { sprintId: id },
         orderBy: { position: 'asc' }
       })
+
+      // If no columns exist, create default columns (same logic as single task)
+      if (!firstSprintColumn) {
+        console.log('🔧 No sprint columns found for bulk operation, creating default columns for sprint:', id)
+        
+        const defaultColumns = [
+          { name: 'To Do', position: 0, isDone: false },
+          { name: 'In Progress', position: 1, isDone: false },
+          { name: 'Done', position: 2, isDone: true }
+        ]
+
+        // Create columns in transaction
+        await prisma.$transaction(async (tx) => {
+          for (const column of defaultColumns) {
+            await tx.sprintColumn.create({
+              data: {
+                ...column,
+                sprintId: id
+              }
+            })
+          }
+        })
+
+        // Get the first column after creation
+        firstSprintColumn = await prisma.sprintColumn.findFirst({
+          where: { sprintId: id },
+          orderBy: { position: 'asc' }
+        })
+      }
 
       // Replace sprint tasks using direct sprintId updates
       await prisma.$transaction(async (tx) => {
@@ -146,7 +205,7 @@ export async function POST(
             },
             data: {
               sprintId: id,
-              sprintColumnId: firstSprintColumn?.id || null
+              sprintColumnId: firstSprintColumn!.id // Use ! since we guarantee columns exist
             }
           })
         }
