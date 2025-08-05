@@ -591,12 +591,15 @@ export default function SprintBacklogView({
         throw new Error('Failed to create task')
       }
 
-      // Success - clear optimistic state and refresh data
-      setOptimisticColumns([])
-      await mutateColumns()
+      // Success - refresh data in background
+      mutateColumns()
       onRefresh()
-      
       toast.success('Task created successfully')
+      
+      // Clear optimistic state after delay to ensure new data has loaded
+      setTimeout(() => {
+        setOptimisticColumns([])
+      }, 1000)
     } catch (error) {
       console.error('Error creating task:', error)
       
@@ -830,10 +833,14 @@ export default function SprintBacklogView({
           throw new Error('Failed to reorder column')
         }
 
-        // Success - clear optimistic state and refresh data
-        setOptimisticColumns([])
-        await mutateColumns()
+        // Success - refresh data in background
+        mutateColumns() 
         toast.success('Column reordered successfully')
+        
+        // Clear optimistic state after delay to ensure new data has loaded
+        setTimeout(() => {
+          setOptimisticColumns([])
+        }, 1000)
         
       } catch (error: unknown) {
         console.error('Error reordering column:', error)
@@ -895,10 +902,14 @@ export default function SprintBacklogView({
           throw new Error(error.error || 'Failed to move task to backlog')
         }
 
-        // Success - clear optimistic state and refresh data
-        setOptimisticColumns([])
-        await mutateColumns()
+        // Success - refresh data in background
+        mutateColumns()
         toast.success('Task moved to backlog successfully')
+        
+        // Clear optimistic state after delay to ensure new data has loaded
+        setTimeout(() => {
+          setOptimisticColumns([])
+        }, 1000)
         return
       }
 
@@ -941,10 +952,14 @@ export default function SprintBacklogView({
         throw new Error(error.error || 'Failed to move task')
       }
 
-      // Success - clear optimistic state and refresh data
-      setOptimisticColumns([])
-      await mutateColumns()
+      // Success - refresh data in background
+      mutateColumns()
       toast.success('Task moved successfully')
+      
+      // Clear optimistic state after delay to ensure new data has loaded  
+      setTimeout(() => {
+        setOptimisticColumns([])
+      }, 1000)
       
     } catch (error: unknown) {
       console.error('Error moving task:', error)
