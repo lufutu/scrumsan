@@ -47,6 +47,12 @@ function BoardContent() {
   // Get initial task ID from URL params for deep linking
   const initialTaskId = searchParams?.get('task') || null
 
+  // IMPORTANT: All hooks must be called before any conditional returns
+  // Use the existing board hooks and components with the board ID
+  const { data: boardData, isLoading: boardDataLoading, mutate } = useBoardData(board?.id || null)
+  const { user } = useSupabase()
+  const { organizations } = useOrganization()
+
   useEffect(() => {
     async function fetchBoard() {
       if (!orgSlug || !boardSlug) return
@@ -94,11 +100,6 @@ function BoardContent() {
   if (!board) {
     return <PageLoadingState message="Loading board data..." />
   }
-
-  // Use the existing board hooks and components with the board ID
-  const { data: boardData, isLoading: boardDataLoading, mutate } = useBoardData(board.id)
-  const { user } = useSupabase()
-  const { organizations } = useOrganization()
   
   // Get organization from the context
   const organization = organizations.find(org => org.slug === orgSlug)
