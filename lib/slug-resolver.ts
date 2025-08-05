@@ -259,7 +259,7 @@ export function createSlugRedirect(
 /**
  * Middleware helper to resolve entity from request params
  */
-export interface EntityResolutionResult<T = any> {
+export type EntityResolutionResult<T = any> = {
   success: true
   entity: T
   resolvedBy: 'slug' | 'uuid'

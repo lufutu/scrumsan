@@ -4,6 +4,7 @@ import { cacheKeys } from '@/lib/query-optimization'
 interface Board {
   id: string
   name: string
+  slug: string | null
   description: string | null
   color: string | null
   boardType: string | null
@@ -15,6 +16,7 @@ interface Board {
   organization?: {
     id: string
     name: string
+    slug: string | null
   }
   projectLinks?: Array<{
     id: string

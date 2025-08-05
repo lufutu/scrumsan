@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth-utils'
+import { generateSlug, generateUniqueSlug } from '@/lib/slug-utils'
 import { z } from 'zod'
 
 const boardSchema = z.object({
@@ -65,7 +66,8 @@ export async function GET(req: NextRequest) {
         organization: {
           select: {
             id: true,
-            name: true
+            name: true,
+            slug: true
           }
         },
         _count: {
@@ -116,12 +118,25 @@ export async function POST(req: NextRequest) {
       )
     }
     
+    // Generate unique slug for the board within the organization
+    const baseSlug = generateSlug(validatedData.name)
+    const existingSlugs = await prisma.board.findMany({
+      where: { 
+        organizationId: validatedData.organizationId,
+        slug: { not: null } 
+      },
+      select: { slug: true }
+    }).then(boards => boards.map(b => b.slug!))
+    
+    const uniqueSlug = generateUniqueSlug(baseSlug, existingSlugs)
+
     // Create board with columns in a transaction
     const result = await prisma.$transaction(async (tx) => {
       // Create the board
       const board = await tx.board.create({
         data: {
           name: validatedData.name,
+          slug: uniqueSlug,
           boardType: validatedData.boardType || 'kanban',
           organizationId: validatedData.organizationId,
           description: validatedData.description || null,
@@ -137,6 +152,7 @@ export async function POST(req: NextRequest) {
           data: {
             boardId: board.id,
             name: 'Backlog',
+            slug: 'backlog',
             position: 0,
             isBacklog: true,
             status: 'planning'
@@ -148,6 +164,7 @@ export async function POST(req: NextRequest) {
           data: {
             boardId: board.id,
             name: 'Sprint 1',
+            slug: 'sprint-1',
             position: 1,
             status: 'planning'
           }

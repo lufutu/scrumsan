@@ -31,6 +31,7 @@ import { Tables } from '@/types/database'
 type Board = {
   id: string
   name: string
+  slug: string | null
   description: string | null
   color: string | null
   boardType: string | null
@@ -45,6 +46,7 @@ type Board = {
   organization?: {
     id: string
     name: string
+    slug: string | null
   }
   projectLinks?: Array<{
     id: string
@@ -79,12 +81,15 @@ export default function BoardsPage() {
   }, [error, toast])
 
 
-  const handleBoardCreated = async (newBoard?: { id?: string }) => {
+  const handleBoardCreated = async (newBoard?: { id?: string, slug?: string }) => {
     // Refresh the boards list using SWR
     await refresh()
 
-    // Redirect to the new board
-    if (newBoard?.id) {
+    // Redirect to the new board using slug-based URL
+    if (newBoard?.slug && activeOrg?.slug) {
+      router.push(`/orgs/${activeOrg.slug}/boards/${newBoard.slug}`)
+    } else if (newBoard?.id) {
+      // Fallback to UUID-based URL (will redirect to slug URL via middleware)
       router.push(`/boards/${newBoard.id}`)
     }
   }
@@ -211,7 +216,7 @@ export default function BoardsPage() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem asChild>
-                          <Link href={`/boards/${board.id}`}>
+                          <Link href={board.slug && board.organization?.slug ? `/orgs/${board.organization.slug}/boards/${board.slug}` : `/boards/${board.id}`}>
                             Open Board
                           </Link>
                         </DropdownMenuItem>
@@ -257,7 +262,7 @@ export default function BoardsPage() {
                     </DropdownMenu>
                   </div>
 
-                  <Link href={`/boards/${board.id}`} className="block">
+                  <Link href={board.slug && board.organization?.slug ? `/orgs/${board.organization.slug}/boards/${board.slug}` : `/boards/${board.id}`} className="block">
                     <CardHeader>
                       <div className="flex items-start justify-between">
                         <div className="flex items-center gap-2">
