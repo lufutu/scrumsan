@@ -95,7 +95,10 @@ export default function Dashboard() {
       setIsLoading(true)
 
       // Fetch projects using our Prisma API
-      const projectsResponse = await fetch(`/api/organizations/${activeOrg.id}/projects?limit=6`)
+      // Ensure we use the UUID, not slug
+      const orgId = activeOrg.id
+      console.log('Dashboard: Using activeOrg.id for API call:', orgId)
+      const projectsResponse = await fetch(`/api/organizations/${orgId}/projects?limit=6`)
       if (!projectsResponse.ok) {
         throw new Error('Failed to fetch projects')
       }

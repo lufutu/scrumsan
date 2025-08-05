@@ -5,15 +5,20 @@ import { cacheKeys, invalidationPatterns } from '@/lib/query-optimization'
 import { Database } from '@/types/database'
 
 const fetcher = async (url: string) => {
+  console.log('useOrganizations fetcher called with URL:', url)
   const response = await fetch(url)
+  console.log('useOrganizations fetch response:', { url, status: response.status, ok: response.ok })
   if (!response.ok) {
     throw new Error('Failed to fetch')
   }
-  return response.json()
+  const data = await response.json()
+  console.log('useOrganizations fetch data sample:', data?.length ? `Array of ${data.length} items` : data)
+  return data
 }
 
 export interface Organization {
   id: string
+  slug: string | null
   name: string
   description: string | null
   logo: string | null

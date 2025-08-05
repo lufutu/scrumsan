@@ -61,9 +61,11 @@ export function OrganizationProvider({ children }: OrganizationProviderProps) {
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), 8000)
       
+      console.log('OrganizationProvider: Fetching organizations from /api/organizations')
       const response = await fetch('/api/organizations', {
         signal: controller.signal
       })
+      console.log('OrganizationProvider: Fetch response:', { status: response.status, ok: response.ok })
       
       clearTimeout(timeoutId)
       
@@ -72,6 +74,7 @@ export function OrganizationProvider({ children }: OrganizationProviderProps) {
       }
       
       const data = await response.json()
+      console.log('OrganizationProvider: Organizations data:', data?.map((org: any) => ({ id: org.id, slug: org.slug, name: org.name })))
       debugLoadingState('OrganizationProvider', { 
         status: 'organizations fetched', 
         count: data.length 
@@ -113,6 +116,10 @@ export function OrganizationProvider({ children }: OrganizationProviderProps) {
         ? organizations.find((org: Organization) => org.id === savedActiveOrgId) || organizations[0]
         : organizations[0]
       
+      console.log('OrganizationProvider: Setting active organization:', { 
+        savedActiveOrgId, 
+        orgToActivate: { id: orgToActivate.id, slug: orgToActivate.slug, name: orgToActivate.name } 
+      })
       setActiveOrgState(orgToActivate)
       
       // Safely set localStorage

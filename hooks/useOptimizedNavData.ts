@@ -3,12 +3,19 @@ import { useMemo } from 'react'
 import { cacheKeys } from '@/lib/query-optimization'
 
 // Generic fetcher function for API requests
-const fetcher = (url: string) => fetch(url).then(res => {
-  if (!res.ok) {
-    throw new Error('Failed to fetch')
-  }
-  return res.json()
-})
+const fetcher = (url: string) => {
+  console.log('useOptimizedNavData fetcher called with URL:', url)
+  return fetch(url).then(res => {
+    console.log('useOptimizedNavData fetch response:', { url, status: res.status, ok: res.ok })
+    if (!res.ok) {
+      throw new Error('Failed to fetch')
+    }
+    return res.json()
+  }).then(data => {
+    console.log('useOptimizedNavData fetch data sample:', data?.length ? `Array of ${data.length} items` : typeof data === 'object' ? Object.keys(data) : data)
+    return data
+  })
+}
 
 interface NavProject {
   id: string
