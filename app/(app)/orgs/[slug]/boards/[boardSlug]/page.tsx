@@ -23,7 +23,7 @@ export default function SlugBasedBoardPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const orgSlug = params.orgSlug as string
+  const orgSlug = params.slug as string
   const boardSlug = params.boardSlug as string
 
   useEffect(() => {
