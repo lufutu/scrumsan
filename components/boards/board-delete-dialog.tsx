@@ -101,10 +101,10 @@ export default function BoardDeleteDialog({
             <AlertTriangle className="h-5 w-5 text-red-600" />
             Delete Board: {board.name}
           </AlertDialogTitle>
-          <AlertDialogDescription className="space-y-3">
-            <span>
+          <div className="text-muted-foreground text-sm space-y-3">
+            <p>
               Are you sure you want to delete this board? This action cannot be undone.
-            </span>
+            </p>
             
             {hasContent && (
               <div className="bg-red-50 border border-red-200 rounded-md p-3">
@@ -132,7 +132,7 @@ export default function BoardDeleteDialog({
                 </div>
               </div>
             )}
-          </AlertDialogDescription>
+          </div>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
