@@ -329,11 +329,11 @@ export function ExpandableNav({ className }: ExpandableNavProps) {
                         <SidebarMenuSubButton
                           asChild
                           className={cn(
-                            pathname === `/organizations/${org.id}/members` && 
+                            pathname === `/organizations/${org.slug || org.id}/members` && 
                             "bg-sidebar-accent text-sidebar-accent-foreground"
                           )}
                         >
-                          <Link href={`/organizations/${org.id}/members`} className="flex items-center gap-2">
+                          <Link href={`/organizations/${org.slug || org.id}/members`} className="flex items-center gap-2">
                             <Users className="h-4 w-4" />
                             <span>Team Management</span>
                           </Link>
@@ -346,7 +346,7 @@ export function ExpandableNav({ className }: ExpandableNavProps) {
                           asChild 
                           className="text-muted-foreground hover:text-foreground"
                         >
-                          <Link href={`/organizations/${org.id}`}>
+                          <Link href={`/organizations/${org.slug || org.id}`}>
                             <Plus className="h-4 w-4" />
                             <span>Add Project</span>
                           </Link>
