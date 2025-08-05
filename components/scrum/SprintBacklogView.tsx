@@ -526,19 +526,31 @@ export default function SprintBacklogView({
       }
     },
     onMutate: async ({ taskId, targetColumnId }) => {
-      // Cancel outgoing refetches
+      // We need to get orgSlug and boardSlug to update the slug-based tasks cache
+      // For now, we'll get these from the current URL or context
+      const currentUrl = window.location.pathname
+      const matches = currentUrl.match(/\/orgs\/([^\/]+)\/boards\/([^\/]+)/)
+      const orgSlug = matches?.[1]
+      const boardSlug = matches?.[2]
+
+      // Cancel outgoing refetches for both caches
       await queryClient.cancelQueries({ queryKey: cacheKeys.sprintColumns(sprint.id) })
+      if (orgSlug && boardSlug) {
+        await queryClient.cancelQueries({ queryKey: ['slug-tasks', orgSlug, boardSlug] })
+      }
 
-      // Snapshot previous value
+      // Snapshot previous values
       const previousColumns = queryClient.getQueryData<SprintColumn[]>(cacheKeys.sprintColumns(sprint.id))
+      const previousTasks = orgSlug && boardSlug ? 
+        queryClient.getQueryData<Task[]>(['slug-tasks', orgSlug, boardSlug]) : null
 
-      if (!previousColumns) return { previousColumns }
+      if (!previousColumns) return { previousColumns, previousTasks }
 
       // Find current task and column
       const currentTask = previousColumns.flatMap(col => col.tasks).find(task => task.id === taskId)
-      if (!currentTask) return { previousColumns }
+      if (!currentTask) return { previousColumns, previousTasks }
 
-      // Optimistically update the cache
+      // 1. Update sprint columns cache (for SprintBacklogView)
       const updatedColumns = previousColumns.map(col => ({
         ...col,
         tasks: [...col.tasks]
@@ -562,21 +574,56 @@ export default function SprintBacklogView({
       }
 
       queryClient.setQueryData(cacheKeys.sprintColumns(sprint.id), updatedColumns)
-      return { previousColumns }
+
+      // 2. Update slug-based tasks cache (for ProductBacklog)
+      if (previousTasks && orgSlug && boardSlug) {
+        const updatedTasks = previousTasks.map(task => {
+          if (task.id === taskId) {
+            if (targetColumnId === 'backlog') {
+              // Moving to backlog: clear sprint assignments
+              return {
+                ...task,
+                sprintId: null,
+                sprintColumnId: null,
+                columnId: null
+              }
+            } else {
+              // Moving between columns: update sprint column
+              return {
+                ...task,
+                sprintColumnId: targetColumnId
+              }
+            }
+          }
+          return task
+        })
+        
+        queryClient.setQueryData(['slug-tasks', orgSlug, boardSlug], updatedTasks)
+      }
+
+      return { previousColumns, previousTasks, orgSlug, boardSlug }
     },
     onError: (error, variables, context) => {
-      // Rollback on error
+      // Rollback on error - restore both caches
       if (context?.previousColumns) {
         queryClient.setQueryData(cacheKeys.sprintColumns(sprint.id), context.previousColumns)
       }
+      if (context?.previousTasks && context?.orgSlug && context?.boardSlug) {
+        queryClient.setQueryData(['slug-tasks', context.orgSlug, context.boardSlug], context.previousTasks)
+      }
       toast.error(error.message || 'Failed to move task')
     },
-    onSuccess: (data) => {
+    onSuccess: (data, variables, context) => {
       const message = data.type === 'backlog' ? 'Task moved to backlog successfully' : 'Task moved successfully'
       toast.success(message)
-      // Invalidate to ensure fresh data
+      // Invalidate both caches to ensure fresh data
       queryClient.invalidateQueries({ queryKey: cacheKeys.sprintColumns(sprint.id) })
       mutateColumns()
+      
+      // Also invalidate slug-based tasks cache if we have the context
+      if (context?.orgSlug && context?.boardSlug) {
+        queryClient.invalidateQueries({ queryKey: ['slug-tasks', context.orgSlug, context.boardSlug] })
+      }
     }
   })
 
