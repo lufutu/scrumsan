@@ -100,7 +100,7 @@ export async function POST(req: NextRequest) {
       )
     }
     return NextResponse.json(
-      { message: error.message || 'Failed to create organization' },
+      { message: error instanceof Error ? error.message : 'Failed to create organization' },
       { status: 500 }
     )
   }
