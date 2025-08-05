@@ -60,11 +60,8 @@ export async function GET(
       )
     }
     
-    // If accessed by UUID but has a slug, redirect to slug URL
-    if (resolvedBy === 'uuid' && organization.slug) {
-      const redirectUrl = `/orgs/${organization.slug}`
-      return createSlugRedirect(organization.slug)
-    }
+    // API endpoints should always return JSON data, not redirect
+    // The redirect logic is only for page routes, not API routes
     
     return NextResponse.json(organization)
   } catch (error: unknown) {
