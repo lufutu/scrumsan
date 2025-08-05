@@ -214,12 +214,31 @@ export default function ProductBacklog({
       })
 
       try {
-        // Move task to new sprint
-        const response = await fetch(`/api/sprints/${targetSprintId}/tasks`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ taskId: draggableId })
-        })
+        let response: Response
+        
+        if (targetSprintId === 'backlog') {
+          // Moving to backlog: remove task from current sprint
+          const currentSprintId = draggedTask.sprintId
+          if (!currentSprintId) {
+            throw new Error('Task is already in backlog')
+          }
+          
+          response = await fetch(`/api/sprints/${currentSprintId}/tasks/move-to-backlog`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              taskId: draggableId,
+              position: destination.index 
+            })
+          })
+        } else {
+          // Moving to sprint: add task to new sprint
+          response = await fetch(`/api/sprints/${targetSprintId}/tasks`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ taskId: draggableId })
+          })
+        }
 
         if (!response.ok) {
           const error = await response.json()

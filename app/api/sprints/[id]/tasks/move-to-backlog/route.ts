@@ -65,6 +65,8 @@ export async function POST(
       updateData.position = position
     }
 
+    console.log('🔧 Moving task to backlog:', { taskId, updateData })
+
     const updatedTask = await prisma.task.update({
       where: { id: taskId },
       data: updateData,
@@ -92,6 +94,13 @@ export async function POST(
           }
         }
       }
+    })
+    
+    console.log('✅ Task moved to backlog successfully:', { 
+      taskId: updatedTask.id, 
+      sprintId: updatedTask.sprintId, 
+      sprintColumnId: updatedTask.sprintColumnId,
+      columnId: updatedTask.columnId 
     })
     
     return NextResponse.json(updatedTask)
