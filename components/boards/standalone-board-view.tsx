@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useToast } from '@/hooks/use-toast'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -91,6 +91,7 @@ export default function StandaloneBoardView({ board, onUpdate }: StandaloneBoard
   const [isAddColumnOpen, setIsAddColumnOpen] = useState(false)
   const [newColumnName, setNewColumnName] = useState('')
   const [columnToDelete, setColumnToDelete] = useState<string | null>(null)
+  const [localBoard, setLocalBoard] = useState(board)
   const { users } = useUsers({ organizationId: board.organizationId })
   const { labels } = useLabels(board.id)
   const { createColumn, updateColumn, deleteColumn, mutate: mutateColumns } = useBoardColumns(board.id)
@@ -98,6 +99,11 @@ export default function StandaloneBoardView({ board, onUpdate }: StandaloneBoard
   // Check if current user can edit/delete this board
   const canEditBoard = user?.id === board.createdBy || ['owner', 'admin'].includes(currentMember?.role || '')
   console.log("board", board, labels)
+
+  // Update local board when props change
+  useEffect(() => {
+    setLocalBoard(board)
+  }, [board])
 
   // Drag and drop handlers for @hello-pangea/dnd
   const handleDragEnd = async (result: DropResult) => {
@@ -110,17 +116,17 @@ export default function StandaloneBoardView({ board, onUpdate }: StandaloneBoard
     const targetColumnId = destination.droppableId
 
     // Store original state for rollback
-    const originalColumns = board.columns.map(col => ({ ...col, tasks: [...col.tasks] }))
+    const originalColumns = localBoard.columns?.map(col => ({ ...col, tasks: [...col.tasks] })) || []
 
     try {
       // Find the task being moved
-      const sourceColumn = board.columns.find(col => col.id === sourceColumnId)
+      const sourceColumn = localBoard.columns?.find(col => col.id === sourceColumnId)
       const task = sourceColumn?.tasks.find(t => t.id === draggableId)
       
       if (!task || !sourceColumn) return
 
       // OPTIMISTIC UPDATE: Immediately update UI
-      const updatedColumns = board.columns.map(col => {
+      const updatedColumns = localBoard.columns?.map(col => {
         if (col.id === sourceColumnId) {
           // Remove task from source column
           return {
@@ -140,7 +146,7 @@ export default function StandaloneBoardView({ board, onUpdate }: StandaloneBoard
       })
 
       // Update board state immediately for optimistic UI
-      board.columns = updatedColumns
+      setLocalBoard({ ...localBoard, columns: updatedColumns || [] })
 
       // Trigger UI refresh
       onUpdate()
@@ -164,7 +170,7 @@ export default function StandaloneBoardView({ board, onUpdate }: StandaloneBoard
       console.error('Error moving task:', err)
       
       // Rollback on error - restore original state
-      board.columns = originalColumns
+      setLocalBoard({ ...localBoard, columns: originalColumns })
       onUpdate()
       
       uiToast({
@@ -178,36 +184,97 @@ export default function StandaloneBoardView({ board, onUpdate }: StandaloneBoard
   const handleAddColumn = async () => {
     if (!newColumnName.trim()) return
 
+    // Generate temporary ID for optimistic update
+    const tempId = `temp_col_${Date.now()}`
+    const newColumn: BoardColumn = {
+      id: tempId,
+      name: newColumnName.trim(),
+      position: localBoard.columns?.length || 0,
+      tasks: []
+    }
+
+    // Store original columns for rollback
+    const originalColumns = localBoard.columns ? [...localBoard.columns] : []
+
+    // OPTIMISTIC UPDATE: Add column immediately
+    setLocalBoard({
+      ...localBoard,
+      columns: [...(localBoard.columns || []), newColumn]
+    })
+    setNewColumnName('')
+    setIsAddColumnOpen(false)
+
     try {
       await createColumn({
-        name: newColumnName.trim(),
-        position: board.columns?.length || 0,
+        name: newColumn.name,
+        position: newColumn.position,
       })
-      setNewColumnName('')
-      setIsAddColumnOpen(false)
       toast.success('Column added successfully')
-      onUpdate() // Refresh board data
+      onUpdate() // Refresh board data to get real column
     } catch (error: unknown) {
+      // ROLLBACK on error
+      setLocalBoard({ ...localBoard, columns: originalColumns })
       toast.error(error instanceof Error ? error.message : 'Failed to add column')
+      // Reopen dialog on error
+      setIsAddColumnOpen(true)
+      setNewColumnName(newColumn.name)
     }
   }
 
   const handleDeleteColumn = async (columnId: string) => {
+    // Find column to delete
+    const columnToDelete = localBoard.columns?.find(col => col.id === columnId)
+    if (!columnToDelete) return
+
+    // Check if column has tasks
+    if (columnToDelete.tasks.length > 0) {
+      toast.error('Cannot delete column with tasks. Please move or delete tasks first.')
+      return
+    }
+
+    // Store original columns for rollback
+    const originalColumns = localBoard.columns ? [...localBoard.columns] : []
+
+    // OPTIMISTIC UPDATE: Remove column immediately
+    setLocalBoard({
+      ...localBoard,
+      columns: localBoard.columns?.filter(col => col.id !== columnId) || []
+    })
+
     try {
       await deleteColumn(columnId)
       toast.success('Column deleted successfully')
       onUpdate() // Refresh board data
     } catch (error: unknown) {
+      // ROLLBACK on error
+      setLocalBoard({ ...localBoard, columns: originalColumns })
       toast.error(error instanceof Error ? error.message : 'Failed to delete column')
     }
   }
 
   const handleRenameColumn = async (columnId: string, newName: string) => {
+    // Find column to rename
+    const columnToRename = localBoard.columns?.find(col => col.id === columnId)
+    if (!columnToRename) return
+
+    // Store original columns for rollback
+    const originalColumns = localBoard.columns ? [...localBoard.columns] : []
+
+    // OPTIMISTIC UPDATE: Rename column immediately
+    setLocalBoard({
+      ...localBoard,
+      columns: localBoard.columns?.map(col => 
+        col.id === columnId ? { ...col, name: newName } : col
+      ) || []
+    })
+
     try {
       await updateColumn(columnId, { name: newName })
       toast.success('Column renamed successfully')
       onUpdate() // Refresh board data
     } catch (error: unknown) {
+      // ROLLBACK on error
+      setLocalBoard({ ...localBoard, columns: originalColumns })
       toast.error(error instanceof Error ? error.message : 'Failed to rename column')
     }
   }
@@ -223,7 +290,7 @@ export default function StandaloneBoardView({ board, onUpdate }: StandaloneBoard
   }
 
   // For scrum boards, use the ProjectScrumBoard component
-  if (board.boardType === 'scrum' && board.columns) {
+  if (localBoard.boardType === 'scrum' && localBoard.columns) {
     return (
       <DragDropContext onDragEnd={handleDragEnd}>
         <div className="h-full">
@@ -262,7 +329,7 @@ export default function StandaloneBoardView({ board, onUpdate }: StandaloneBoard
                       id: board.id,
                       name: board.name,
                       _count: {
-                        tasks: board.columns?.reduce((total, col) => total + col.tasks.length, 0) || 0,
+                        tasks: localBoard.columns?.reduce((total, col) => total + col.tasks.length, 0) || 0,
                         sprints: 0
                       }
                     }}
@@ -281,7 +348,7 @@ export default function StandaloneBoardView({ board, onUpdate }: StandaloneBoard
           
           <div className="flex gap-6 h-full min-h-96 overflow-x-auto">
             <div className="flex gap-6 min-w-max">
-              {board.columns.map((column) => (
+              {localBoard.columns.map((column) => (
                 <div key={column.id} className="flex flex-col w-[350px] flex-shrink-0">
                   <Card className="flex-1">
                     <CardHeader className="pb-3">
@@ -398,7 +465,51 @@ export default function StandaloneBoardView({ board, onUpdate }: StandaloneBoard
                               <div className="mt-3">
                                 <ComprehensiveInlineForm
                                   onAdd={async (data) => {
+                                    // Generate temporary ID for optimistic update
+                                    const tempId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+                                    
+                                    // Create optimistic task object
+                                    const optimisticTask: Task = {
+                                      id: tempId,
+                                      title: data.title,
+                                      boardId: board.id,
+                                      columnId: column.id,
+                                      taskType: data.taskType,
+                                      priority: data.priority || 'medium',
+                                      storyPoints: data.storyPoints,
+                                      taskAssignees: data.assignees?.map(a => ({
+                                        user: users.find(u => u.id === a.id) || { id: a.id, fullName: 'Unknown', email: '' }
+                                      })) || [],
+                                      taskLabels: data.labels?.map(labelId => {
+                                        const label = labels.find(l => l.id === labelId)
+                                        return label ? { label } : null
+                                      }).filter(Boolean) || [],
+                                      position: column.tasks.length,
+                                      createdAt: new Date().toISOString(),
+                                      updatedAt: new Date().toISOString(),
+                                      itemCode: `TEMP-${Date.now()}`,
+                                      isOptimistic: true // Mark as optimistic
+                                    }
+                                    
+                                    // Store original columns for rollback
+                                    const originalColumns = localBoard.columns?.map(col => ({ ...col, tasks: [...col.tasks] })) || []
+                                    
+                                    // OPTIMISTIC UPDATE: Add task to UI immediately
+                                    const updatedColumns = localBoard.columns?.map(col => {
+                                      if (col.id === column.id) {
+                                        return {
+                                          ...col,
+                                          tasks: [...col.tasks, optimisticTask]
+                                        }
+                                      }
+                                      return col
+                                    }) || []
+                                    
+                                    setLocalBoard({ ...localBoard, columns: updatedColumns })
+                                    setShowInlineForm(prev => ({ ...prev, [column.id]: false }))
+                                    
                                     try {
+                                      // Make API call
                                       const response = await fetch('/api/tasks', {
                                         method: 'POST',
                                         headers: {
@@ -421,18 +532,14 @@ export default function StandaloneBoardView({ board, onUpdate }: StandaloneBoard
                                         throw new Error(error.message || 'Failed to create task');
                                       }
                                       
+                                      // Success - refresh data to get real task
                                       onUpdate();
-                                      setShowInlineForm(prev => ({ ...prev, [column.id]: false }));
-                                      uiToast({
-                                        title: "Success",
-                                        description: "Task created successfully"
-                                      });
+                                      toast.success("Task created successfully")
                                     } catch (err: any) {
+                                      // ROLLBACK on error
                                       console.error('Error creating task:', err)
-                                      uiToast({
-                                        title: "Error",
-                                        description: "Failed to create task"
-                                      })
+                                      setLocalBoard({ ...localBoard, columns: originalColumns })
+                                      toast.error("Failed to create task")
                                     }
                                   }}
                                   onCancel={() => setShowInlineForm(prev => ({ ...prev, [column.id]: false }))}
@@ -485,7 +592,7 @@ export default function StandaloneBoardView({ board, onUpdate }: StandaloneBoard
 
         <div className="flex gap-6 h-full min-h-96 overflow-x-auto">
           <div className="flex gap-6 min-w-max">
-            {board.columns?.map((column) => (
+            {localBoard.columns?.map((column) => (
               <div key={column.id} className="flex flex-col w-[350px] flex-shrink-0">
                 <Card className="flex-1">
                   <CardHeader className="pb-3">
@@ -594,7 +701,51 @@ export default function StandaloneBoardView({ board, onUpdate }: StandaloneBoard
                             <div className="mt-3">
                               <ComprehensiveInlineForm
                                 onAdd={async (data) => {
+                                  // Generate temporary ID for optimistic update
+                                  const tempId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+                                  
+                                  // Create optimistic task object
+                                  const optimisticTask: Task = {
+                                    id: tempId,
+                                    title: data.title,
+                                    boardId: board.id,
+                                    columnId: column.id,
+                                    taskType: data.taskType,
+                                    priority: data.priority || 'medium',
+                                    storyPoints: data.storyPoints,
+                                    taskAssignees: data.assignees?.map(a => ({
+                                      user: users.find(u => u.id === a.id) || { id: a.id, fullName: 'Unknown', email: '' }
+                                    })) || [],
+                                    taskLabels: data.labels?.map(labelId => {
+                                      const label = labels.find(l => l.id === labelId)
+                                      return label ? { label } : null
+                                    }).filter(Boolean) || [],
+                                    position: column.tasks.length,
+                                    createdAt: new Date().toISOString(),
+                                    updatedAt: new Date().toISOString(),
+                                    itemCode: `TEMP-${Date.now()}`,
+                                    isOptimistic: true // Mark as optimistic
+                                  }
+                                  
+                                  // Store original columns for rollback
+                                  const originalColumns = localBoard.columns?.map(col => ({ ...col, tasks: [...col.tasks] })) || []
+                                  
+                                  // OPTIMISTIC UPDATE: Add task to UI immediately
+                                  const updatedColumns = localBoard.columns?.map(col => {
+                                    if (col.id === column.id) {
+                                      return {
+                                        ...col,
+                                        tasks: [...col.tasks, optimisticTask]
+                                      }
+                                    }
+                                    return col
+                                  }) || []
+                                  
+                                  setLocalBoard({ ...localBoard, columns: updatedColumns })
+                                  setShowInlineForm(prev => ({ ...prev, [column.id]: false }))
+                                  
                                   try {
+                                    // Make API call
                                     const response = await fetch('/api/tasks', {
                                       method: 'POST',
                                       headers: {
@@ -605,7 +756,7 @@ export default function StandaloneBoardView({ board, onUpdate }: StandaloneBoard
                                         boardId: board.id,
                                         columnId: column.id,
                                         taskType: data.taskType,
-                                        assignees: data.assignees || [],
+                                        taskAssignees: data.assignees || [],
                                         labels: data.labels || [],
                                         priority: data.priority,
                                         storyPoints: data.storyPoints,
@@ -617,18 +768,14 @@ export default function StandaloneBoardView({ board, onUpdate }: StandaloneBoard
                                       throw new Error(error.message || 'Failed to create task');
                                     }
                                     
+                                    // Success - refresh data to get real task
                                     onUpdate();
-                                    setShowInlineForm(prev => ({ ...prev, [column.id]: false }));
-                                    uiToast({
-                                      title: "Success",
-                                      description: "Task created successfully"
-                                    });
+                                    toast.success("Task created successfully")
                                   } catch (err: unknown) {
+                                    // ROLLBACK on error
                                     console.error('Error creating task:', err)
-                                    uiToast({
-                                      title: "Error",
-                                      description: "Failed to create task"
-                                    })
+                                    setLocalBoard({ ...localBoard, columns: originalColumns })
+                                    toast.error("Failed to create task")
                                   }
                                 }}
                                 onCancel={() => setShowInlineForm(prev => ({ ...prev, [column.id]: false }))}

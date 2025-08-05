@@ -410,6 +410,159 @@ This rule has **ZERO TOLERANCE** - maintaining clean schema is critical for appl
 - **Extract client components** when using browser-only APIs
 - **Use useEffect for URL parameter handling** after hydration
 
+### 🚀 CRITICAL: Optimistic UI Rule (MANDATORY FOR ALL FEATURES)
+
+#### Core Principle: Always Update UI First, Validate Later
+- **IMMEDIATE UI UPDATES**: Every user action must update the UI instantly before API calls
+- **PERCEIVED PERFORMANCE**: Create illusion of zero latency for all interactions
+- **USER CONFIDENCE**: Provide instant visual feedback to build trust and engagement
+- **GRACEFUL ROLLBACK**: Handle failures smoothly with clear error messages and state restoration
+
+#### 🔴 MANDATORY IMPLEMENTATION PATTERNS
+1. **All Create Operations**:
+   ```typescript
+   // ✅ CORRECT - Optimistic creation
+   const handleCreate = async (data) => {
+     // 1. Generate temporary ID
+     const tempId = `temp_${Date.now()}`
+     
+     // 2. Update UI immediately
+     setItems(prev => [...prev, { ...data, id: tempId, isOptimistic: true }])
+     
+     // 3. Make API call
+     try {
+       const result = await createItem(data)
+       // 4. Replace temp item with real data
+       setItems(prev => prev.map(item => 
+         item.id === tempId ? result : item
+       ))
+       toast.success('Item created successfully')
+     } catch (error) {
+       // 5. Rollback on failure
+       setItems(prev => prev.filter(item => item.id !== tempId))
+       toast.error('Failed to create item')
+     }
+   }
+   ```
+
+2. **All Update Operations**:
+   ```typescript
+   // ✅ CORRECT - Optimistic updates
+   const handleUpdate = async (id, updates) => {
+     // 1. Store previous state
+     const previousItem = items.find(item => item.id === id)
+     
+     // 2. Update UI immediately
+     setItems(prev => prev.map(item => 
+       item.id === id ? { ...item, ...updates } : item
+     ))
+     
+     // 3. Make API call
+     try {
+       await updateItem(id, updates)
+       toast.success('Updated successfully')
+     } catch (error) {
+       // 4. Rollback to previous state
+       setItems(prev => prev.map(item => 
+         item.id === id ? previousItem : item
+       ))
+       toast.error('Failed to update')
+     }
+   }
+   ```
+
+3. **All Delete Operations**:
+   ```typescript
+   // ✅ CORRECT - Optimistic deletion
+   const handleDelete = async (id) => {
+     // 1. Store item for potential restoration
+     const deletedItem = items.find(item => item.id === id)
+     const deletedIndex = items.findIndex(item => item.id === id)
+     
+     // 2. Remove from UI immediately
+     setItems(prev => prev.filter(item => item.id !== id))
+     
+     // 3. Make API call
+     try {
+       await deleteItem(id)
+       toast.success('Deleted successfully')
+     } catch (error) {
+       // 4. Restore item at original position
+       setItems(prev => {
+         const newItems = [...prev]
+         newItems.splice(deletedIndex, 0, deletedItem)
+         return newItems
+       })
+       toast.error('Failed to delete')
+     }
+   }
+   ```
+
+4. **Drag & Drop Operations** (Already Implemented):
+   ```typescript
+   // ✅ CORRECT - Optimistic reordering
+   const handleDragEnd = async (result) => {
+     // 1. Update UI immediately
+     const newOrder = reorderItems(items, result)
+     setItems(newOrder)
+     
+     // 2. Make API call
+     try {
+       await updateOrder(newOrder)
+     } catch (error) {
+       // 3. Rollback to original order
+       setItems(originalItems)
+       toast.error('Failed to reorder')
+     }
+   }
+   ```
+
+#### 🛡️ REQUIRED INFRASTRUCTURE
+1. **Use `useOptimisticUpdates` Hook**:
+   - Located in `/lib/optimistic-updates.ts`
+   - Provides standardized optimistic update patterns
+   - Handles rollback and error states automatically
+
+2. **Visual Indicators for Optimistic State**:
+   - Add subtle opacity or loading spinners for optimistic items
+   - Use `isOptimistic` flag to differentiate pending items
+   - Show sync indicators when background operations are running
+
+3. **Error Handling Requirements**:
+   - Always provide rollback capability
+   - Show clear error messages with retry options
+   - Maintain data consistency after failures
+   - Log errors for debugging but don't expose technical details
+
+4. **Performance Considerations**:
+   - Use React Query's optimistic updates for cache consistency
+   - Implement debouncing for rapid updates (e.g., typing)
+   - Batch multiple operations when possible
+   - Maintain local state for instant feedback
+
+#### ⚠️ FORBIDDEN PRACTICES
+- ❌ Waiting for API response before updating UI
+- ❌ Showing loading states instead of optimistic updates
+- ❌ Disabling UI during API calls
+- ❌ Not implementing rollback for failures
+- ❌ Using synchronous patterns that block UI
+
+#### 📋 Implementation Checklist for Every Feature
+- [ ] UI updates immediately on user action
+- [ ] Temporary IDs for new items
+- [ ] Previous state stored for rollback
+- [ ] Error handling with state restoration
+- [ ] Success/error toast notifications
+- [ ] Visual indicators for optimistic items
+- [ ] Consistent behavior across all CRUD operations
+
+#### 🎯 Benefits We're Achieving
+- ✅ **Instant Feedback**: Zero perceived latency
+- ✅ **Better UX**: Users feel the app is fast and responsive
+- ✅ **Increased Engagement**: Users more likely to interact
+- ✅ **Professional Feel**: Modern, polished application
+- ✅ **Competitive Advantage**: Matches top-tier apps like Notion, Linear
+
 #### Example: Adding a Comments Feature
 BAD (UI only):
 - ✗ Create comment UI component
