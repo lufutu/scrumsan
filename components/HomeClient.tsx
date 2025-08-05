@@ -6,6 +6,7 @@ import { AppSidebar } from "@/components/dashboard/app-sidebar";
 import { SidebarInset, SidebarProvider } from "@/components/animate-ui/radix/sidebar";
 import { useEffect, useState } from "react";
 import { Loading } from "@/components/loading";
+import { FetchDebugger } from "@/components/FetchDebugger";
 
 export default function HomeClient() {
   const { user, isLoading } = useSupabase();

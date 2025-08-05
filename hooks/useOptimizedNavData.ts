@@ -131,10 +131,12 @@ export function useOptimizedNavData(organizationId: string | null) {
 
 // Hook for multiple organizations
 export function useOptimizedNavDataMultiple(organizationIds: string[]) {
+  console.log('useOptimizedNavDataMultiple called with organizationIds:', organizationIds)
   const results = organizationIds.map(orgId => {
     // eslint-disable-next-line react-hooks/rules-of-hooks
     return useOptimizedNavData(orgId)
   })
+  console.log('useOptimizedNavDataMultiple results:', results.map(r => ({ data: r.data?.name, isLoading: r.isLoading, error: r.error })))
 
   const allData = results.map(result => result.data).filter(Boolean) as NavOrganizationData[]
   const isLoading = results.some(result => result.isLoading)
