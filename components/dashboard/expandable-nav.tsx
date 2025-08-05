@@ -57,7 +57,7 @@ export function ExpandableNav({ className }: ExpandableNavProps) {
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set())
   // Use optimized SWR-based data fetching instead of manual fetch calls
   const organizationIds = organizations.map(org => org.id)
-
+  const { data: orgData, isLoading } = useOptimizedNavDataMultiple(organizationIds)
 
   // SWR handles data fetching automatically, no need for manual effects
 
