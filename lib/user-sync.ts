@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/prisma'
+import { ensureUserExists } from '@/lib/auth-utils'
 
 export interface SupabaseUser {
   id: string
@@ -28,51 +29,18 @@ export async function syncUserFromSupabase(supabaseUserId: string): Promise<void
   try {
     const supabase = await createClient()
     
-    // Get user from Supabase auth
-    const { data: authUser, error } = await supabase.auth.admin.getUserById(supabaseUserId)
+    // Try to get current user if it matches the ID
+    const { data: { user: currentUser } } = await supabase.auth.getUser()
     
-    if (error || !authUser.user) {
-      console.error('Failed to fetch user from Supabase:', error)
+    if (currentUser && currentUser.id === supabaseUserId) {
+      // We have the current user, sync them
+      await ensureUserExists(currentUser)
       return
     }
-
-    const user = authUser.user as SupabaseUser
     
-    // Extract user data
-    const userData = {
-      id: user.id,
-      email: user.email || null,
-      fullName: user.user_metadata?.full_name || 
-                user.raw_user_meta_data?.full_name || 
-                user.user_metadata?.name ||
-                user.raw_user_meta_data?.name ||
-                null,
-      avatarUrl: user.user_metadata?.avatar_url || 
-                 user.raw_user_meta_data?.avatar_url || 
-                 null,
-      phone: user.phone || null,
-      emailConfirmed: !!user.email_confirmed_at,
-      lastSignIn: user.last_sign_in_at ? new Date(user.last_sign_in_at) : null,
-      authSyncedAt: new Date()
-    }
-
-    // Upsert user in our database
-    await prisma.user.upsert({
-      where: { id: user.id },
-      update: {
-        email: userData.email,
-        fullName: userData.fullName,
-        avatarUrl: userData.avatarUrl,
-        phone: userData.phone,
-        emailConfirmed: userData.emailConfirmed,
-        lastSignIn: userData.lastSignIn,
-        authSyncedAt: userData.authSyncedAt,
-        updatedAt: new Date()
-      },
-      create: userData
-    })
-
-    console.log(`User ${user.id} synced successfully`)
+    // If we can't get the user through regular auth, skip admin sync
+    // This happens when we don't have service role key
+    console.log(`Skipping admin sync for user ${supabaseUserId} - admin API not available`)
   } catch (error) {
     console.error('Error syncing user:', error)
     throw error

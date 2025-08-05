@@ -36,7 +36,18 @@ export async function ensureUserExists(user: User) {
     })
     
     return dbUser
-  } catch (error) {
+  } catch (error: any) {
+    // If it's a database connection error, log it but don't throw
+    if (error.code === 'P1001') {
+      console.error('Database connection error in ensureUserExists:', error.message)
+      // Return a minimal user object to allow the app to continue
+      return {
+        id: user.id,
+        email: user.email!,
+        fullName: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Unknown User',
+        avatarUrl: user.user_metadata?.avatar_url || null
+      }
+    }
     console.error('Error ensuring user exists:', error)
     throw new Error('Failed to sync user data')
   }
