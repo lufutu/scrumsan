@@ -65,6 +65,8 @@ import { useSprintColumns } from '@/hooks/useSprintColumns'
 import { toast } from 'sonner'
 import { ComprehensiveInlineForm } from './ComprehensiveInlineForm'
 import { BacklogDropZone } from './BacklogDropZone'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { cacheKeys } from '@/lib/query-optimization'
 
 
 
@@ -404,11 +406,179 @@ export default function SprintBacklogView({
   const [activeId, setActiveId] = useState<string | null>(null)
   const [selectedTask, setSelectedTask] = useState<unknown | null>(null)
   const [isDragging, setIsDragging] = useState(false)
-  const [optimisticColumns, setOptimisticColumns] = useState<SprintColumn[]>([])
+  
+  // Get query client for React Query optimistic updates
+  const queryClient = useQueryClient()
   
   // Users and labels data for inline form
   const [users, setUsers] = useState<User[]>([])
   const [labels, setLabels] = useState<Label[]>([])
+
+  // Task creation mutation with optimistic updates
+  const createTaskMutation = useMutation({
+    mutationFn: async (taskData: any) => {
+      const response = await fetch('/api/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(taskData)
+      })
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to create task')
+      }
+      return response.json()
+    },
+    onMutate: async (taskData) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: cacheKeys.sprintColumns(sprint.id) })
+
+      // Snapshot previous value
+      const previousColumns = queryClient.getQueryData<SprintColumn[]>(cacheKeys.sprintColumns(sprint.id))
+
+      // Create optimistic task
+      const optimisticTask = {
+        id: `temp-${Date.now()}`,
+        title: taskData.title,
+        description: '',
+        boardId,
+        taskType: taskData.taskType,
+        priority: taskData.priority || 'medium',
+        storyPoints: taskData.storyPoints || 0,
+        sprintId: sprint.id,
+        sprintColumnId: taskData.sprintColumnId,
+        position: 0,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        done: false,
+        taskAssignees: taskData.assignees?.map((a: any) => ({
+          id: `temp-${a.id}`,
+          taskId: `temp-${Date.now()}`,
+          userId: a.id,
+          user: users.find(u => u.id === a.id) || { id: a.id, fullName: 'Unknown', email: '' }
+        })) || [],
+        taskLabels: taskData.labels?.map((labelId: string) => ({
+          id: `temp-${labelId}`,
+          taskId: `temp-${Date.now()}`,
+          labelId,
+          label: labels.find(l => l.id === labelId) || { id: labelId, name: 'Unknown', color: '#gray' }
+        })) || [],
+        _count: { comments: 0, attachments: 0 }
+      }
+
+      // Optimistically update the cache
+      if (previousColumns) {
+        const updatedColumns = previousColumns.map(col => {
+          if (col.id === taskData.sprintColumnId) {
+            return {
+              ...col,
+              tasks: [...col.tasks, optimisticTask]
+            }
+          }
+          return col
+        })
+        queryClient.setQueryData(cacheKeys.sprintColumns(sprint.id), updatedColumns)
+      }
+
+      return { previousColumns }
+    },
+    onError: (error, variables, context) => {
+      // Rollback on error
+      if (context?.previousColumns) {
+        queryClient.setQueryData(cacheKeys.sprintColumns(sprint.id), context.previousColumns)
+      }
+      toast.error(error.message || 'Failed to create task')
+    },
+    onSuccess: () => {
+      toast.success('Task created successfully')
+      // Invalidate to ensure fresh data
+      queryClient.invalidateQueries({ queryKey: cacheKeys.sprintColumns(sprint.id) })
+      onRefresh()
+    }
+  })
+
+  // Task movement mutation with optimistic updates
+  const moveTaskMutation = useMutation({
+    mutationFn: async ({ taskId, targetColumnId, position }: { taskId: string, targetColumnId: string, position?: number }) => {
+      if (targetColumnId === 'backlog') {
+        // Move to backlog
+        const response = await fetch(`/api/sprints/${sprint.id}/tasks/move-to-backlog`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ taskId, position })
+        })
+        if (!response.ok) {
+          const error = await response.json()
+          throw new Error(error.error || 'Failed to move task to backlog')
+        }
+        return { type: 'backlog', response: await response.json() }
+      } else {
+        // Move between columns
+        const response = await fetch(`/api/sprints/${sprint.id}/tasks/move`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ taskId, targetColumnId })
+        })
+        if (!response.ok) {
+          const error = await response.json()
+          throw new Error(error.error || 'Failed to move task')
+        }
+        return { type: 'move', response: await response.json() }
+      }
+    },
+    onMutate: async ({ taskId, targetColumnId }) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: cacheKeys.sprintColumns(sprint.id) })
+
+      // Snapshot previous value
+      const previousColumns = queryClient.getQueryData<SprintColumn[]>(cacheKeys.sprintColumns(sprint.id))
+
+      if (!previousColumns) return { previousColumns }
+
+      // Find current task and column
+      const currentTask = previousColumns.flatMap(col => col.tasks).find(task => task.id === taskId)
+      if (!currentTask) return { previousColumns }
+
+      // Optimistically update the cache
+      const updatedColumns = previousColumns.map(col => ({
+        ...col,
+        tasks: [...col.tasks]
+      }))
+
+      // Remove task from source column
+      updatedColumns.forEach(col => {
+        const taskIndex = col.tasks.findIndex(t => t.id === taskId)
+        if (taskIndex !== -1) {
+          col.tasks.splice(taskIndex, 1)
+        }
+      })
+
+      // Add task to destination column (unless moving to backlog)
+      if (targetColumnId !== 'backlog') {
+        const destCol = updatedColumns.find(col => col.id === targetColumnId)
+        if (destCol) {
+          const updatedTask = { ...currentTask, sprintColumnId: targetColumnId }
+          destCol.tasks.push(updatedTask)
+        }
+      }
+
+      queryClient.setQueryData(cacheKeys.sprintColumns(sprint.id), updatedColumns)
+      return { previousColumns }
+    },
+    onError: (error, variables, context) => {
+      // Rollback on error
+      if (context?.previousColumns) {
+        queryClient.setQueryData(cacheKeys.sprintColumns(sprint.id), context.previousColumns)
+      }
+      toast.error(error.message || 'Failed to move task')
+    },
+    onSuccess: (data) => {
+      const message = data.type === 'backlog' ? 'Task moved to backlog successfully' : 'Task moved successfully'
+      toast.success(message)
+      // Invalidate to ensure fresh data
+      queryClient.invalidateQueries({ queryKey: cacheKeys.sprintColumns(sprint.id) })
+      mutateColumns()
+    }
+  })
 
   // Use sprint columns hook
   console.log('🔍 Sprint ID for useSprintColumns:', sprint.id)
@@ -443,29 +613,8 @@ export default function SprintBacklogView({
     })
   })
 
-  // Merge optimistic updates with original columns
-  const mergedColumns = useMemo(() => {
-    if (optimisticColumns.length === 0) return originalColumns
-    
-    // Create a map of optimistic columns by ID for quick lookup
-    const optimisticMap = new Map(optimisticColumns.map(c => [c.id, c]))
-    
-    // Replace original columns with optimistic versions where they exist
-    // Keep optimistic versions even if original columns update
-    return originalColumns.map(col => {
-      const optimisticCol = optimisticMap.get(col.id)
-      if (optimisticCol) {
-        // Merge optimistic tasks with any new tasks from server
-        const optimisticTaskIds = new Set(optimisticCol.tasks.map(t => t.id))
-        const newServerTasks = col.tasks.filter(t => !optimisticTaskIds.has(t.id))
-        return {
-          ...optimisticCol,
-          tasks: [...optimisticCol.tasks, ...newServerTasks]
-        }
-      }
-      return col
-    })
-  }, [originalColumns, optimisticColumns])
+  // Use originalColumns directly - React Query handles optimistic updates
+  const mergedColumns = originalColumns
 
   // Add virtual Backlog column at the beginning
   const columns = useMemo(() => {
@@ -536,92 +685,18 @@ export default function SprintBacklogView({
   }
 
   const handleAddTask = async (taskData: any, columnId: string) => {
-    try {
-      // Generate temporary ID for optimistic update
-      const tempId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-      
-      // Create optimistic task object
-      const optimisticTask: any = {
-        id: tempId,
-        title: taskData.title,
-        description: '',
-        boardId,
-        taskType: taskData.taskType,
-        priority: taskData.priority || 'medium',
-        storyPoints: taskData.storyPoints || 0,
-        sprintId: sprint.id,
-        sprintColumnId: columnId,
-        position: 0,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        done: false,
-        taskAssignees: taskData.assignees?.map((a: any) => ({
-          id: `temp-${a.id}`,
-          taskId: tempId,
-          userId: a.id,
-          user: users.find(u => u.id === a.id) || { id: a.id, fullName: 'Unknown', email: '' }
-        })) || [],
-        taskLabels: taskData.labels?.map((labelId: string) => ({
-          id: `temp-${labelId}`,
-          taskId: tempId,
-          labelId,
-          label: labels.find(l => l.id === labelId) || { id: labelId, name: 'Unknown', color: '#gray' }
-        })) || [],
-        _count: { comments: 0, attachments: 0 },
-        isOptimistic: true
-      }
-
-      // OPTIMISTIC UPDATE: Add task to UI immediately
-      const updatedColumns = mergedColumns.map(col => {
-        if (col.id === columnId) {
-          return {
-            ...col,
-            tasks: [...col.tasks, optimisticTask]
-          }
-        }
-        return col
-      })
-      
-      setOptimisticColumns(updatedColumns)
-
-      const response = await fetch('/api/tasks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: taskData.title,
-          taskType: taskData.taskType,
-          assignees: taskData.assignees || [],
-          labels: taskData.labels || [],
-          storyPoints: taskData.storyPoints,
-          priority: taskData.priority,
-          boardId,
-          sprintColumnId: columnId,
-          sprintId: sprint.id
-        })
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to create task')
-      }
-
-      // Success - show toast but keep optimistic state until data loads
-      toast.success('Task created successfully')
-      
-      // Refresh data in background
-      mutateColumns()
-      onRefresh()
-      
-      // Clear optimistic state after delay to ensure new data has loaded
-      setTimeout(() => {
-        setOptimisticColumns([])
-      }, 1500)
-    } catch (error) {
-      console.error('Error creating task:', error)
-      
-      // Rollback on error - clear optimistic state
-      setOptimisticColumns([])
-      toast.error('Failed to create task')
-    }
+    // Use the React Query mutation for proper optimistic updates
+    createTaskMutation.mutate({
+      title: taskData.title,
+      taskType: taskData.taskType,
+      assignees: taskData.assignees || [],
+      labels: taskData.labels || [],
+      storyPoints: taskData.storyPoints,
+      priority: taskData.priority,
+      boardId,
+      sprintColumnId: columnId,
+      sprintId: sprint.id
+    })
   }
 
 
@@ -828,44 +903,8 @@ export default function SprintBacklogView({
       // Store original state for rollback
       const originalColumnsState = [...originalColumns]
 
-      try {
-        // OPTIMISTIC UPDATE: Immediately reorder columns
-        const updatedColumns = [...originalColumns]
-        const [movedColumn] = updatedColumns.splice(sourceIndex, 1)
-        updatedColumns.splice(destinationIndex, 0, movedColumn)
-
-        // Update optimistic state
-        setOptimisticColumns(updatedColumns)
-
-        // Make API call in background
-        const response = await fetch(`/api/sprints/${sprint.id}/columns/${columnId}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ position: destinationIndex })
-        })
-
-        if (!response.ok) {
-          throw new Error('Failed to reorder column')
-        }
-
-        // Success - show toast but keep optimistic state until data loads
-        toast.success('Column reordered successfully')
-        
-        // Refresh data in background
-        mutateColumns()
-        
-        // Clear optimistic state after delay to ensure new data has loaded
-        setTimeout(() => {
-          setOptimisticColumns([])
-        }, 1500)
-        
-      } catch (error: unknown) {
-        console.error('Error reordering column:', error)
-        
-        // Rollback on error - clear optimistic state
-        setOptimisticColumns([])
-        toast.error('Failed to reorder column')
-      }
+      // Use the existing updateColumn mutation which has proper React Query optimistic updates
+      updateColumn(columnId, { position: destinationIndex })
       return
     }
 
@@ -874,121 +913,12 @@ export default function SprintBacklogView({
     const targetColumnId = destination.droppableId
     const sourceColumnId = source.droppableId
 
-    // Find current task and column from merged columns
-    const currentTask = mergedColumns.flatMap(col => col.tasks).find(task => task.id === taskId)
-    const currentColumn = mergedColumns.find(col => col.tasks.some(task => task.id === taskId))
-
-    if (!currentTask || !currentColumn) {
-      return
-    }
-
-    try {
-      // OPTIMISTIC UPDATE: Immediately move task
-      const updatedColumns = mergedColumns.map(col => ({
-        ...col,
-        tasks: [...col.tasks]
-      }))
-
-      // Remove task from source column
-      const sourceCol = updatedColumns.find(col => col.id === sourceColumnId)
-      if (sourceCol) {
-        const taskIndex = sourceCol.tasks.findIndex(t => t.id === taskId)
-        if (taskIndex !== -1) {
-          sourceCol.tasks.splice(taskIndex, 1)
-        }
-      }
-
-      // Handle moving to backlog column
-      if (targetColumnId === 'backlog') {
-        // Task is moved to backlog - it will disappear from sprint view
-        // Don't add it to any column in the sprint view
-        setOptimisticColumns(updatedColumns)
-        
-        // Make API call to move task to backlog
-        const response = await fetch(`/api/sprints/${sprint.id}/tasks/move-to-backlog`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            taskId,
-            position: destination.index
-          }),
-        })
-        
-        if (!response.ok) {
-          const error = await response.json()
-          throw new Error(error.error || 'Failed to move task to backlog')
-        }
-
-        // Success - show toast but keep optimistic state until data loads
-        toast.success('Task moved to backlog successfully')
-        
-        // Refresh data in background
-        mutateColumns()
-        
-        // Clear optimistic state after delay to ensure new data has loaded
-        setTimeout(() => {
-          setOptimisticColumns([])
-        }, 1500)
-        return
-      }
-
-      // Add task to destination column at correct position
-      const destCol = updatedColumns.find(col => col.id === targetColumnId)
-      if (destCol) {
-        const updatedTask = { ...currentTask, sprintColumnId: targetColumnId }
-        destCol.tasks.splice(destination.index, 0, updatedTask)
-      }
-
-      // Update optimistic state
-      setOptimisticColumns(updatedColumns)
-
-      // Make API call in background
-      let apiCall: Promise<Response>
-      
-      if (sourceColumnId === targetColumnId) {
-        // Handle position change within the same column
-        apiCall = fetch(`/api/tasks/${taskId}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ position: destination.index }),
-        })
-      } else {
-        // Handle column change
-        apiCall = fetch(`/api/sprints/${sprint.id}/tasks/move`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            taskId,
-            targetColumnId
-          }),
-        })
-      }
-
-      const response = await apiCall
-      
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Failed to move task')
-      }
-
-      // Success - show toast but keep optimistic state until data loads
-      toast.success('Task moved successfully')
-      
-      // Refresh data in background  
-      mutateColumns()
-      
-      // Clear optimistic state after delay to ensure new data has loaded
-      setTimeout(() => {
-        setOptimisticColumns([])
-      }, 1500)
-      
-    } catch (error: unknown) {
-      console.error('Error moving task:', error)
-      
-      // Rollback on error - clear optimistic state
-      setOptimisticColumns([])
-      toast.error(error instanceof Error ? error.message : 'Failed to move task')
-    }
+    // Use React Query mutation for proper optimistic updates
+    moveTaskMutation.mutate({
+      taskId,
+      targetColumnId,
+      position: destination.index
+    })
   }
 
 
