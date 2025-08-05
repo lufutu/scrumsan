@@ -197,6 +197,15 @@ function BoardContent() {
     </div>
   )
 
+  // Merge tasks with columns for Kanban boards
+  const boardWithTasks = board.boardType === 'kanban' && boardData?.tasks ? {
+    ...board,
+    columns: board.columns?.map(column => ({
+      ...column,
+      tasks: boardData.tasks.filter(task => task.columnId === column.id)
+    })) || []
+  } : board
+
   return (
     <>
       <AppHeader
@@ -216,7 +225,7 @@ function BoardContent() {
               onProductBacklogStateChange={setProductBacklogState}
             />
           ) : (
-            <StandaloneBoardView board={board} onUpdate={mutate} />
+            <StandaloneBoardView board={boardWithTasks} onUpdate={mutate} />
           )}
         </div>
     </>
