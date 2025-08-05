@@ -11,6 +11,7 @@ import Scrum from '@/components/scrum/Scrum'
 import BoardEditForm from '@/components/boards/board-edit-form'
 import BoardDeleteDialog from '@/components/boards/board-delete-dialog'
 import { AppHeader } from '@/components/dashboard/app-header'
+import { useBoardData } from '@/hooks/useBoardData'
 import { useSupabase } from '@/providers/supabase-provider'
 import { useOrganization } from '@/providers/organization-provider'
 import {
@@ -49,63 +50,40 @@ function BoardContent() {
   const { user } = useSupabase()
   const { organizations } = useOrganization()
 
-  // For now, don't use useBoardData as it makes UUID-based API calls
-  // We'll fetch all data directly using slug-based APIs
-  const [fullBoardData, setFullBoardData] = useState<any>(null)
-  const [boardDataLoading, setBoardDataLoading] = useState(false)
+  // Use useBoardData with the board ID once we have it from slug API
+  const { data: boardData, isLoading: boardDataLoading, mutate } = useBoardData(board?.id || null)
 
   useEffect(() => {
-    async function fetchBoardAndData() {
+    async function fetchBoard() {
       if (!orgSlug || !boardSlug) return
 
       try {
         setIsLoading(true)
-        setBoardDataLoading(true)
         setError(null)
 
-        // 1. First get the basic board info
-        const boardResponse = await fetch(`/api/orgs/${orgSlug}/boards/${boardSlug}`)
+        const response = await fetch(`/api/orgs/${orgSlug}/boards/${boardSlug}`)
         
-        if (boardResponse.status === 404) {
+        if (response.status === 404) {
           setError('Board not found')
           return
         }
 
-        if (!boardResponse.ok) {
+        if (!response.ok) {
           throw new Error('Failed to fetch board')
         }
 
-        const boardData = await boardResponse.json()
-        setBoard(boardData)
-
-        // 2. Now fetch all related data using the board ID but with organization context
-        // For now, we'll create a minimal board data structure to avoid UUID API calls
-        // TODO: Create proper slug-based APIs for tasks, sprints, etc.
-        const mockBoardData = {
-          board: {
-            ...boardData,
-            columns: boardData.columns || []
-          },
-          tasks: [],
-          sprints: [],
-          sprintDetails: [],
-          labels: [],
-          users: [],
-          activeSprint: null
-        }
-
-        setFullBoardData(mockBoardData)
+        const boardInfo = await response.json()
+        setBoard(boardInfo)
 
       } catch (err) {
         console.error('Error fetching board:', err)
         setError(err instanceof Error ? err.message : 'Failed to load board')
       } finally {
         setIsLoading(false)
-        setBoardDataLoading(false)
       }
     }
 
-    fetchBoardAndData()
+    fetchBoard()
   }, [orgSlug, boardSlug])
 
   if (isLoading) {
@@ -130,21 +108,33 @@ function BoardContent() {
     return <PageLoadingState message="Loading board data..." />
   }
 
-  if (!fullBoardData) {
-    return <PageErrorState error="Failed to load board data" onRetry={() => window.location.reload()} />
+  if (!boardData) {
+    return <PageErrorState error="Failed to load board data" onRetry={() => mutate()} />
   }
 
   // Render the appropriate board component based on board type
-  const isScrum = fullBoardData.board.boardType === 'scrum'
+  const isScrum = boardData.board.boardType === 'scrum'
+
+  // Merge tasks with columns for Kanban boards (same logic as UUID board page)
+  const boardWithTasks = boardData.board.boardType === 'kanban' && boardData?.tasks && Array.isArray(boardData.tasks) ? {
+    ...boardData.board,
+    columns: boardData.board.columns?.map(column => {
+      const filteredTasks = boardData.tasks.filter(task => task.columnId === column.id)
+      return {
+        ...column,
+        tasks: filteredTasks
+      }
+    }) || []
+  } : boardData.board
 
   return (
     <div className="flex flex-col h-screen">
       <AppHeader 
-        title={fullBoardData.board.name}
+        title={boardData.board.name}
         breadcrumbs={[
           { label: organization?.name || 'Organization', href: `/orgs/${orgSlug}` },
           { label: 'Boards', href: `/orgs/${orgSlug}` },
-          { label: fullBoardData.board.name }
+          { label: boardData.board.name }
         ]}
         actions={
           <div className="flex items-center gap-3">
@@ -160,12 +150,12 @@ function BoardContent() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <BoardEditForm board={fullBoardData.board} onSuccess={() => window.location.reload()}>
+                <BoardEditForm board={boardData.board} onSuccess={() => mutate()}>
                   <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
                     Edit Board
                   </DropdownMenuItem>
                 </BoardEditForm>
-                <BoardDeleteDialog board={fullBoardData.board}>
+                <BoardDeleteDialog board={boardData.board}>
                   <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
                     Delete Board
                   </DropdownMenuItem>
@@ -176,16 +166,21 @@ function BoardContent() {
         }
       />
       
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 overflow-hidden px-4 py-6">
         {isScrum ? (
-          <Scrum 
-            board={fullBoardData.board} 
+          <Scrum
+            boardId={boardData.board.id}
+            organizationId={boardData.board.organizationId}
             initialTaskId={initialTaskId}
+            boardColor={boardData.board.color}
+            boardData={boardData}
+            onDataChange={mutate}
+            onProductBacklogStateChange={() => {}}
           />
         ) : (
           <StandaloneBoardView 
-            board={fullBoardData.board} 
-            initialTaskId={initialTaskId}
+            board={boardWithTasks} 
+            onUpdate={mutate}
           />
         )}
       </div>
