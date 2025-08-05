@@ -197,13 +197,32 @@ function BoardContent() {
     </div>
   )
 
+  // Debug logging
+  console.log('Board data debug:', {
+    boardType: board.boardType,
+    hasboardData: !!boardData,
+    hasTasks: !!boardData?.tasks,
+    tasksIsArray: Array.isArray(boardData?.tasks),
+    tasksLength: boardData?.tasks?.length,
+    tasks: boardData?.tasks,
+    columns: board.columns?.map(col => ({ id: col.id, name: col.name }))
+  })
+
   // Merge tasks with columns for Kanban boards
   const boardWithTasks = board.boardType === 'kanban' && boardData?.tasks && Array.isArray(boardData.tasks) ? {
     ...board,
-    columns: board.columns?.map(column => ({
-      ...column,
-      tasks: boardData.tasks.filter(task => task.columnId === column.id)
-    })) || []
+    columns: board.columns?.map(column => {
+      const filteredTasks = boardData.tasks.filter(task => task.columnId === column.id)
+      console.log(`Column ${column.name} (${column.id}):`, {
+        allTasks: boardData.tasks.length,
+        filteredTasks: filteredTasks.length,
+        taskColumnIds: boardData.tasks.map(t => ({ id: t.id, title: t.title, columnId: t.columnId }))
+      })
+      return {
+        ...column,
+        tasks: filteredTasks
+      }
+    }) || []
   } : board
 
   return (
