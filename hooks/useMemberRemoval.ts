@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback } from 'react'
-import useSWR, { mutate } from 'swr'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 
 const fetcher = (url: string) => fetch(url).then(res => {
@@ -77,15 +77,18 @@ export function useMemberRemoval(organizationId: string, memberId: string) {
   const [removalError, setRemovalError] = useState<Error | null>(null)
   const [leaveError, setLeaveError] = useState<Error | null>(null)
 
+  const queryClient = useQueryClient()
+
   // Fetch boards that the member can be removed from
   const {
     data: memberBoards,
     isLoading: boardsLoading,
     error: boardsError,
-  } = useSWR<MemberBoardsResponse>(
-    organizationId && memberId ? `/api/organizations/${organizationId}/members/${memberId}/boards` : null,
-    fetcher
-  )
+  } = useQuery<MemberBoardsResponse>({
+    queryKey: ['memberBoards', organizationId, memberId],
+    queryFn: () => fetcher(`/api/organizations/${organizationId}/members/${memberId}/boards`),
+    enabled: !!(organizationId && memberId),
+  })
 
   // Remove member function
   const removeMemberAction = useCallback(async (options: RemovalOptions) => {
@@ -108,9 +111,9 @@ export function useMemberRemoval(organizationId: string, memberId: string) {
 
       const data: RemovalResult = await response.json()
 
-      // Invalidate relevant SWR caches
-      mutate(`/api/organizations/${organizationId}/members`)
-      mutate(`/api/organizations/${organizationId}/members/${memberId}/boards`)
+      // Invalidate relevant React Query caches
+      queryClient.invalidateQueries({ queryKey: ['organizationMembers', organizationId] })
+      queryClient.invalidateQueries({ queryKey: ['memberBoards', organizationId, memberId] })
       
       // Show success message
       toast.success(data.message)
@@ -153,9 +156,9 @@ export function useMemberRemoval(organizationId: string, memberId: string) {
 
       const data: RemovalResult = await response.json()
 
-      // Invalidate relevant SWR caches
-      mutate(`/api/organizations/${organizationId}/members`)
-      mutate('/api/organizations')
+      // Invalidate relevant React Query caches
+      queryClient.invalidateQueries({ queryKey: ['organizationMembers', organizationId] })
+      queryClient.invalidateQueries({ queryKey: ['organizations'] })
       
       // Show success message
       toast.success(data.message)

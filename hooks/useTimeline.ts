@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback } from 'react'
-import useSWR, { mutate } from 'swr'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 export interface TimelineEvent {
   id: string
@@ -53,18 +53,21 @@ export function useTimeline(organizationId: string, memberId: string) {
   const {
     data: timelineData,
     error,
-    mutate: refetch
-  } = useSWR<TimelineResponse>(
-    organizationId && memberId ? `/api/organizations/${organizationId}/members/${memberId}/timeline` : null,
-    async (url: string) => {
-      const response = await fetch(url)
+  } = useQuery<TimelineResponse>({
+    queryKey: ['timeline', organizationId, memberId],
+    queryFn: async () => {
+      const response = await fetch(`/api/organizations/${organizationId}/members/${memberId}/timeline`)
       if (!response.ok) {
         const errorData = await response.json()
         throw new Error(errorData.error || 'Failed to fetch timeline events')
       }
       return response.json()
-    }
-  )
+    },
+    enabled: !!(organizationId && memberId),
+  })
+
+  const queryClient = useQueryClient()
+  const refetch = () => queryClient.invalidateQueries({ queryKey: ['timeline', organizationId, memberId] })
 
   const isLoading = !timelineData && !error
 

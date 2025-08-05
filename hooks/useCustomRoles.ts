@@ -1,6 +1,6 @@
 'use client'
 
-import useSWR from 'swr'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useCallback } from 'react'
 import { toast } from 'sonner'
 
@@ -44,10 +44,15 @@ export const DEFAULT_ROLE_COLORS = [
 ] as const
 
 export function useCustomRoles(organizationId: string) {
-  const { data, error, isLoading, mutate } = useSWR<CustomRole[]>(
-    organizationId ? `/api/organizations/${organizationId}/roles` : null,
-    fetcher
-  )
+  const queryClient = useQueryClient()
+  
+  const { data, error, isLoading } = useQuery<CustomRole[]>({
+    queryKey: ['customRoles', organizationId],
+    queryFn: () => fetcher(`/api/organizations/${organizationId}/roles`),
+    enabled: !!organizationId,
+  })
+  
+  const mutate = () => queryClient.invalidateQueries({ queryKey: ['customRoles', organizationId] })
 
   const createRole = useCallback(async (roleData: CustomRoleCreateData) => {
     if (!organizationId) throw new Error('Organization ID is required')
@@ -235,12 +240,15 @@ export function useCustomRoles(organizationId: string) {
 }
 
 export function useCustomRole(organizationId: string, roleId: string) {
-  const { data, error, isLoading, mutate } = useSWR<CustomRole>(
-    organizationId && roleId 
-      ? `/api/organizations/${organizationId}/roles/${roleId}`
-      : null,
-    fetcher
-  )
+  const queryClient = useQueryClient()
+  
+  const { data, error, isLoading } = useQuery<CustomRole>({
+    queryKey: ['customRole', organizationId, roleId],
+    queryFn: () => fetcher(`/api/organizations/${organizationId}/roles/${roleId}`),
+    enabled: !!(organizationId && roleId),
+  })
+
+  const mutate = () => queryClient.invalidateQueries({ queryKey: ['customRole', organizationId, roleId] })
 
   return {
     role: data,

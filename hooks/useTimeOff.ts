@@ -1,6 +1,6 @@
 'use client'
 
-import useSWR from 'swr'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useCallback } from 'react'
 import { toast } from 'sonner'
 
@@ -57,12 +57,15 @@ export const TIME_OFF_STATUSES = {
 } as const
 
 export function useTimeOff(organizationId: string, memberId: string) {
-  const { data, error, isLoading, mutate } = useSWR<TimeOffEntry[]>(
-    organizationId && memberId 
-      ? `/api/organizations/${organizationId}/members/${memberId}/time-off`
-      : null,
-    fetcher
-  )
+  const queryClient = useQueryClient()
+  
+  const { data, error, isLoading } = useQuery<TimeOffEntry[]>({
+    queryKey: ['timeOff', organizationId, memberId],
+    queryFn: () => fetcher(`/api/organizations/${organizationId}/members/${memberId}/time-off`),
+    enabled: !!(organizationId && memberId),
+  })
+  
+  const mutate = () => queryClient.invalidateQueries({ queryKey: ['timeOff', organizationId, memberId] })
 
   const createTimeOff = useCallback(async (timeOffData: TimeOffCreateData) => {
     if (!organizationId || !memberId) throw new Error('Organization ID and Member ID are required')
