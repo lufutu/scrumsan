@@ -103,10 +103,12 @@ export async function resolveBoard(
       organizationId // Still verify it belongs to the org
     }
   } else {
-    // If it's a slug, search within the organization
+    // If it's a slug, search within the organization using compound unique key
     whereClause = { 
-      slug: identifier,
-      organizationId
+      organizationId_slug: {
+        organizationId,
+        slug: identifier
+      }
     }
   }
   

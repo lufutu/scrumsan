@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useActiveOrg } from '@/hooks/useActiveOrg'
-import { PageLoadingState, PageErrorState } from '@/components/ui/loading-state'
+import { PageLoadingState } from '@/components/ui/loading-state'
+import { PageErrorState } from '@/components/ui/error-state'
 import { NotFoundErrorState } from '@/components/ui/error-state'
 
 interface Board {

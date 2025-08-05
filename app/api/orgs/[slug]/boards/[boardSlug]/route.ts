@@ -5,13 +5,13 @@ import { resolveOrganization, resolveBoard } from '@/lib/slug-resolver'
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { slug: string; boardSlug: string } }
+  { params }: { params: Promise<{ slug: string; boardSlug: string }> }
 ) {
   try {
     const supabase = await createClient()
     const user = await getCurrentUser(supabase)
 
-    const { slug: orgSlug, boardSlug } = params
+    const { slug: orgSlug, boardSlug } = await params
 
     // First resolve the organization
     const orgResult = await resolveOrganization(orgSlug)
