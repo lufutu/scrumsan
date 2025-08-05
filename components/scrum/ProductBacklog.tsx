@@ -70,7 +70,7 @@ export default function ProductBacklog({
   // Use provided data instead of fetching
   const sprints = useMemo(() => boardData?.sprints || [], [boardData?.sprints])
   const sprintDetails = useMemo(() => boardData?.sprintDetails || [], [boardData?.sprintDetails])
-  // Merge optimistic tasks with real tasks, replacing real tasks with optimistic ones where IDs match
+  // Merge optimistic tasks with real tasks - optimistic versions always take precedence
   const tasks = useMemo(() => {
     const realTasks = boardData?.tasks || []
     if (optimisticTasks.length === 0) return realTasks
@@ -78,14 +78,14 @@ export default function ProductBacklog({
     // Create a map of optimistic tasks by ID for quick lookup
     const optimisticMap = new Map(optimisticTasks.map(t => [t.id, t]))
     
-    // Filter out real tasks that have optimistic versions
+    // Filter out real tasks that have optimistic versions (by ID, regardless of other properties)
     const filteredRealTasks = realTasks.filter(t => !optimisticMap.has(t.id))
     
-    // Add new optimistic tasks (ones with temp IDs)
-    const newOptimisticTasks = optimisticTasks.filter(t => t.id.startsWith('temp-'))
+    // Add ALL optimistic tasks (both temp and existing task updates)
+    const allOptimisticTasks = optimisticTasks
     
-    // Combine all tasks
-    return [...filteredRealTasks, ...newOptimisticTasks]
+    // Combine: real tasks (without optimistic versions) + all optimistic tasks
+    return [...filteredRealTasks, ...allOptimisticTasks]
   }, [optimisticTasks, boardData?.tasks])
   const labels = useMemo(() => boardData?.labels || [], [boardData?.labels])
   const users = useMemo(() => boardData?.users || [], [boardData?.users])
@@ -186,11 +186,14 @@ export default function ProductBacklog({
         }
 
         toast.success('Task reordered successfully')
-        // Remove this specific optimistic task and refresh
+        
+        // Refresh data in background - do NOT clear optimistic state yet
+        mutateTasks()
+        
+        // Only clear optimistic state after a delay to ensure new data has loaded
         setTimeout(() => {
           setOptimisticTasks(prev => prev.filter(t => t.id !== draggableId))
-          mutateTasks()
-        }, 500)
+        }, 1000)
       } catch (error: unknown) {
         console.error('Error reordering task:', error)
         toast.error('Failed to reorder task')
@@ -248,11 +251,15 @@ export default function ProductBacklog({
 
         // Success - show toast and refresh data
         toast.success(`Task moved to ${targetSprint.name}`)
+        
+        // Refresh data in background - do NOT clear optimistic state yet
+        mutateTasks()
+        mutateSprints()
+        
+        // Only clear optimistic state after a delay to ensure new data has loaded
         setTimeout(() => {
           setOptimisticTasks(prev => prev.filter(t => t.id !== draggableId))
-          mutateTasks()
-          mutateSprints()
-        }, 500)
+        }, 1000)
       } catch (error: unknown) {
         toast.error(error instanceof Error ? error.message : 'Failed to move task')
         // Remove only the failed optimistic task
@@ -454,8 +461,8 @@ export default function ProductBacklog({
         })) || []
       }
 
-      // Show optimistic update immediately
-      setOptimisticTasks([...tasks, optimisticTask])
+      // Show optimistic update immediately - add to existing optimistic tasks
+      setOptimisticTasks(prev => [...prev, optimisticTask])
 
       const taskData = {
         title: data.title,
@@ -482,11 +489,14 @@ export default function ProductBacklog({
       }
 
       toast.success('Task created successfully')
-      // Remove the temporary optimistic task and refresh with real data
+      
+      // Refresh data in background - do NOT clear optimistic state yet
+      mutateTasks()
+      
+      // Only clear optimistic state after a delay to ensure new data has loaded
       setTimeout(() => {
         setOptimisticTasks(prev => prev.filter(t => t.id !== optimisticTask.id))
-        mutateTasks()
-      }, 500)
+      }, 1000)
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : 'Failed to create task')
       // Remove only the failed optimistic task
