@@ -1,7 +1,7 @@
 "use client"
 
 import { useParams, useSearchParams } from 'next/navigation'
-import { useState, useEffect, Suspense } from 'react'
+import { Suspense } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Loader2, ArrowLeft, MoreHorizontal, Kanban, Calendar } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -11,7 +11,7 @@ import Scrum from '@/components/scrum/Scrum'
 import BoardEditForm from '@/components/boards/board-edit-form'
 import BoardDeleteDialog from '@/components/boards/board-delete-dialog'
 import { AppHeader } from '@/components/dashboard/app-header'
-import { useBoardData } from '@/hooks/useBoardData'
+import { useSlugBoardData } from '@/hooks/useSlugBoardData'
 import { useSupabase } from '@/providers/supabase-provider'
 import { useOrganization } from '@/providers/organization-provider'
 import {
@@ -24,14 +24,6 @@ import { PageLoadingState } from '@/components/ui/loading-state'
 import { PageErrorState } from '@/components/ui/error-state'
 import { NotFoundErrorState } from '@/components/ui/error-state'
 
-interface Board {
-  id: string
-  name: string
-  slug: string
-  description: string | null
-  boardType: string | null
-  organizationId: string
-}
 
 function BoardContent() {
   const params = useParams()
@@ -39,9 +31,6 @@ function BoardContent() {
   const orgSlug = params.slug as string
   const boardSlug = params.boardSlug as string
   
-  const [board, setBoard] = useState<Board | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
 
   // Get initial task ID from URL params for deep linking
   const initialTaskId = searchParams?.get('task') || null
@@ -50,57 +39,9 @@ function BoardContent() {
   const { user } = useSupabase()
   const { organizations } = useOrganization()
 
-  // Use useBoardData with the board ID once we have it from slug API
-  const { data: boardData, isLoading: boardDataLoading, mutate } = useBoardData(board?.id || null)
+  // Use slug-based data fetching - no more UUID API calls!
+  const { data: boardData, isLoading: boardDataLoading, error: boardDataError, mutate } = useSlugBoardData(orgSlug, boardSlug)
 
-  useEffect(() => {
-    async function fetchBoard() {
-      if (!orgSlug || !boardSlug) return
-
-      try {
-        setIsLoading(true)
-        setError(null)
-
-        const response = await fetch(`/api/orgs/${orgSlug}/boards/${boardSlug}`)
-        
-        if (response.status === 404) {
-          setError('Board not found')
-          return
-        }
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch board')
-        }
-
-        const boardInfo = await response.json()
-        setBoard(boardInfo)
-
-      } catch (err) {
-        console.error('Error fetching board:', err)
-        setError(err instanceof Error ? err.message : 'Failed to load board')
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    fetchBoard()
-  }, [orgSlug, boardSlug])
-
-  if (isLoading) {
-    return <PageLoadingState message="Loading board..." />
-  }
-
-  if (error) {
-    if (error === 'Board not found') {
-      return <NotFoundErrorState message="Board not found" />
-    }
-    return <PageErrorState error={error} onRetry={() => window.location.reload()} />
-  }
-
-  if (!board) {
-    return <PageLoadingState message="Loading board data..." />
-  }
-  
   // Get organization from the context
   const organization = organizations.find(org => org.slug === orgSlug)
 
@@ -108,8 +49,15 @@ function BoardContent() {
     return <PageLoadingState message="Loading board data..." />
   }
 
+  if (boardDataError) {
+    if (boardDataError.message?.includes('not found')) {
+      return <NotFoundErrorState message="Board not found" />
+    }
+    return <PageErrorState error={boardDataError.message || 'Failed to load board'} onRetry={() => mutate()} />
+  }
+
   if (!boardData) {
-    return <PageErrorState error="Failed to load board data" onRetry={() => mutate()} />
+    return <PageLoadingState message="Loading board data..." />
   }
 
   // Render the appropriate board component based on board type
