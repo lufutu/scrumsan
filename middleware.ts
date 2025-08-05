@@ -4,7 +4,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { isUUID } from '@/lib/slug-utils'
 
 const publicRoutes = ['/', '/login', '/signup', '/auth/callback', '/auth/verify-email']
-const protectedRoutes = ['/dashboard', '/projects', '/organizations', '/settings', '/profile']
+const protectedRoutes = ['/dashboard', '/projects', '/organizations', '/settings', '/profile', '/orgs', '/boards']
 
 /**
  * Handle UUID to slug redirects for backward compatibility
