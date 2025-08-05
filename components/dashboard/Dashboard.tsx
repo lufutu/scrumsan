@@ -294,8 +294,9 @@ export default function Dashboard() {
   if (!activeOrg) {
     return (
       <OrganizationEmptyState
-      onCreateOrg={() => router.push('/organizations')}
-      className="min-h-[60vh]"/>
+        onCreateOrg={() => router.push('/organizations')}
+        className="min-h-[60vh]"
+      />
     )
   }
 
@@ -316,6 +317,63 @@ export default function Dashboard() {
               </CardContent>
             </Card>
           ))}
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Recent Projects Loading */}
+          <div className="lg:col-span-2">
+            <Card className="animate-pulse">
+              <CardHeader>
+                <div className="h-6 bg-muted rounded w-48 mb-2"></div>
+                <div className="h-4 bg-muted rounded w-64"></div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {[...Array(3)].map((_, i) => (
+                    <div key={i} className="flex items-center justify-between p-4 border rounded-lg">
+                      <div className="flex-1 space-y-2">
+                        <div className="h-5 bg-muted rounded w-32"></div>
+                        <div className="h-4 bg-muted rounded w-48"></div>
+                        <div className="flex items-center gap-4">
+                          <div className="h-3 bg-muted rounded w-16"></div>
+                          <div className="h-3 bg-muted rounded w-12"></div>
+                          <div className="h-3 bg-muted rounded w-14"></div>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <div className="h-8 bg-muted rounded w-16"></div>
+                        <div className="h-8 bg-muted rounded w-12"></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Recent Activity Loading */}
+          <div>
+            <Card className="animate-pulse">
+              <CardHeader>
+                <div className="h-6 bg-muted rounded w-32 mb-2"></div>
+                <div className="h-4 bg-muted rounded w-48"></div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {[...Array(4)].map((_, i) => (
+                    <div key={i} className="flex items-start gap-3">
+                      <div className="h-5 w-5 bg-muted rounded-full flex-shrink-0"></div>
+                      <div className="flex-1 space-y-1">
+                        <div className="h-4 bg-muted rounded w-24"></div>
+                        <div className="h-3 bg-muted rounded w-32"></div>
+                        <div className="h-3 bg-muted rounded w-16"></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
     )
