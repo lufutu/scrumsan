@@ -15,6 +15,8 @@ import {
 } from '@hello-pangea/dnd'
 import { useRouter } from 'next/navigation'
 import { Sprint, Task, ProductBacklogProps } from '@/types/shared'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { cacheKeys } from '@/lib/query-optimization'
 
 interface ProductBacklogState {
   showFinishedSprints: boolean
@@ -34,6 +36,7 @@ export default function ProductBacklog({
   onStateChange
 }: ExtendedProductBacklogProps) {
   const router = useRouter()
+  const queryClient = useQueryClient()
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [showFinishedSprints, setShowFinishedSprints] = useState(false)
 
@@ -64,37 +67,191 @@ export default function ProductBacklog({
   const [isStartSprintOpen, setIsStartSprintOpen] = useState(false)
   const [startingSprintId, setStartingSprintId] = useState<string | null>(null)
   const [startSprintData, setStartSprintData] = useState({ dueDate: '', goal: '' })
-  const [optimisticTasks, setOptimisticTasks] = useState<Task[]>([])
   const [isFixingOrphanedTasks, setIsFixingOrphanedTasks] = useState(false)
 
-  // Use provided data instead of fetching
+  // Use provided data directly - React Query handles optimistic updates
   const sprints = useMemo(() => boardData?.sprints || [], [boardData?.sprints])
-  const sprintDetails = useMemo(() => boardData?.sprintDetails || [], [boardData?.sprintDetails])
-  // Merge optimistic tasks with real tasks - optimistic versions always take precedence
-  const tasks = useMemo(() => {
-    const realTasks = boardData?.tasks || []
-    if (optimisticTasks.length === 0) return realTasks
-    
-    // Create a map of optimistic tasks by ID for quick lookup
-    const optimisticMap = new Map(optimisticTasks.map(t => [t.id, t]))
-    
-    // Filter out real tasks that have optimistic versions (by ID, regardless of other properties)
-    const filteredRealTasks = realTasks.filter(t => !optimisticMap.has(t.id))
-    
-    // Add ALL optimistic tasks (both temp and existing task updates)
-    const allOptimisticTasks = optimisticTasks
-    
-    // Combine: real tasks (without optimistic versions) + all optimistic tasks
-    return [...filteredRealTasks, ...allOptimisticTasks]
-  }, [optimisticTasks, boardData?.tasks])
+  const sprintDetails = useMemo(() => boardData?.sprintDetails || [], [boardData?.sprintDetails])  
+  const tasks = useMemo(() => boardData?.tasks || [], [boardData?.tasks])
   const labels = useMemo(() => boardData?.labels || [], [boardData?.labels])
   const users = useMemo(() => boardData?.users || [], [boardData?.users])
   const activeSprint = boardData?.activeSprint || null
+
+  // Task movement mutation with proper React Query optimistic updates
+  const moveTaskMutation = useMutation({
+    mutationFn: async ({ taskId, targetSprintId, position }: { taskId: string, targetSprintId: string, position?: number }) => {
+      if (targetSprintId === 'backlog') {
+        // Get current task to find its sprint
+        const currentTask = tasks.find(t => t.id === taskId)
+        if (!currentTask?.sprintId) {
+          throw new Error('Task is already in backlog')
+        }
+        
+        const response = await fetch(`/api/sprints/${currentTask.sprintId}/tasks/move-to-backlog`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ taskId, position })
+        })
+        if (!response.ok) {
+          const error = await response.json()
+          throw new Error(error.error || 'Failed to move task to backlog')
+        }
+        return { type: 'backlog', response: await response.json() }
+      } else {
+        // Move to sprint
+        const response = await fetch(`/api/sprints/${targetSprintId}/tasks`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ taskId })
+        })
+        if (!response.ok) {
+          const error = await response.json()
+          throw new Error(error.error || 'Failed to move task')
+        }
+        return { type: 'sprint', response: await response.json() }
+      }
+    },
+    onMutate: async ({ taskId, targetSprintId }) => {
+      // Get orgSlug and boardSlug from URL for cache keys
+      const currentUrl = window.location.pathname
+      const matches = currentUrl.match(/\/orgs\/([^\/]+)\/boards\/([^\/]+)/)
+      const orgSlug = matches?.[1]
+      const boardSlug = matches?.[2]
+
+      // Cancel outgoing refetches for slug-based caches
+      if (orgSlug && boardSlug) {
+        await queryClient.cancelQueries({ queryKey: ['slug-tasks', orgSlug, boardSlug] })
+        await queryClient.cancelQueries({ queryKey: ['slug-sprints', orgSlug, boardSlug] })
+        await queryClient.cancelQueries({ queryKey: ['slug-sprintDetails', orgSlug, boardSlug] })
+      }
+
+      // Snapshot previous values
+      const previousTasks = orgSlug && boardSlug ? 
+        queryClient.getQueryData<Task[]>(['slug-tasks', orgSlug, boardSlug]) : null
+      const previousSprints = orgSlug && boardSlug ?
+        queryClient.getQueryData<Sprint[]>(['slug-sprints', orgSlug, boardSlug]) : null
+
+      if (!previousTasks) return { previousTasks, previousSprints, orgSlug, boardSlug }
+
+      // Find current task
+      const currentTask = previousTasks.find(t => t.id === taskId)
+      if (!currentTask) return { previousTasks, previousSprints, orgSlug, boardSlug }
+
+      // Update tasks cache optimistically
+      const updatedTasks = previousTasks.map(task => {
+        if (task.id === taskId) {
+          if (targetSprintId === 'backlog') {
+            // Moving to backlog: clear sprint assignments
+            return {
+              ...task,
+              sprintId: null,
+              sprintColumnId: null,
+              columnId: null
+            }
+          } else {
+            // Moving to sprint: set sprint assignment
+            return {
+              ...task,
+              sprintId: targetSprintId,
+              sprintColumnId: null // Will be set by API when it creates default columns
+            }
+          }
+        }
+        return task
+      })
+
+      if (orgSlug && boardSlug) {
+        queryClient.setQueryData(['slug-tasks', orgSlug, boardSlug], updatedTasks)
+      }
+
+      return { previousTasks, previousSprints, orgSlug, boardSlug }
+    },
+    onError: (error, variables, context) => {
+      // Rollback on error
+      if (context?.previousTasks && context?.orgSlug && context?.boardSlug) {
+        queryClient.setQueryData(['slug-tasks', context.orgSlug, context.boardSlug], context.previousTasks)
+      }
+      toast.error(error.message || 'Failed to move task')
+    },
+    onSuccess: (data, variables, context) => {
+      const message = data.type === 'backlog' ? 'Task moved to backlog successfully' : 'Task moved successfully'
+      toast.success(message)
+      
+      // Invalidate caches to ensure fresh data
+      if (context?.orgSlug && context?.boardSlug) {
+        queryClient.invalidateQueries({ queryKey: ['slug-tasks', context.orgSlug, context.boardSlug] })
+        queryClient.invalidateQueries({ queryKey: ['slug-sprints', context.orgSlug, context.boardSlug] })
+        queryClient.invalidateQueries({ queryKey: ['slug-sprintDetails', context.orgSlug, context.boardSlug] })
+      }
+      if (onDataChange) onDataChange()
+    }
+  })
 
   const sprintsLoading = !boardData
   const tasksLoading = !boardData
   const sprintsError: unknown = null
   const tasksError: unknown = null
+
+  // Task position update mutation with proper React Query optimistic updates
+  const updateTaskPositionMutation = useMutation({
+    mutationFn: async ({ taskId, position }: { taskId: string, position: number }) => {
+      const response = await fetch(`/api/tasks/${taskId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ position })
+      })
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to update task position')
+      }
+      return await response.json()
+    },
+    onMutate: async ({ taskId, position }) => {
+      // Get orgSlug and boardSlug from URL for cache keys
+      const currentUrl = window.location.pathname
+      const matches = currentUrl.match(/\/orgs\/([^\/]+)\/boards\/([^\/]+)/)
+      const orgSlug = matches?.[1]
+      const boardSlug = matches?.[2]
+
+      // Cancel outgoing refetches
+      if (orgSlug && boardSlug) {
+        await queryClient.cancelQueries({ queryKey: ['slug-tasks', orgSlug, boardSlug] })
+      }
+
+      // Snapshot previous value
+      const previousTasks = orgSlug && boardSlug ? 
+        queryClient.getQueryData<Task[]>(['slug-tasks', orgSlug, boardSlug]) : null
+
+      if (!previousTasks) return { previousTasks, orgSlug, boardSlug }
+
+      // Update tasks cache optimistically
+      const updatedTasks = previousTasks.map(task => 
+        task.id === taskId ? { ...task, position } : task
+      )
+
+      if (orgSlug && boardSlug) {
+        queryClient.setQueryData(['slug-tasks', orgSlug, boardSlug], updatedTasks)
+      }
+
+      return { previousTasks, orgSlug, boardSlug }
+    },
+    onError: (error, variables, context) => {
+      // Rollback on error
+      if (context?.previousTasks && context?.orgSlug && context?.boardSlug) {
+        queryClient.setQueryData(['slug-tasks', context.orgSlug, context.boardSlug], context.previousTasks)
+      }
+      toast.error(error.message || 'Failed to reorder task')
+    },
+    onSuccess: (data, variables, context) => {
+      toast.success('Task reordered successfully')
+      
+      // Invalidate cache to ensure fresh data
+      if (context?.orgSlug && context?.boardSlug) {
+        queryClient.invalidateQueries({ queryKey: ['slug-tasks', context.orgSlug, context.boardSlug] })
+      }
+      if (onDataChange) onDataChange()
+    }
+  })
 
   // Mutation functions - trigger parent data refresh
   const mutateSprints = useCallback(() => {
@@ -102,18 +259,8 @@ export default function ProductBacklog({
   }, [onDataChange])
 
   const mutateTasks = useCallback(() => {
-    setOptimisticTasks([]) // Clear optimistic state
     if (onDataChange) onDataChange() // This invalidates all caches including sprintDetails
   }, [onDataChange])
-
-  // Delayed mutation functions for better optimistic UX
-  const delayedMutateSprints = useCallback(() => {
-    setTimeout(() => mutateSprints(), 300)
-  }, [mutateSprints])
-
-  const delayedMutateTasks = useCallback(() => {
-    setTimeout(() => mutateTasks(), 300)
-  }, [mutateTasks])
 
   // Filter sprints - always include backlog sprint
   const visibleSprints = useMemo(() =>
@@ -164,109 +311,20 @@ export default function ProductBacklog({
     const targetSprintId = destination.droppableId
 
     if (sourceSprintId === targetSprintId) {
-      // Reordering within the same sprint - only update the moved task
-      const updatedTask = { ...draggedTask, position: destination.index }
-      setOptimisticTasks(prev => {
-        // Replace existing optimistic version or add new one
-        const filtered = prev.filter(t => t.id !== draggableId)
-        return [...filtered, updatedTask]
-      })
-
-      try {
-        const response = await fetch(`/api/tasks/${draggableId}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            position: destination.index
-          })
-        })
-
-        if (!response.ok) {
-          throw new Error('Failed to update task position')
-        }
-
-        toast.success('Task reordered successfully')
-        
-        // Refresh data in background - do NOT clear optimistic state yet
-        mutateTasks()
-        
-        // Only clear optimistic state after a delay to ensure new data has loaded
-        setTimeout(() => {
-          setOptimisticTasks(prev => prev.filter(t => t.id !== draggableId))
-        }, 1000)
-      } catch (error: unknown) {
-        console.error('Error reordering task:', error)
-        toast.error('Failed to reorder task')
-        // Remove only the failed optimistic task
-        setOptimisticTasks(prev => prev.filter(t => t.id !== draggableId))
-      }
-    } else {
-      // Moving between sprints
-      const targetSprint = sprints.find((s: Sprint) => s.id === targetSprintId)
-      if (!targetSprint) return
-
-      // Optimistic update - only update the moved task
-      const updatedTask = {
-        ...draggedTask,
-        sprintId: targetSprintId === 'backlog' ? null : targetSprintId,
+      // Reordering within the same sprint - use React Query mutation
+      updateTaskPositionMutation.mutate({
+        taskId: draggableId,
         position: destination.index
-      }
-      setOptimisticTasks(prev => {
-        // Replace existing optimistic version or add new one
-        const filtered = prev.filter(t => t.id !== draggableId)
-        return [...filtered, updatedTask]
       })
-
-      try {
-        let response: Response
-        
-        if (targetSprintId === 'backlog') {
-          // Moving to backlog: remove task from current sprint
-          const currentSprintId = draggedTask.sprintId
-          if (!currentSprintId) {
-            throw new Error('Task is already in backlog')
-          }
-          
-          response = await fetch(`/api/sprints/${currentSprintId}/tasks/move-to-backlog`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-              taskId: draggableId,
-              position: destination.index 
-            })
-          })
-        } else {
-          // Moving to sprint: add task to new sprint
-          response = await fetch(`/api/sprints/${targetSprintId}/tasks`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ taskId: draggableId })
-          })
-        }
-
-        if (!response.ok) {
-          const error = await response.json()
-          throw new Error(error.error || 'Failed to move task')
-        }
-
-        // Success - show toast and refresh data
-        toast.success(`Task moved to ${targetSprint.name}`)
-        
-        // Refresh data in background - do NOT clear optimistic state yet
-        mutateTasks()
-        mutateSprints()
-        
-        // Only clear optimistic state after a delay to ensure new data has loaded
-        setTimeout(() => {
-          setOptimisticTasks(prev => prev.filter(t => t.id !== draggableId))
-        }, 1000)
-      } catch (error: unknown) {
-        toast.error(error instanceof Error ? error.message : 'Failed to move task')
-        // Remove only the failed optimistic task
-        setOptimisticTasks(prev => prev.filter(t => t.id !== draggableId))
-      }
+    } else {
+      // Moving between sprints - use React Query mutation
+      moveTaskMutation.mutate({
+        taskId: draggableId,
+        targetSprintId: targetSprintId,
+        position: destination.index
+      })
     }
-  }, [tasks, sprints, visibleSprints, mutateTasks, mutateSprints, boardData, onDataChange])
+  }, [tasks, moveTaskMutation, updateTaskPositionMutation, onDataChange])
 
   const handleSprintAction = async (action: string, sprintId: string) => {
     const sprint = sprints.find((s: Sprint) => s.id === sprintId)
@@ -431,38 +489,8 @@ export default function ProductBacklog({
         return
       }
 
-      // Create optimistic task
-      const optimisticTask: Task = {
-        id: `temp-${Date.now()}`, // Temporary ID
-        title: data.title,
-        description: '',
-        boardId,
-        taskType: data.taskType as 'story' | 'bug' | 'task' | 'epic' | 'improvement',
-        storyPoints: data.storyPoints || 0,
-        priority: data.priority as 'low' | 'medium' | 'high' | 'urgent',
-        sprintId: sprintId === 'backlog' ? null : sprintId,
-        position: tasks.filter(t => 
-          sprintId === 'backlog' ? !t.sprintId : t.sprintId === sprintId
-        ).length,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        done: false,
-        taskAssignees: data.assignees?.map(a => ({
-          id: `temp-${a.id}`,
-          taskId: `temp-${Date.now()}`,
-          userId: a.id,
-          user: users.find(u => u.id === a.id) || { id: a.id, fullName: 'Unknown', email: '' }
-        })) || [],
-        taskLabels: data.labels?.map(labelId => ({
-          id: `temp-${labelId}`,
-          taskId: `temp-${Date.now()}`,
-          labelId,
-          label: labels.find(l => l.id === labelId) || { id: labelId, name: 'Unknown', color: '#gray' }
-        })) || []
-      }
-
-      // Show optimistic update immediately - add to existing optimistic tasks
-      setOptimisticTasks(prev => [...prev, optimisticTask])
+      // Show optimistic success immediately
+      toast.success('Task created successfully')
 
       const taskData = {
         title: data.title,
@@ -488,19 +516,10 @@ export default function ProductBacklog({
         throw new Error(error.error || 'Failed to create task')
       }
 
-      toast.success('Task created successfully')
-      
-      // Refresh data in background - do NOT clear optimistic state yet
+      // Refresh data in background
       mutateTasks()
-      
-      // Only clear optimistic state after a delay to ensure new data has loaded
-      setTimeout(() => {
-        setOptimisticTasks(prev => prev.filter(t => t.id !== optimisticTask.id))
-      }, 1000)
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : 'Failed to create task')
-      // Remove only the failed optimistic task
-      setOptimisticTasks(prev => prev.filter(t => t.id !== optimisticTask.id))
     }
   }
 
