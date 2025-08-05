@@ -66,7 +66,7 @@ export async function GET(
       include: includeDetails ? {
         tasks: {
           include: {
-            assignees: {
+            taskAssignees: {
               include: {
                 user: {
                   select: {
@@ -78,7 +78,7 @@ export async function GET(
                 }
               }
             },
-            reviewers: {
+            taskReviewers: {
               include: {
                 user: {
                   select: {
@@ -114,8 +114,8 @@ export async function GET(
       ...sprint,
       tasks: sprint.tasks?.map(task => ({
         ...task,
-        assignees: task.assignees?.map((a: any) => a.user) || [],
-        reviewers: task.reviewers?.map((r: any) => r.user) || [],
+        assignees: task.taskAssignees?.map((a: any) => a.user) || [],
+        reviewers: task.taskReviewers?.map((r: any) => r.user) || [],
         labels: task.taskLabels?.map((tl: any) => tl.label) || []
       })) || undefined
     }))

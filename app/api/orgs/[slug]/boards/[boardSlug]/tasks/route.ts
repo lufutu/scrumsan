@@ -62,7 +62,7 @@ export async function GET(
     const tasks = await prisma.task.findMany({
       where: { boardId: board.id },
       include: {
-        assignees: {
+        taskAssignees: {
           include: {
             user: {
               select: {
@@ -74,7 +74,7 @@ export async function GET(
             }
           }
         },
-        reviewers: {
+        taskReviewers: {
           include: {
             user: {
               select: {
@@ -106,9 +106,10 @@ export async function GET(
             itemType: true
           }
         },
-        blockedBy: {
-          include: {
-            blockingTask: {
+        relationsAsTarget: {
+          select: {
+            relationType: true,
+            sourceTask: {
               select: {
                 id: true,
                 title: true,
@@ -117,9 +118,10 @@ export async function GET(
             }
           }
         },
-        blocking: {
-          include: {
-            blockedTask: {
+        relationsAsSource: {
+          select: {
+            relationType: true,
+            targetTask: {
               select: {
                 id: true,
                 title: true,
@@ -138,11 +140,11 @@ export async function GET(
     // Transform tasks to match expected format
     const transformedTasks = tasks.map(task => ({
       ...task,
-      assignees: task.assignees.map(a => a.user),
-      reviewers: task.reviewers.map(r => r.user),
+      assignees: task.taskAssignees.map(a => a.user),
+      reviewers: task.taskReviewers.map(r => r.user),
       labels: task.taskLabels.map(tl => tl.label),
-      blockedBy: task.blockedBy.map(b => b.blockingTask),
-      blocking: task.blocking.map(b => b.blockedTask)
+      blockedBy: task.relationsAsTarget.filter(rel => rel.relationType === 'blocks').map(rel => rel.sourceTask),
+      blocking: task.relationsAsSource.filter(rel => rel.relationType === 'blocks').map(rel => rel.targetTask)
     }))
 
     return NextResponse.json({
