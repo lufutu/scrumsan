@@ -61,11 +61,12 @@ interface NavOrganizationData {
 export function useOptimizedNavData(organizationId: string | null) {
   // Use React Query for all API calls with proper caching
   const { data: organization, error: orgError } = useQuery<{ id: string; name: string; slug: string | null }>({
-    queryKey: cacheKeys.organization(organizationId || ''),
+    queryKey: ['organization-uuid', organizationId], // New cache key to avoid conflicts
     queryFn: () => fetcher(`/api/organizations/${organizationId}`),
     enabled: !!organizationId,
     staleTime: 0, // Always refetch to avoid cache issues
     cacheTime: 0, // Don't cache to avoid corruption
+    retry: false, // Don't retry on failure to avoid loops
   })
 
   const { data: projects = [], error: projectsError } = useQuery<NavProject[]>({

@@ -6,7 +6,7 @@ import { AppSidebar } from "@/components/dashboard/app-sidebar";
 import { SidebarInset, SidebarProvider } from "@/components/animate-ui/radix/sidebar";
 import { useEffect, useState } from "react";
 import { Loading } from "@/components/loading";
-import { FetchDebugger } from "@/components/FetchDebugger";
+import { CacheClearer } from "@/components/CacheClearer";
 
 export default function HomeClient() {
   const { user, isLoading } = useSupabase();
@@ -20,12 +20,15 @@ export default function HomeClient() {
 
   if (user) {
     return (
-      <SidebarProvider>
-        <AppSidebar />
-        <SidebarInset>
-          <Dashboard />
-        </SidebarInset>
-      </SidebarProvider>
+      <>
+        <CacheClearer />
+        <SidebarProvider>
+          <AppSidebar />
+          <SidebarInset>
+            <Dashboard />
+          </SidebarInset>
+        </SidebarProvider>
+      </>
     );
   }
   
