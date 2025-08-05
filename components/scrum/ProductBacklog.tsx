@@ -65,6 +65,7 @@ export default function ProductBacklog({
   const [startingSprintId, setStartingSprintId] = useState<string | null>(null)
   const [startSprintData, setStartSprintData] = useState({ dueDate: '', goal: '' })
   const [optimisticTasks, setOptimisticTasks] = useState<Task[]>([])
+  const [isFixingOrphanedTasks, setIsFixingOrphanedTasks] = useState(false)
 
   // Use provided data instead of fetching
   const sprints = useMemo(() => boardData?.sprints || [], [boardData?.sprints])
@@ -534,6 +535,32 @@ export default function ProductBacklog({
     }
   }
 
+  const handleFixOrphanedTasks = async () => {
+    setIsFixingOrphanedTasks(true)
+    try {
+      const response = await fetch('/api/tasks/fix-orphaned', {
+        method: 'POST'
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to fix orphaned tasks')
+      }
+
+      const result = await response.json()
+      toast.success(result.message)
+      
+      // Refresh data to show fixed tasks
+      if (onDataChange) {
+        onDataChange()
+      }
+    } catch (error: unknown) {
+      console.error('Error fixing orphaned tasks:', error)
+      toast.error(error instanceof Error ? error.message : 'Failed to fix orphaned tasks')
+    } finally {
+      setIsFixingOrphanedTasks(false)
+    }
+  }
+
 
   if (sprintsLoading || tasksLoading) {
     return (
@@ -554,9 +581,46 @@ export default function ProductBacklog({
     )
   }
 
+  // Check for orphaned tasks (have sprintId but no sprintColumnId)
+  const orphanedTasks = tasks.filter(task => task.sprintId && !task.sprintColumnId)
+  const hasOrphanedTasks = orphanedTasks.length > 0
+
   return (
     <>
-
+      {/* Debug: Fix Orphaned Tasks Button */}
+      {hasOrphanedTasks && (
+        <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div>
+              <h4 className="text-sm font-medium text-yellow-800">
+                Found {orphanedTasks.length} orphaned task(s)
+              </h4>
+              <p className="text-xs text-yellow-600 mt-1">
+                These tasks are assigned to sprints but not in any columns. Click to move them to backlog.
+              </p>
+            </div>
+            <button
+              onClick={handleFixOrphanedTasks}
+              disabled={isFixingOrphanedTasks}
+              className="ml-4 px-3 py-1 bg-yellow-600 text-white text-xs rounded hover:bg-yellow-700 disabled:opacity-50"
+            >
+              {isFixingOrphanedTasks ? 'Fixing...' : 'Fix Tasks'}
+            </button>
+          </div>
+          {process.env.NODE_ENV === 'development' && (
+            <details className="mt-2">
+              <summary className="text-xs text-yellow-600 cursor-pointer">Show orphaned tasks</summary>
+              <ul className="mt-1 text-xs text-yellow-700">
+                {orphanedTasks.map(task => (
+                  <li key={task.id}>
+                    {task.title} (sprintId: {task.sprintId?.slice(0, 8)}..., sprintColumnId: {task.sprintColumnId || 'null'})
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+        </div>
+      )}
 
       {/* Sprint Columns */}
       <ScrollArea className='w-full'>
