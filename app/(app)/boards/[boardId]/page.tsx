@@ -198,7 +198,7 @@ function BoardContent() {
   )
 
   // Merge tasks with columns for Kanban boards
-  const boardWithTasks = board.boardType === 'kanban' && boardData?.tasks ? {
+  const boardWithTasks = board.boardType === 'kanban' && boardData?.tasks && Array.isArray(boardData.tasks) ? {
     ...board,
     columns: board.columns?.map(column => ({
       ...column,
