@@ -62,14 +62,10 @@ export function useOptimizedNavData(organizationId: string | null) {
   // Use React Query for all API calls with proper caching
   const { data: organization, error: orgError } = useQuery<{ id: string; name: string; slug: string | null }>({
     queryKey: cacheKeys.organization(organizationId || ''),
-    queryFn: () => {
-      // For slug-based IDs, use the slug API endpoint
-      if (organizationId && !organizationId.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
-        return fetcher(`/api/orgs/${organizationId}`)
-      }
-      return fetcher(`/api/organizations/${organizationId}`)
-    },
+    queryFn: () => fetcher(`/api/organizations/${organizationId}`),
     enabled: !!organizationId,
+    staleTime: 0, // Always refetch to avoid cache issues
+    cacheTime: 0, // Don't cache to avoid corruption
   })
 
   const { data: projects = [], error: projectsError } = useQuery<NavProject[]>({
