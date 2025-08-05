@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -50,13 +50,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import {
-  DragDropContext,
-  Droppable,
-  Draggable,
-  DropResult,
-  DragStart,
-} from '@hello-pangea/dnd'
+import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter'
+import { monitorForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter'
 import { TaskCardModern } from './TaskCardModern'
 import { ItemModal } from './ItemModal'
 import BurndownChart from './BurndownChart'
@@ -65,8 +60,9 @@ import { useSprintColumns } from '@/hooks/useSprintColumns'
 import { toast } from 'sonner'
 import { ComprehensiveInlineForm } from './ComprehensiveInlineForm'
 import { BacklogDropZone } from './BacklogDropZone'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { cacheKeys } from '@/lib/query-optimization'
+import { DragDropProvider } from '@/components/drag-drop/DragDropProvider'
+import { DragDropAPI } from '@/lib/drag-drop-api'
+import { DragDataTypes } from '@/lib/optimistic-drag-drop'
 
 
 
@@ -96,69 +92,46 @@ interface Label {
 
 
 
-const DraggableTask = ({ task, index, onTaskClick, boardId, onTaskUpdate, mutateColumns, ...props }: any) => {
+const PragmaticDraggableTask = ({ task, index, onTaskClick, boardId, onTaskUpdate, mutateColumns, ...props }: any) => {
+  // TaskCardModern already handles draggable setup internally, so we just need to pass the required props
   return (
-    <Draggable draggableId={task.id} index={index}>
-      {(provided, snapshot) => {
-        const style = provided.draggableProps.style
-        const isDragging = snapshot.isDragging
-
-        return (
-          <div
-            ref={provided.innerRef}
-            {...provided.draggableProps}
-            {...provided.dragHandleProps}
-            className={`cursor-grab active:cursor-grabbing ${isDragging ? 'z-50' : ''}`}
-            style={{
-              ...style,
-              opacity: isDragging ? 0.9 : 1,
-              transform: isDragging && style?.transform
-                ? `${style.transform} rotate(3deg)`
-                : style?.transform,
-              transformOrigin: 'center center',
-            }}
-          >
-            <div className={`transition-shadow ${isDragging ? 'shadow-2xl ring-2 ring-blue-400 ring-opacity-50' : ''}`}>
-              <TaskCardModern
-                id={task.id}
-                itemCode={task.id}
-                title={task.title}
-                description={task.description || ''}
-                taskType={task.taskType as any}
-                storyPoints={task.storyPoints || 0}
-                priority={task.priority as 'critical' | 'high' | 'medium' | 'low'}
-                dueDate={task.dueDate}
-                assignees={task.taskAssignees?.map((ta: TaskAssignee) => ({
-                  id: ta.user.id,
-                  name: ta.user.fullName || ta.user.email || 'Unknown User',
-                  avatar: ta.user.avatarUrl || undefined,
-                  initials: ta.user.fullName?.split(' ').map((n: string) => n[0]).join('') || 'U'
-                })) || []}
-                labels={task.taskLabels ? task.taskLabels.map((tl: TaskLabel) => ({
-                  id: tl.label.id,
-                  name: tl.label.name,
-                  color: tl.label.color || '#6B7280'
-                })) : []}
-                commentsCount={task._count?.comments || 0}
-                filesCount={task._count?.attachments || 0}
-                organizationId={props.organizationId}
-                boardId={boardId}
-                onClick={!isDragging ? () => onTaskClick?.(task) : undefined}
-                onAssigneesChange={() => {
-                  // Note: onAssigneesChange is called for any task data changes (assignees, labels, comments, etc.)
-                  onTaskUpdate?.() // Invalidate parent cache 
-                  mutateColumns() // Invalidate sprint columns cache to update counts/labels display
-                }}
-              />
-            </div>
-          </div>
-        )
+    <TaskCardModern
+      id={task.id}
+      itemCode={task.itemCode || task.id}
+      title={task.title}
+      description={task.description || ''}
+      taskType={task.taskType as any}
+      storyPoints={task.storyPoints || 0}
+      priority={task.priority as 'critical' | 'high' | 'medium' | 'low'}
+      dueDate={task.dueDate}
+      assignees={task.taskAssignees?.map((ta: TaskAssignee) => ({
+        id: ta.user.id,
+        name: ta.user.fullName || ta.user.email || 'Unknown User',
+        avatar: ta.user.avatarUrl || undefined,
+        initials: ta.user.fullName?.split(' ').map((n: string) => n[0]).join('') || 'U'
+      })) || []}
+      labels={task.taskLabels ? task.taskLabels.map((tl: TaskLabel) => ({
+        id: tl.label.id,
+        name: tl.label.name,
+        color: tl.label.color || '#6B7280'
+      })) : []}
+      commentsCount={task._count?.comments || 0}
+      filesCount={task._count?.attachments || 0}
+      organizationId={props.organizationId}
+      boardId={boardId}
+      sprintId={task.sprintId}
+      sprintColumnId={task.sprintColumnId}
+      onClick={() => onTaskClick?.(task)}
+      onAssigneesChange={() => {
+        // Note: onAssigneesChange is called for any task data changes (assignees, labels, comments, etc.)
+        onTaskUpdate?.() // Invalidate parent cache 
+        mutateColumns() // Invalidate sprint columns cache to update counts/labels display
       }}
-    </Draggable>
+    />
   )
 }
 
-const DraggableSprintColumn = ({
+const PragmaticSprintColumn = ({
   column,
   index,
   columnTasks,
@@ -196,189 +169,180 @@ const DraggableSprintColumn = ({
   mutateColumns: () => void
 }) => {
   const [showInlineForm, setShowInlineForm] = useState(false)
+  const [isDraggedOver, setIsDraggedOver] = useState(false)
   const isLimitExceeded = column.wipLimit && columnTasks.length > column.wipLimit
+  const dropRef = useRef<HTMLDivElement>(null)
+
+  // Setup drop target functionality
+  useEffect(() => {
+    const element = dropRef.current
+    if (!element) return
+
+    return dropTargetForElements({
+      element,
+      canDrop: ({ source }) => DragDataTypes.isTask(source.data),
+      getData: () => ({
+        type: 'sprint-column',
+        sprintId: sprint.id,
+        columnId: column.id
+      }),
+      onDragEnter: () => setIsDraggedOver(true),
+      onDragLeave: () => setIsDraggedOver(false),
+      onDrop: ({ source }) => {
+        setIsDraggedOver(false)
+        // Drop handling will be managed by DragDropProvider
+      }
+    })
+  }, [sprint.id, column.id])
 
   return (
-    <Draggable draggableId={`column-${column.id}`} index={index}>
-      {(dragProvided, dragSnapshot) => {
-        const style = dragProvided.draggableProps.style
-        const isDragging = dragSnapshot.isDragging
-
-        return (
-          <div
-            ref={dragProvided.innerRef}
-            {...dragProvided.draggableProps}
-            className={`bg-white rounded-lg shadow-sm border border-gray-200 w-80 flex-shrink-0 ${isDragging ? 'opacity-90 shadow-2xl ring-2 ring-blue-400 ring-opacity-50 z-50' : ''
-              }`}
-            style={{
-              ...style,
-              transform: isDragging && style?.transform
-                ? `${style.transform} rotate(2deg)`
-                : style?.transform,
-              transformOrigin: 'center center',
-            }}
-          >
-            <Droppable droppableId={column.id}>
-              {(dropProvided, dropSnapshot) => (
-                <div
-                  ref={dropProvided.innerRef}
-                  {...dropProvided.droppableProps}
-                  className={`h-full ${dropSnapshot.isDraggingOver ? 'border-blue-500 border-2 bg-blue-50/30' : ''
-                    }`}
-                >
-                  {/* Column Header */}
-                  <div
-                    {...dragProvided.dragHandleProps}
-                    className="pb-4 border-b bg-gray-50/50 p-4 cursor-grab active:cursor-grabbing"
-                  >
-                    <div className="text-lg font-semibold flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-3 h-3 rounded-full shadow-sm ${column.isDone ? 'bg-green-500' : 'bg-blue-500'
-                          }`} />
-                        <span className="text-gray-900">{column.name}</span>
-                        {column.isDone && (
-                          <Badge variant="secondary" className="bg-green-100 text-green-800 border-green-200">
-                            Done
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Badge
-                          variant={isLimitExceeded ? "destructive" : "secondary"}
-                          className={isLimitExceeded ? "" : "bg-gray-100 text-gray-700"}
-                        >
-                          {columnTasks.length}{column.wipLimit ? `/${column.wipLimit}` : ''}
-                        </Badge>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm" className="hover:bg-gray-100">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => {
-                              const newName = prompt('Enter new column name:', column.name)
-                              if (newName) handleRenameColumn(column.id, newName)
-                            }}>
-                              <Edit className="h-4 w-4 mr-2" />
-                              Rename Column
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() =>
-                              handleMarkColumnAsDone(column.id, !column.isDone)
-                            }>
-                              <CheckCircle className="h-4 w-4 mr-2" />
-                              {column.isDone ? 'Unmark as Done' : 'Mark as Done'}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={async () => {
-                              try {
-                                const response = await fetch(`/api/sprints/${sprint.id}/columns/${column.id}/predefined-items`, {
-                                  method: 'POST'
-                                })
-                                if (!response.ok) throw new Error('Failed to add predefined items')
-                                const result = await response.json()
-                                toast.success(result.message)
-                                onRefresh()
-                              } catch (error: unknown) {
-                                toast.error(error instanceof Error ? error.message : 'Failed to add predefined items')
-                              }
-                            }}>
-                              <Upload className="h-4 w-4 mr-2" />
-                              Insert Predefined Items
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => {
-                              const limit = prompt('Enter column limit (0 for no limit):', String(column.wipLimit || 0))
-                              if (limit !== null) handleSetColumnLimit(column.id, parseInt(limit))
-                            }}>
-                              <Users className="h-4 w-4 mr-2" />
-                              Set Column Limit
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => handleExportColumn(column.id, 'csv')}>
-                              <FileSpreadsheet className="h-4 w-4 mr-2" />
-                              Export as CSV
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleExportColumn(column.id, 'json')}>
-                              <FileText className="h-4 w-4 mr-2" />
-                              Export as JSON
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              onClick={() => handleDeleteColumn(column.id)}
-                              className="text-destructive"
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Delete Column
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Column Content */}
-                  <div className="space-y-3 p-4 min-h-[600px]">
-                    {/* Render Tasks */}
-                    {columnTasks.map((task, taskIndex) => (
-                      <DraggableTask
-                        key={task.id}
-                        task={task}
-                        index={taskIndex}
-                        onTaskClick={onTaskClick}
-                        boardId={boardId}
-                        onTaskUpdate={onRefresh}
-                        mutateColumns={mutateColumns}
-                        organizationId={organizationId}
-                        className={`hover:shadow-lg transition-all border-l-4 bg-white ${column.isDone ? 'border-l-green-400 opacity-75' : 'border-l-blue-400'
-                          }`}
-                      />
-                    ))}
-                  
-                    {columnTasks.length === 0 && !showInlineForm && (
-                      <div className="text-center text-sm text-muted-foreground py-12 border-2 border-dashed border-gray-200 rounded-lg bg-gray-50/30">
-                        <div className="flex flex-col items-center gap-2">
-                          <Square className="h-8 w-8 text-gray-300" />
-                          <p>No tasks in {column.name.toLowerCase()}</p>
-                          <p className="text-xs">Drag items here or add new tasks</p>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {/* Inline Form */}
-                    {showInlineForm && (
-                      <div className="pt-2">
-                        <ComprehensiveInlineForm
-                          onAdd={async (data) => {
-                            await handleAddTask(data, column.id)
-                            setShowInlineForm(false)
-                          }}
-                          onCancel={() => setShowInlineForm(false)}
-                          placeholder="What needs to be done?"
-                          users={users}
-                          labels={labels}
-                        />
-                      </div>
-                    )}
-                    
-                    {/* Add Task Button */}
-                    {!showInlineForm && (
-                      <Button 
-                        variant="ghost" 
-                        className="w-full justify-start text-muted-foreground hover:text-foreground mt-2"
-                        onClick={() => setShowInlineForm(true)}
-                      >
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add Item
-                      </Button>
-                    )}
-                    {dropProvided.placeholder}
-                  </div>
-                </div>
+    <div className="bg-white rounded-lg shadow-sm border border-gray-200 w-80 flex-shrink-0">
+      <div
+        ref={dropRef}
+        className={`h-full ${isDraggedOver ? 'border-blue-500 border-2 bg-blue-50/30' : ''}`}
+      >
+        {/* Column Header */}
+        <div className="pb-4 border-b bg-gray-50/50 p-4">
+          <div className="text-lg font-semibold flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className={`w-3 h-3 rounded-full shadow-sm ${column.isDone ? 'bg-green-500' : 'bg-blue-500'}`} />
+              <span className="text-gray-900">{column.name}</span>
+              {column.isDone && (
+                <Badge variant="secondary" className="bg-green-100 text-green-800 border-green-200">
+                  Done
+                </Badge>
               )}
-            </Droppable>
+            </div>
+            <div className="flex items-center gap-2">
+              <Badge
+                variant={isLimitExceeded ? "destructive" : "secondary"}
+                className={isLimitExceeded ? "" : "bg-gray-100 text-gray-700"}
+              >
+                {columnTasks.length}{column.wipLimit ? `/${column.wipLimit}` : ''}
+              </Badge>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="hover:bg-gray-100">
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => {
+                    const newName = prompt('Enter new column name:', column.name)
+                    if (newName) handleRenameColumn(column.id, newName)
+                  }}>
+                    <Edit className="h-4 w-4 mr-2" />
+                    Rename Column
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() =>
+                    handleMarkColumnAsDone(column.id, !column.isDone)
+                  }>
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    {column.isDone ? 'Unmark as Done' : 'Mark as Done'}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={async () => {
+                    try {
+                      const response = await fetch(`/api/sprints/${sprint.id}/columns/${column.id}/predefined-items`, {
+                        method: 'POST'
+                      })
+                      if (!response.ok) throw new Error('Failed to add predefined items')
+                      const result = await response.json()
+                      toast.success(result.message)
+                      onRefresh()
+                    } catch (error: unknown) {
+                      toast.error(error instanceof Error ? error.message : 'Failed to add predefined items')
+                    }
+                  }}>
+                    <Upload className="h-4 w-4 mr-2" />
+                    Insert Predefined Items
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => {
+                    const limit = prompt('Enter column limit (0 for no limit):', String(column.wipLimit || 0))
+                    if (limit !== null) handleSetColumnLimit(column.id, parseInt(limit))
+                  }}>
+                    <Users className="h-4 w-4 mr-2" />
+                    Set Column Limit
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => handleExportColumn(column.id, 'csv')}>
+                    <FileSpreadsheet className="h-4 w-4 mr-2" />
+                    Export as CSV
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleExportColumn(column.id, 'json')}>
+                    <FileText className="h-4 w-4 mr-2" />
+                    Export as JSON
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => handleDeleteColumn(column.id)}
+                    className="text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete Column
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
-        )
-      }}
-    </Draggable>
+        </div>
+
+        {/* Column Content */}
+        <div className="space-y-3 p-4 min-h-[600px]">
+          {/* Render Tasks */}
+          {columnTasks.map((task, taskIndex) => (
+            <PragmaticDraggableTask
+              key={task.id}
+              task={task}
+              index={taskIndex}
+              onTaskClick={onTaskClick}
+              boardId={boardId}
+              onTaskUpdate={onRefresh}
+              mutateColumns={mutateColumns}
+              organizationId={organizationId}
+              className={`hover:shadow-lg transition-all border-l-4 bg-white ${column.isDone ? 'border-l-green-400 opacity-75' : 'border-l-blue-400'}`}
+            />
+          ))}
+        
+          {columnTasks.length === 0 && !showInlineForm && (
+            <div className="text-center text-sm text-muted-foreground py-12 border-2 border-dashed border-gray-200 rounded-lg bg-gray-50/30">
+              <div className="flex flex-col items-center gap-2">
+                <Square className="h-8 w-8 text-gray-300" />
+                <p>No tasks in {column.name.toLowerCase()}</p>
+                <p className="text-xs">Drag items here or add new tasks</p>
+              </div>
+            </div>
+          )}
+          
+          {/* Inline Form */}
+          {showInlineForm && (
+            <div className="pt-2">
+              <ComprehensiveInlineForm
+                onAdd={async (data) => {
+                  await handleAddTask(data, column.id)
+                  setShowInlineForm(false)
+                }}
+                onCancel={() => setShowInlineForm(false)}
+                placeholder="What needs to be done?"
+                users={users}
+                labels={labels}
+              />
+            </div>
+          )}
+          
+          {/* Add Task Button */}
+          {!showInlineForm && (
+            <Button 
+              variant="ghost" 
+              className="w-full justify-start text-muted-foreground hover:text-foreground mt-2"
+              onClick={() => setShowInlineForm(true)}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Item
+            </Button>
+          )}
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -407,225 +371,9 @@ export default function SprintBacklogView({
   const [selectedTask, setSelectedTask] = useState<unknown | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   
-  // Get query client for React Query optimistic updates
-  const queryClient = useQueryClient()
-  
   // Users and labels data for inline form
   const [users, setUsers] = useState<User[]>([])
   const [labels, setLabels] = useState<Label[]>([])
-
-  // Task creation mutation with optimistic updates
-  const createTaskMutation = useMutation({
-    mutationFn: async (taskData: any) => {
-      const response = await fetch('/api/tasks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(taskData)
-      })
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Failed to create task')
-      }
-      return response.json()
-    },
-    onMutate: async (taskData) => {
-      // Cancel outgoing refetches
-      await queryClient.cancelQueries({ queryKey: cacheKeys.sprintColumns(sprint.id) })
-
-      // Snapshot previous value
-      const previousColumns = queryClient.getQueryData<SprintColumn[]>(cacheKeys.sprintColumns(sprint.id))
-
-      // Create optimistic task
-      const optimisticTask = {
-        id: `temp-${Date.now()}`,
-        title: taskData.title,
-        description: '',
-        boardId,
-        taskType: taskData.taskType,
-        priority: taskData.priority || 'medium',
-        storyPoints: taskData.storyPoints || 0,
-        sprintId: sprint.id,
-        sprintColumnId: taskData.sprintColumnId,
-        position: 0,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        done: false,
-        taskAssignees: taskData.assignees?.map((a: any) => ({
-          id: `temp-${a.id}`,
-          taskId: `temp-${Date.now()}`,
-          userId: a.id,
-          user: users.find(u => u.id === a.id) || { id: a.id, fullName: 'Unknown', email: '' }
-        })) || [],
-        taskLabels: taskData.labels?.map((labelId: string) => ({
-          id: `temp-${labelId}`,
-          taskId: `temp-${Date.now()}`,
-          labelId,
-          label: labels.find(l => l.id === labelId) || { id: labelId, name: 'Unknown', color: '#gray' }
-        })) || [],
-        _count: { comments: 0, attachments: 0 }
-      }
-
-      // Optimistically update the cache
-      if (previousColumns) {
-        const updatedColumns = previousColumns.map(col => {
-          if (col.id === taskData.sprintColumnId) {
-            return {
-              ...col,
-              tasks: [...col.tasks, optimisticTask]
-            }
-          }
-          return col
-        })
-        queryClient.setQueryData(cacheKeys.sprintColumns(sprint.id), updatedColumns)
-      }
-
-      return { previousColumns }
-    },
-    onError: (error, variables, context) => {
-      // Rollback on error
-      if (context?.previousColumns) {
-        queryClient.setQueryData(cacheKeys.sprintColumns(sprint.id), context.previousColumns)
-      }
-      toast.error(error.message || 'Failed to create task')
-    },
-    onSuccess: () => {
-      toast.success('Task created successfully')
-      // Invalidate to ensure fresh data
-      queryClient.invalidateQueries({ queryKey: cacheKeys.sprintColumns(sprint.id) })
-      onRefresh()
-    }
-  })
-
-  // Task movement mutation with optimistic updates
-  const moveTaskMutation = useMutation({
-    mutationFn: async ({ taskId, targetColumnId, position }: { taskId: string, targetColumnId: string, position?: number }) => {
-      if (targetColumnId === 'backlog') {
-        // Move to backlog
-        const response = await fetch(`/api/sprints/${sprint.id}/tasks/move-to-backlog`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ taskId, position })
-        })
-        if (!response.ok) {
-          const error = await response.json()
-          throw new Error(error.error || 'Failed to move task to backlog')
-        }
-        return { type: 'backlog', response: await response.json() }
-      } else {
-        // Move between columns
-        const response = await fetch(`/api/sprints/${sprint.id}/tasks/move`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ taskId, targetColumnId })
-        })
-        if (!response.ok) {
-          const error = await response.json()
-          throw new Error(error.error || 'Failed to move task')
-        }
-        return { type: 'move', response: await response.json() }
-      }
-    },
-    onMutate: async ({ taskId, targetColumnId }) => {
-      // We need to get orgSlug and boardSlug to update the slug-based tasks cache
-      // For now, we'll get these from the current URL or context
-      const currentUrl = window.location.pathname
-      const matches = currentUrl.match(/\/orgs\/([^\/]+)\/boards\/([^\/]+)/)
-      const orgSlug = matches?.[1]
-      const boardSlug = matches?.[2]
-
-      // Cancel outgoing refetches for both caches
-      await queryClient.cancelQueries({ queryKey: cacheKeys.sprintColumns(sprint.id) })
-      if (orgSlug && boardSlug) {
-        await queryClient.cancelQueries({ queryKey: ['slug-tasks', orgSlug, boardSlug] })
-      }
-
-      // Snapshot previous values
-      const previousColumns = queryClient.getQueryData<SprintColumn[]>(cacheKeys.sprintColumns(sprint.id))
-      const previousTasks = orgSlug && boardSlug ? 
-        queryClient.getQueryData<Task[]>(['slug-tasks', orgSlug, boardSlug]) : null
-
-      if (!previousColumns) return { previousColumns, previousTasks }
-
-      // Find current task and column
-      const currentTask = previousColumns.flatMap(col => col.tasks).find(task => task.id === taskId)
-      if (!currentTask) return { previousColumns, previousTasks }
-
-      // 1. Update sprint columns cache (for SprintBacklogView)
-      const updatedColumns = previousColumns.map(col => ({
-        ...col,
-        tasks: [...col.tasks]
-      }))
-
-      // Remove task from source column
-      updatedColumns.forEach(col => {
-        const taskIndex = col.tasks.findIndex(t => t.id === taskId)
-        if (taskIndex !== -1) {
-          col.tasks.splice(taskIndex, 1)
-        }
-      })
-
-      // Add task to destination column (unless moving to backlog)
-      if (targetColumnId !== 'backlog') {
-        const destCol = updatedColumns.find(col => col.id === targetColumnId)
-        if (destCol) {
-          const updatedTask = { ...currentTask, sprintColumnId: targetColumnId }
-          destCol.tasks.push(updatedTask)
-        }
-      }
-
-      queryClient.setQueryData(cacheKeys.sprintColumns(sprint.id), updatedColumns)
-
-      // 2. Update slug-based tasks cache (for ProductBacklog)
-      if (previousTasks && orgSlug && boardSlug) {
-        const updatedTasks = previousTasks.map(task => {
-          if (task.id === taskId) {
-            if (targetColumnId === 'backlog') {
-              // Moving to backlog: clear sprint assignments
-              return {
-                ...task,
-                sprintId: null,
-                sprintColumnId: null,
-                columnId: null
-              }
-            } else {
-              // Moving between columns: update sprint column
-              return {
-                ...task,
-                sprintColumnId: targetColumnId
-              }
-            }
-          }
-          return task
-        })
-        
-        queryClient.setQueryData(['slug-tasks', orgSlug, boardSlug], updatedTasks)
-      }
-
-      return { previousColumns, previousTasks, orgSlug, boardSlug }
-    },
-    onError: (error, variables, context) => {
-      // Rollback on error - restore both caches
-      if (context?.previousColumns) {
-        queryClient.setQueryData(cacheKeys.sprintColumns(sprint.id), context.previousColumns)
-      }
-      if (context?.previousTasks && context?.orgSlug && context?.boardSlug) {
-        queryClient.setQueryData(['slug-tasks', context.orgSlug, context.boardSlug], context.previousTasks)
-      }
-      toast.error(error.message || 'Failed to move task')
-    },
-    onSuccess: (data, variables, context) => {
-      const message = data.type === 'backlog' ? 'Task moved to backlog successfully' : 'Task moved successfully'
-      toast.success(message)
-      // Invalidate both caches to ensure fresh data
-      queryClient.invalidateQueries({ queryKey: cacheKeys.sprintColumns(sprint.id) })
-      mutateColumns()
-      
-      // Also invalidate slug-based tasks cache if we have the context
-      if (context?.orgSlug && context?.boardSlug) {
-        queryClient.invalidateQueries({ queryKey: ['slug-tasks', context.orgSlug, context.boardSlug] })
-      }
-    }
-  })
 
   // Use sprint columns hook
   console.log('🔍 Sprint ID for useSprintColumns:', sprint.id)
@@ -731,19 +479,75 @@ export default function SprintBacklogView({
     onEditDialogChange?.(open)
   }
 
+  // Handle task movement with new Pragmatic D&D API
+  const handleTaskMove = async (
+    taskId: string, 
+    targetLocation: { sprintId?: string | null; columnId?: string | null }
+  ) => {
+    try {
+      if (targetLocation.sprintId === null || targetLocation.columnId === 'backlog') {
+        // Moving to backlog
+        await DragDropAPI.moveTask(
+          'to-backlog', 
+          { taskId, sourceSprintId: sprint.id },
+          () => {
+            mutateColumns()
+            onRefresh()
+          },
+          (error) => {
+            console.error('Failed to move task to backlog:', error)
+          }
+        )
+      } else if (targetLocation.columnId) {
+        // Moving between sprint columns
+        await DragDropAPI.moveTask(
+          'to-column',
+          { taskId, sprintId: sprint.id, columnId: targetLocation.columnId },
+          () => {
+            mutateColumns()
+            onRefresh()
+          },
+          (error) => {
+            console.error('Failed to move task between columns:', error)
+          }
+        )
+      }
+    } catch (error) {
+      console.error('Task move operation failed:', error)
+    }
+  }
+
   const handleAddTask = async (taskData: any, columnId: string) => {
-    // Use the React Query mutation for proper optimistic updates
-    createTaskMutation.mutate({
-      title: taskData.title,
-      taskType: taskData.taskType,
-      assignees: taskData.assignees || [],
-      labels: taskData.labels || [],
-      storyPoints: taskData.storyPoints,
-      priority: taskData.priority,
-      boardId,
-      sprintColumnId: columnId,
-      sprintId: sprint.id
-    })
+    try {
+      toast.success('Task created successfully')
+
+      const response = await fetch('/api/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: taskData.title,
+          taskType: taskData.taskType,
+          assignees: taskData.assignees || [],
+          labels: taskData.labels || [],
+          storyPoints: taskData.storyPoints,
+          priority: taskData.priority,
+          boardId,
+          sprintColumnId: columnId,
+          sprintId: sprint.id
+        })
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to create task')
+      }
+
+      // Refresh data to show the new task in the column
+      mutateColumns()
+      onRefresh()
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : 'Failed to create task')
+    }
   }
 
 
@@ -917,56 +721,9 @@ export default function SprintBacklogView({
     toast.success(`${column.name} exported as ${format.toUpperCase()}`)
   }
 
-  const handleDragStart = (start: DragStart) => {
-    setActiveId(start.draggableId)
-    setIsDragging(true)
-  }
-
-  const handleDragEnd = async (result: DropResult) => {
-    const { destination, source, draggableId, type } = result
-    setActiveId(null)
-    setIsDragging(false)
-
-    if (!destination) {
-      return
-    }
-
-    // If dropped in same position, do nothing
-    if (destination.droppableId === source.droppableId && destination.index === source.index) {
-      return
-    }
-
-    // Handle column reordering (skip backlog column which is virtual)
-    if (type === 'COLUMN') {
-      const sourceIndex = source.index - 1 // Adjust for backlog column
-      const destinationIndex = destination.index - 1 // Adjust for backlog column
-      const columnId = draggableId.replace('column-', '')
-
-      // Don't allow reordering the backlog column
-      if (columnId === 'backlog' || sourceIndex < 0 || destinationIndex < 0) {
-        return
-      }
-
-      // Store original state for rollback
-      const originalColumnsState = [...originalColumns]
-
-      // Use the existing updateColumn mutation which has proper React Query optimistic updates
-      updateColumn(columnId, { position: destinationIndex })
-      return
-    }
-
-    // Handle task movement
-    const taskId = draggableId
-    const targetColumnId = destination.droppableId
-    const sourceColumnId = source.droppableId
-
-    // Use React Query mutation for proper optimistic updates
-    moveTaskMutation.mutate({
-      taskId,
-      targetColumnId,
-      position: destination.index
-    })
-  }
+  // Drag state management - simplified for Pragmatic D&D
+  const [activeId, setActiveId] = useState<string | null>(null)
+  const [isDragging, setIsDragging] = useState(false)
 
 
   const SprintBoard = useMemo(() => (
@@ -1010,79 +767,73 @@ export default function SprintBacklogView({
 
       {/* Horizontal Scroll Wrapper */}
       <ScrollArea className='w-full'>
-        <DragDropContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-          <Droppable
-            droppableId="sprint-board"
-            type="COLUMN"
-            direction="horizontal"
-            ignoreContainerClipping={true}
-          >
-            {(boardProvided) => (
-              <div
-                ref={boardProvided.innerRef}
-                {...boardProvided.droppableProps}
-                className="flex gap-6 min-h-full"
-                style={{
-                  minWidth: `${columns.length * 320 + (columns.length - 1) * 24 + 48}px`,
-                  width: 'max-content'
-                }}
-              >
-                {columns.map((column, index) => {
-                  const columnTasks = getTasksByColumn(column.id)
+        <div 
+          className="flex gap-6 min-h-full"
+          style={{
+            minWidth: `${columns.length * 320 + (columns.length - 1) * 24 + 48}px`,
+            width: 'max-content'
+          }}
+        >
+          {columns.map((column, index) => {
+            const columnTasks = getTasksByColumn(column.id)
 
-                  // Render special Backlog drop zone for the virtual backlog column
-                  if (column.id === 'backlog') {
-                    return (
-                      <BacklogDropZone
-                        key={column.id}
-                        isDragOver={false}
-                        draggedTask={null}
-                      />
-                    )
-                  }
+            // Render special Backlog drop zone for the virtual backlog column
+            if (column.id === 'backlog') {
+              return (
+                <BacklogDropZone
+                  key={column.id}
+                  isDragOver={false}
+                  draggedTask={null}
+                />
+              )
+            }
 
-                  return (
-                    <DraggableSprintColumn
-                      key={column.id}
-                      column={column}
-                      index={index}
-                      columnTasks={columnTasks}
-                      onTaskClick={setSelectedTask}
-                      onRefresh={onRefresh}
-                      organizationId={organizationId}
-                      boardId={boardId}
-                      handleRenameColumn={handleRenameColumn}
-                      handleMarkColumnAsDone={handleMarkColumnAsDone}
-                      handleSetColumnLimit={handleSetColumnLimit}
-                      handleExportColumn={handleExportColumn}
-                      handleDeleteColumn={handleDeleteColumn}
-                      handleAddTask={handleAddTask}
-                      sprint={sprint}
-                      users={users}
-                      labels={labels}
-                      mutateColumns={mutateColumns}
-                    />
-                  )
-                }
-                )}
-                {boardProvided.placeholder}
-              </div>
-            )}
-          </Droppable>
-        </DragDropContext>
+            return (
+              <PragmaticSprintColumn
+                key={column.id}
+                column={column}
+                index={index}
+                columnTasks={columnTasks}
+                onTaskClick={setSelectedTask}
+                onRefresh={onRefresh}
+                organizationId={organizationId}
+                boardId={boardId}
+                handleRenameColumn={handleRenameColumn}
+                handleMarkColumnAsDone={handleMarkColumnAsDone}
+                handleSetColumnLimit={handleSetColumnLimit}
+                handleExportColumn={handleExportColumn}
+                handleDeleteColumn={handleDeleteColumn}
+                handleAddTask={handleAddTask}
+                sprint={sprint}
+                users={users}
+                labels={labels}
+                mutateColumns={mutateColumns}
+              />
+            )
+          })}
+        </div>
         <ScrollBar orientation="horizontal" />
       </ScrollArea>
 
     </div>
-  ), [columns, searchTerm, activeId, handleDragStart, handleDragEnd, getTasksByColumn, onRefresh, organizationId, boardId, handleRenameColumn, handleMarkColumnAsDone, handleSetColumnLimit, handleExportColumn, handleDeleteColumn, handleAddTask, sprint, users, labels, mutateColumns])
+  ), [columns, searchTerm, getTasksByColumn, onRefresh, organizationId, boardId, handleRenameColumn, handleMarkColumnAsDone, handleSetColumnLimit, handleExportColumn, handleDeleteColumn, handleAddTask, sprint, users, labels, mutateColumns])
+
+  // Get all tasks from columns for DragDropProvider
+  const allTasks = useMemo(() => {
+    return mergedColumns.flatMap(col => col.tasks || [])
+  }, [mergedColumns])
 
   return (
-    <div className=""
-      style={{
-        '--transform-origin': 'center center',
-        maxWidth: '100%'
-      } as React.CSSProperties}
+    <DragDropProvider 
+      initialTasks={allTasks}
+      onTaskMove={handleTaskMove}
     >
+      <div className=""
+        style={{
+          '--transform-origin': 'center center',
+          maxWidth: '100%'
+        } as React.CSSProperties}
+      >
       {/* Sprint Goal */}
       {sprint.goal && (
         <Card className="bg-blue-50 border-blue-200 mb-4 p-2">
@@ -1532,6 +1283,7 @@ export default function SprintBacklogView({
           }}
         />
       )}
-    </div>
+      </div>
+    </DragDropProvider>
   )
 }

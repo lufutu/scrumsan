@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { draggable } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import {
   Paperclip,
   MessageCircle,
@@ -42,6 +43,12 @@ import { toast } from 'sonner';
 
 import { TaskCardProps as TaskCardModernProps } from '@/types/shared';
 
+interface ExtendedTaskCardModernProps extends TaskCardModernProps {
+  sprintId?: string | null;
+  sprintColumnId?: string | null;
+  isDragging?: boolean;
+}
+
 export function TaskCardModern({
   id,
   itemCode,
@@ -61,8 +68,11 @@ export function TaskCardModern({
   organizationId,
   boardId,
   onClick,
-  onAssigneesChange
-}: TaskCardModernProps) {
+  onAssigneesChange,
+  sprintId,
+  sprintColumnId,
+  isDragging = false
+}: ExtendedTaskCardModernProps) {
 
   // Get boardId from task data or props
   const taskBoardId = (boardId || (typeof window !== 'undefined' && window.location.pathname.includes('/boards/')
@@ -113,6 +123,9 @@ export function TaskCardModern({
 
   // Ref to track previous assignees to prevent infinite re-renders
   const prevAssigneesRef = useRef<string>('');
+  
+  // Drag and drop ref
+  const dragRef = useRef<HTMLDivElement>(null);
 
   // Sync local state with prop changes (e.g., after refresh)
   useEffect(() => {
@@ -125,6 +138,24 @@ export function TaskCardModern({
       prevAssigneesRef.current = assigneesKey;
     }
   }, [assignees]);
+
+  // Setup drag and drop functionality
+  useEffect(() => {
+    const element = dragRef.current;
+    if (!element || !id) return;
+
+    return draggable({
+      element,
+      getInitialData: () => ({
+        type: 'task',
+        taskId: id,
+        sprintId: sprintId || null,
+        sprintColumnId: sprintColumnId || null,
+        title,
+        taskType
+      })
+    });
+  }, [id, sprintId, sprintColumnId, title, taskType]);
 
   // Fetch organization members
   const { users: organizationMembers, loading: loadingMembers } = useUsers({
@@ -649,10 +680,12 @@ export function TaskCardModern({
 
   return (
     <div
+      ref={dragRef}
       className={cn(
         "group bg-white rounded-lg border border-gray-200 hover:shadow-md transition-all cursor-pointer",
         "shadow-sm hover:shadow-lg hover:-translate-y-0.5 transform duration-200 ease-out",
-        status === 'done' && "opacity-75"
+        status === 'done' && "opacity-75",
+        isDragging && "opacity-50 transform rotate-2"
       )}
       onClick={onClick}
     >

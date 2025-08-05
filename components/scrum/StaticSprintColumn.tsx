@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from 'react'
-import { Droppable } from '@hello-pangea/dnd'
+import { useState, useRef, useEffect } from 'react'
+import { dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -15,8 +15,9 @@ import {
 } from '@/components/ui/dropdown-menu'
 import Link from 'next/link'
 import { ComprehensiveInlineForm } from './ComprehensiveInlineForm'
-import { DraggableTask } from './DraggableTask'
+import { TaskCardModern } from './TaskCardModern'
 import { Sprint, Task } from '@/types/shared'
+import { DragDataTypes } from '@/lib/optimistic-drag-drop'
 
 interface StaticSprintColumnProps {
   sprint: Sprint
@@ -37,8 +38,9 @@ interface StaticSprintColumnProps {
   isActiveSprint: boolean
   boardId: string
   onTaskUpdate?: () => void
-  isDragOver?: boolean
-  draggedTask?: Task | null
+  // New props for Pragmatic D&D
+  onTaskDrop?: (taskId: string, targetSprintId: string) => void
+  organizationId?: string
 }
 
 export function StaticSprintColumn({
@@ -53,10 +55,12 @@ export function StaticSprintColumn({
   isActiveSprint,
   boardId,
   onTaskUpdate,
-  isDragOver,
-  draggedTask
+  onTaskDrop,
+  organizationId
 }: StaticSprintColumnProps) {
   const [showAddForm, setShowAddForm] = useState(false)
+  const [isDraggedOver, setIsDraggedOver] = useState(false)
+  const dropRef = useRef<HTMLDivElement>(null)
 
   const getSprintStatus = () => {
     if (sprint.status === 'active') {
@@ -69,19 +73,40 @@ export function StaticSprintColumn({
 
   const status = getSprintStatus()
 
+  // Setup drop target functionality
+  useEffect(() => {
+    const element = dropRef.current
+    if (!element) return
+
+    return dropTargetForElements({
+      element,
+      canDrop: ({ source }) => DragDataTypes.isTask(source.data),
+      getData: () => ({
+        type: sprint.isBacklog ? 'backlog' : 'sprint',
+        sprintId: sprint.id
+      }),
+      onDragEnter: () => setIsDraggedOver(true),
+      onDragLeave: () => setIsDraggedOver(false),
+      onDrop: ({ source }) => {
+        setIsDraggedOver(false)
+        
+        if (DragDataTypes.isTask(source.data) && onTaskDrop) {
+          onTaskDrop(source.data.taskId, sprint.id)
+        }
+      }
+    })
+  }, [sprint.id, sprint.isBacklog, onTaskDrop])
+
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 w-80 flex-shrink-0">
-      <Droppable droppableId={sprint.id}>
-        {(dropProvided, dropSnapshot) => (
-          <div
-            ref={dropProvided.innerRef}
-            {...dropProvided.droppableProps}
-            className={cn(
-              "h-full overflow-hidden flex flex-col",
-              dropSnapshot.isDraggingOver && "bg-blue-50 border-blue-300",
-              isActiveSprint && "ring-2 ring-blue-500"
-            )}
-          >
+      <div
+        ref={dropRef}
+        className={cn(
+          "h-full overflow-hidden flex flex-col",
+          isDraggedOver && "bg-blue-50 border-blue-300",
+          isActiveSprint && "ring-2 ring-blue-500"
+        )}
+      >
             <div
               className={cn(
                 "p-4 border-b border-gray-200",
@@ -181,33 +206,49 @@ export function StaticSprintColumn({
 
             {/* Sprint Tasks */}
             <div className="flex-1 overflow-y-auto p-4 space-y-3">
-              {isDragOver && tasks.length === 0 && (
+              {isDraggedOver && tasks.length === 0 && (
                 <div className="text-center py-8 text-gray-400 animate-pulse">
                   <p className="text-sm">Drop here</p>
                 </div>
               )}
               
-              {tasks.length === 0 && !isDragOver ? (
+              {tasks.length === 0 && !isDraggedOver ? (
                 <div className="text-center py-8 text-gray-400">
                   <p className="text-sm">No items in this {sprint.isBacklog ? 'backlog' : 'sprint'}</p>
                   <p className="text-xs mt-1">Drag items here to add them</p>
                 </div>
               ) : (
                 <div>
-                  {tasks.map((task, taskIndex) => (
-                    <DraggableTask
-                      key={task.id || taskIndex}
-                      task={task}
-                      index={taskIndex}
-                      onTaskClick={onTaskClick}
-                      labels={labels}
+                  {tasks.map((task) => (
+                    <TaskCardModern
+                      key={task.id}
+                      id={task.id}
+                      itemCode={task.itemCode}
+                      title={task.title}
+                      taskType={task.taskType}
+                      storyPoints={task.storyPoints}
+                      assignees={task.taskAssignees?.map(ta => ({
+                        id: ta.user.id,
+                        name: ta.user.fullName || ta.user.email || 'Unknown',
+                        avatar: ta.user.avatarUrl,
+                        initials: ta.user.fullName?.split(' ').map(n => n[0]).join('') || 'U'
+                      })) || []}
+                      labels={task.taskLabels?.map(tl => ({
+                        id: tl.label.id,
+                        name: tl.label.name,
+                        color: tl.label.color || '#gray'
+                      })) || []}
+                      priority={task.priority}
+                      dueDate={task.dueDate}
+                      organizationId={organizationId}
                       boardId={boardId}
-                      onTaskUpdate={onTaskUpdate}
+                      sprintId={sprint.id}
+                      onClick={() => onTaskClick?.(task)}
+                      onAssigneesChange={onTaskUpdate}
                     />
                   ))}
                 </div>
               )}
-              {dropProvided.placeholder}
             </div>
 
             {/* Add Task Button */}
@@ -224,9 +265,7 @@ export function StaticSprintColumn({
                 </Button>
               </div>
             )}
-          </div>
-        )}
-      </Droppable>
+      </div>
     </div>
   )
 }
