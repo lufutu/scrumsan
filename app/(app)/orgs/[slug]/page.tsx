@@ -35,7 +35,7 @@ export default function OrganizationDetailsPage({ params }: { params: Promise<{ 
     try {
       setIsLoading(true)
 
-      // Use the new slug-based API endpoint
+      // Use the slug-based API endpoint
       const response = await fetch(`/api/orgs/${slug}`)
 
       if (!response.ok) {
@@ -45,8 +45,8 @@ export default function OrganizationDetailsPage({ params }: { params: Promise<{ 
 
       const data = await response.json()
 
-      // Get projects for this organization
-      const projectsResponse = await fetch(`/api/orgs/${slug}/projects`)
+      // Get projects for this organization using the resolved organizationId
+      const projectsResponse = await fetch(`/api/projects?organizationId=${data.id}`)
       let projects = []
 
       if (projectsResponse.ok) {
@@ -146,13 +146,13 @@ export default function OrganizationDetailsPage({ params }: { params: Promise<{ 
           
           <div className="flex gap-3">
             <Button asChild variant="outline">
-              <Link href={`/orgs/${slug}/settings`}>
+              <Link href={`/organizations/${slug}/settings`}>
                 <Settings className="w-4 h-4 mr-2" />
                 Settings
               </Link>
             </Button>
             <Button asChild variant="outline">
-              <Link href={`/orgs/${slug}/members`}>
+              <Link href={`/organizations/${slug}/members`}>
                 <Users className="w-4 h-4 mr-2" />
                 Members
               </Link>
