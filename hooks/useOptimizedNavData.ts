@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { useMemo } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { cacheKeys } from '@/lib/query-optimization'
 
 // Generic fetcher function for API requests
@@ -59,15 +59,47 @@ interface NavOrganizationData {
 }
 
 export function useOptimizedNavData(organizationId: string | null) {
-  // Use React Query for all API calls with proper caching
-  const { data: organization, error: orgError } = useQuery<{ id: string; name: string; slug: string | null }>({
-    queryKey: ['organization-uuid', organizationId], // New cache key to avoid conflicts
-    queryFn: () => fetcher(`/api/organizations/${organizationId}`),
-    enabled: !!organizationId,
-    staleTime: 0, // Always refetch to avoid cache issues
-    cacheTime: 0, // Don't cache to avoid corruption
-    retry: false, // Don't retry on failure to avoid loops
-  })
+  // BYPASS React Query for organization endpoint due to cache corruption
+  const [organization, setOrganization] = useState<{ id: string; name: string; slug: string | null } | null>(null)
+  const [orgError, setOrgError] = useState<Error | null>(null)
+  
+  useEffect(() => {
+    if (!organizationId) return
+    
+    let isCancelled = false
+    
+    async function fetchOrganization() {
+      try {
+        console.log('Direct fetch for organization:', organizationId)
+        const response = await fetch(`/api/organizations/${organizationId}`)
+        console.log('Direct fetch response:', { status: response.status, ok: response.ok })
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch organization: ${response.status}`)
+        }
+        
+        const data = await response.json()
+        console.log('Direct fetch organization data:', data)
+        
+        if (!isCancelled) {
+          setOrganization(data)
+          setOrgError(null)
+        }
+      } catch (error) {
+        console.error('Direct fetch organization error:', error)
+        if (!isCancelled) {
+          setOrgError(error as Error)
+          setOrganization(null)
+        }
+      }
+    }
+    
+    fetchOrganization()
+    
+    return () => {
+      isCancelled = true
+    }
+  }, [organizationId])
 
   const { data: projects = [], error: projectsError } = useQuery<NavProject[]>({
     queryKey: cacheKeys.projects(organizationId || ''),
