@@ -25,7 +25,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - UI components with **shadcn/ui** and **Radix UI**
 - Drag and drop with **@dnd-kit**
 - Forms with **react-hook-form** and **zod**
-- Data fetching with **SWR**
+- Data fetching with **React Query (@tanstack/react-query)**
 - **Motion for React** (modern animation library) - `motion` package only
 
 ## Architecture Overview
@@ -135,7 +135,7 @@ This is a **VivifyScrum clone** - a comprehensive project management application
 - **Layout components**: `components/dashboard/`
 
 ### Data Fetching
-- **SWR** for client-side data fetching with automatic revalidation
+- **React Query** for client-side data fetching with automatic caching and revalidation
 - **Server Actions** for mutations (create, update, delete)
 - **Prisma client** for database queries
 - **Type-safe** with Prisma generated types
@@ -149,7 +149,7 @@ This is a **VivifyScrum clone** - a comprehensive project management application
 ### State Management
 - **React Context** for global state (organizations, auth)
 - **Local state** with useState/useReducer
-- **SWR cache** for server state
+- **React Query cache** for server state with automatic invalidation
 - **localStorage** for persistence
 
 ## Important Files
