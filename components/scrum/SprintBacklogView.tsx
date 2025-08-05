@@ -451,7 +451,20 @@ export default function SprintBacklogView({
     const optimisticMap = new Map(optimisticColumns.map(c => [c.id, c]))
     
     // Replace original columns with optimistic versions where they exist
-    return originalColumns.map(col => optimisticMap.get(col.id) || col)
+    // Keep optimistic versions even if original columns update
+    return originalColumns.map(col => {
+      const optimisticCol = optimisticMap.get(col.id)
+      if (optimisticCol) {
+        // Merge optimistic tasks with any new tasks from server
+        const optimisticTaskIds = new Set(optimisticCol.tasks.map(t => t.id))
+        const newServerTasks = col.tasks.filter(t => !optimisticTaskIds.has(t.id))
+        return {
+          ...optimisticCol,
+          tasks: [...optimisticCol.tasks, ...newServerTasks]
+        }
+      }
+      return col
+    })
   }, [originalColumns, optimisticColumns])
 
   // Add virtual Backlog column at the beginning
@@ -591,15 +604,17 @@ export default function SprintBacklogView({
         throw new Error('Failed to create task')
       }
 
-      // Success - refresh data in background
+      // Success - show toast but keep optimistic state until data loads
+      toast.success('Task created successfully')
+      
+      // Refresh data in background
       mutateColumns()
       onRefresh()
-      toast.success('Task created successfully')
       
       // Clear optimistic state after delay to ensure new data has loaded
       setTimeout(() => {
         setOptimisticColumns([])
-      }, 1000)
+      }, 1500)
     } catch (error) {
       console.error('Error creating task:', error)
       
@@ -833,14 +848,16 @@ export default function SprintBacklogView({
           throw new Error('Failed to reorder column')
         }
 
-        // Success - refresh data in background
-        mutateColumns() 
+        // Success - show toast but keep optimistic state until data loads
         toast.success('Column reordered successfully')
+        
+        // Refresh data in background
+        mutateColumns()
         
         // Clear optimistic state after delay to ensure new data has loaded
         setTimeout(() => {
           setOptimisticColumns([])
-        }, 1000)
+        }, 1500)
         
       } catch (error: unknown) {
         console.error('Error reordering column:', error)
@@ -902,14 +919,16 @@ export default function SprintBacklogView({
           throw new Error(error.error || 'Failed to move task to backlog')
         }
 
-        // Success - refresh data in background
-        mutateColumns()
+        // Success - show toast but keep optimistic state until data loads
         toast.success('Task moved to backlog successfully')
+        
+        // Refresh data in background
+        mutateColumns()
         
         // Clear optimistic state after delay to ensure new data has loaded
         setTimeout(() => {
           setOptimisticColumns([])
-        }, 1000)
+        }, 1500)
         return
       }
 
@@ -952,14 +971,16 @@ export default function SprintBacklogView({
         throw new Error(error.error || 'Failed to move task')
       }
 
-      // Success - refresh data in background
-      mutateColumns()
+      // Success - show toast but keep optimistic state until data loads
       toast.success('Task moved successfully')
       
-      // Clear optimistic state after delay to ensure new data has loaded  
+      // Refresh data in background  
+      mutateColumns()
+      
+      // Clear optimistic state after delay to ensure new data has loaded
       setTimeout(() => {
         setOptimisticColumns([])
-      }, 1000)
+      }, 1500)
       
     } catch (error: unknown) {
       console.error('Error moving task:', error)
