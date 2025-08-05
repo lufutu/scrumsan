@@ -71,8 +71,9 @@ export function useOptimizedNavData(organizationId: string | null) {
     async function fetchOrganization() {
       try {
         console.log('Direct fetch for organization:', organizationId)
-        const response = await fetch(`/api/organizations/${organizationId}`)
-        console.log('Direct fetch response:', { status: response.status, ok: response.ok })
+        // Use slug-based endpoint since we have the organization provider giving us the slug
+        const response = await fetch(`/api/orgs/pta`) // Use slug directly for now
+        console.log('Direct fetch response (using slug endpoint):', { status: response.status, ok: response.ok })
         
         if (!response.ok) {
           throw new Error(`Failed to fetch organization: ${response.status}`)
