@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth-utils'
-import { validateUUID } from '@/lib/validation-schemas'
+import { resolveOrganization } from '@/lib/slug-resolver'
+import { createErrorResponse } from '@/lib/api-auth-utils'
 import { validatePermission, logAuditEvent } from '@/lib/permission-utils'
 import { deleteFileFromS3ByUrl } from '@/lib/aws/s3'
 import { z } from 'zod'
@@ -20,19 +21,18 @@ const bulkActionSchema = z.object({
  */
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id: organizationId } = params
+    const { id: organizationSlugOrId } = await params
     
-    // Validate organization ID
-    const orgIdValidation = validateUUID(organizationId, 'Organization ID')
-    if (!orgIdValidation.valid) {
-      return NextResponse.json(
-        { error: orgIdValidation.error },
-        { status: 400 }
-      )
+    // Resolve organization by slug or UUID
+    const orgResult = await resolveOrganization(organizationSlugOrId)
+    if (!orgResult.success) {
+      return createErrorResponse(orgResult.error, orgResult.status)
     }
+    
+    const organizationId = orgResult.entity.id
 
     // Get current user
     const supabase = await createClient()
@@ -311,19 +311,18 @@ export async function POST(
  */
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id: organizationId } = params
+    const { id: organizationSlugOrId } = await params
     
-    // Validate organization ID
-    const orgIdValidation = validateUUID(organizationId, 'Organization ID')
-    if (!orgIdValidation.valid) {
-      return NextResponse.json(
-        { error: orgIdValidation.error },
-        { status: 400 }
-      )
+    // Resolve organization by slug or UUID
+    const orgResult = await resolveOrganization(organizationSlugOrId)
+    if (!orgResult.success) {
+      return createErrorResponse(orgResult.error, orgResult.status)
     }
+    
+    const organizationId = orgResult.entity.id
 
     // Get current user
     const supabase = await createClient()

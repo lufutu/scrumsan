@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth-utils'
-import { customRoleCreateSchema, validateUUID } from '@/lib/validation-schemas'
+import { customRoleCreateSchema } from '@/lib/validation-schemas'
+import { resolveOrganization } from '@/lib/slug-resolver'
+import { createErrorResponse } from '@/lib/api-auth-utils'
 import { checkOrganizationPermission } from '@/lib/permission-utils'
 
 /**
@@ -14,16 +16,15 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id: organizationId } = await params
+    const { id: organizationSlugOrId } = await params
 
-    // Validate organization ID format
-    const uuidValidation = validateUUID(organizationId, 'Organization ID')
-    if (!uuidValidation.valid) {
-      return NextResponse.json(
-        { error: uuidValidation.error },
-        { status: 400 }
-      )
+    // Resolve organization by slug or UUID
+    const orgResult = await resolveOrganization(organizationSlugOrId)
+    if (!orgResult.success) {
+      return createErrorResponse(orgResult.error, orgResult.status)
     }
+    
+    const organizationId = orgResult.entity.id
 
     // Get current user
     const supabase = await createClient()
@@ -73,16 +74,15 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id: organizationId } = await params
+    const { id: organizationSlugOrId } = await params
 
-    // Validate organization ID format
-    const uuidValidation = validateUUID(organizationId, 'Organization ID')
-    if (!uuidValidation.valid) {
-      return NextResponse.json(
-        { error: uuidValidation.error },
-        { status: 400 }
-      )
+    // Resolve organization by slug or UUID
+    const orgResult = await resolveOrganization(organizationSlugOrId)
+    if (!orgResult.success) {
+      return createErrorResponse(orgResult.error, orgResult.status)
     }
+    
+    const organizationId = orgResult.entity.id
 
     // Get current user
     const supabase = await createClient()

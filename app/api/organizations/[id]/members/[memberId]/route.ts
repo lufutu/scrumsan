@@ -4,6 +4,8 @@ import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth-utils'
 import { z } from 'zod'
 import { commonFields, validateUUID } from '@/lib/validation-schemas'
+import { resolveOrganization } from '@/lib/slug-resolver'
+import { createErrorResponse } from '@/lib/api-auth-utils'
 
 // Validation schemas
 const memberUpdateSchema = z.object({
@@ -157,16 +159,15 @@ export async function GET(
   { params }: { params: Promise<{ id: string; memberId: string }> }
 ) {
   try {
-    const { id: organizationId, memberId  } = await params
+    const { id: organizationSlugOrId, memberId  } = await params
     
-    // Validate IDs
-    const orgIdValidation = validateUUID(organizationId, 'Organization ID')
-    if (!orgIdValidation.valid) {
-      return NextResponse.json(
-        { error: orgIdValidation.error },
-        { status: 400 }
-      )
+    // Resolve organization by slug or UUID
+    const orgResult = await resolveOrganization(organizationSlugOrId)
+    if (!orgResult.success) {
+      return createErrorResponse(orgResult.error, orgResult.status)
     }
+    
+    const organizationId = orgResult.entity.id
 
     const memberIdValidation = validateUUID(memberId, 'Member ID')
     if (!memberIdValidation.valid) {
@@ -226,16 +227,15 @@ export async function PUT(
   { params }: { params: Promise<{ id: string; memberId: string }> }
 ) {
   try {
-    const { id: organizationId, memberId  } = await params
+    const { id: organizationSlugOrId, memberId  } = await params
     
-    // Validate IDs
-    const orgIdValidation = validateUUID(organizationId, 'Organization ID')
-    if (!orgIdValidation.valid) {
-      return NextResponse.json(
-        { error: orgIdValidation.error },
-        { status: 400 }
-      )
+    // Resolve organization by slug or UUID
+    const orgResult = await resolveOrganization(organizationSlugOrId)
+    if (!orgResult.success) {
+      return createErrorResponse(orgResult.error, orgResult.status)
     }
+    
+    const organizationId = orgResult.entity.id
 
     const memberIdValidation = validateUUID(memberId, 'Member ID')
     if (!memberIdValidation.valid) {
@@ -440,16 +440,15 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string; memberId: string }> }
 ) {
   try {
-    const { id: organizationId, memberId  } = await params
+    const { id: organizationSlugOrId, memberId  } = await params
     
-    // Validate IDs
-    const orgIdValidation = validateUUID(organizationId, 'Organization ID')
-    if (!orgIdValidation.valid) {
-      return NextResponse.json(
-        { error: orgIdValidation.error },
-        { status: 400 }
-      )
+    // Resolve organization by slug or UUID
+    const orgResult = await resolveOrganization(organizationSlugOrId)
+    if (!orgResult.success) {
+      return createErrorResponse(orgResult.error, orgResult.status)
     }
+    
+    const organizationId = orgResult.entity.id
 
     const memberIdValidation = validateUUID(memberId, 'Member ID')
     if (!memberIdValidation.valid) {

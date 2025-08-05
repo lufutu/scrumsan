@@ -15,6 +15,7 @@ import {
 } from '@/lib/query-optimization'
 import { sendInvitationEmail } from '@/lib/email-utils'
 import { generateSecureToken } from '@/lib/crypto-utils'
+import { resolveOrganization } from '@/lib/slug-resolver'
 
 // Validation schemas
 const memberCreateSchema = z.object({
@@ -56,7 +57,15 @@ export const GET = withSecureAuth(
   }
 )(async (req: NextRequest, { params }, authContext) => {
   try {
-    const { id: organizationId } = await params
+    const { id: organizationSlugOrId } = await params
+    
+    // Resolve organization by slug or UUID
+    const orgResult = await resolveOrganization(organizationSlugOrId)
+    if (!orgResult.success) {
+      return createErrorResponse(orgResult.error, orgResult.status)
+    }
+    
+    const organizationId = orgResult.entity.id
     const searchParams = req.nextUrl.searchParams
     
     // Parse array parameters manually (Next.js doesn't handle arrays well)
@@ -225,7 +234,15 @@ export const POST = withSecureAuth(
   }
 )(async (req: NextRequest, { params }, authContext) => {
   try {
-    const { id: organizationId } = await params
+    const { id: organizationSlugOrId } = await params
+    
+    // Resolve organization by slug or UUID
+    const orgResult = await resolveOrganization(organizationSlugOrId)
+    if (!orgResult.success) {
+      return createErrorResponse(orgResult.error, orgResult.status)
+    }
+    
+    const organizationId = orgResult.entity.id
     
     // Validate and sanitize request body
     const bodyResult = await validateAndSanitizeRequestBody(req, memberCreateSchema)
