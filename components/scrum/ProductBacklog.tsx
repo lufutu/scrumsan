@@ -4,7 +4,7 @@ import React, { useState, useCallback, useMemo } from 'react'
 import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { ItemModal } from './ItemModal'
-import { DraggableSprintColumn } from './DraggableSprintColumn'
+import { StaticSprintColumn } from './StaticSprintColumn'
 import { SprintDialogs } from './SprintDialogs'
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area"
 
@@ -69,10 +69,23 @@ export default function ProductBacklog({
   // Use provided data instead of fetching
   const sprints = useMemo(() => boardData?.sprints || [], [boardData?.sprints])
   const sprintDetails = useMemo(() => boardData?.sprintDetails || [], [boardData?.sprintDetails])
-  const tasks = useMemo(() =>
-    optimisticTasks.length > 0 ? optimisticTasks : (boardData?.tasks || []),
-    [optimisticTasks, boardData?.tasks]
-  )
+  // Merge optimistic tasks with real tasks, replacing real tasks with optimistic ones where IDs match
+  const tasks = useMemo(() => {
+    const realTasks = boardData?.tasks || []
+    if (optimisticTasks.length === 0) return realTasks
+    
+    // Create a map of optimistic tasks by ID for quick lookup
+    const optimisticMap = new Map(optimisticTasks.map(t => [t.id, t]))
+    
+    // Filter out real tasks that have optimistic versions
+    const filteredRealTasks = realTasks.filter(t => !optimisticMap.has(t.id))
+    
+    // Add new optimistic tasks (ones with temp IDs)
+    const newOptimisticTasks = optimisticTasks.filter(t => t.id.startsWith('temp-'))
+    
+    // Combine all tasks
+    return [...filteredRealTasks, ...newOptimisticTasks]
+  }, [optimisticTasks, boardData?.tasks])
   const labels = useMemo(() => boardData?.labels || [], [boardData?.labels])
   const users = useMemo(() => boardData?.users || [], [boardData?.users])
   const activeSprint = boardData?.activeSprint || null
@@ -140,53 +153,7 @@ export default function ProductBacklog({
       return
     }
 
-    // Handle sprint column reordering
-    if (type === 'COLUMN') {
-      const sourceIndex = source.index
-      const destinationIndex = destination.index
-
-      // Optimistically reorder sprints array
-      const reorderedSprints = Array.from(visibleSprints)
-      const [removed] = reorderedSprints.splice(sourceIndex, 1)
-      reorderedSprints.splice(destinationIndex, 0, removed)
-
-      // Show optimistic update immediately
-      const optimisticBoardData = {
-        ...boardData,
-        sprints: boardData?.sprints?.map((sprint: Sprint) => {
-          const newIndex = reorderedSprints.findIndex(s => s.id === sprint.id)
-          return newIndex !== -1 ? { ...sprint, position: newIndex } : sprint
-        }) || []
-      }
-
-      // Trigger optimistic update
-      if (onDataChange) {
-        onDataChange()
-      }
-
-      try {
-        // Call API to update sprint positions
-        const response = await fetch(`/api/sprints/${draggableId}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ position: destinationIndex })
-        })
-
-        if (!response.ok) {
-          throw new Error('Failed to reorder sprint')
-        }
-
-        toast.success('Sprint reordered successfully')
-        // Refresh data to get server state
-        setTimeout(() => mutateSprints(), 100)
-      } catch (error: unknown) {
-        console.error('Error reordering sprint:', error)
-        toast.error('Failed to reorder sprint')
-        // Revert optimistic update
-        mutateSprints()
-      }
-      return
-    }
+    // We no longer support column reordering in Product Backlog view
 
     // Find the dragged task
     const draggedTask = tasks.find((t: Task) => t.id === draggableId)
@@ -196,28 +163,13 @@ export default function ProductBacklog({
     const targetSprintId = destination.droppableId
 
     if (sourceSprintId === targetSprintId) {
-      // Reordering within the same sprint - show optimistic update immediately
-      const optimisticUpdate = tasks.map((task: Task, index: number) => {
-        if (task.id === draggableId) {
-          return { ...task, position: destination.index }
-        }
-        // Adjust positions of other tasks in the same sprint
-        if (task.sprintId === sourceSprintId || (sourceSprintId === 'backlog' && !task.sprintId)) {
-          if (source.index < destination.index) {
-            // Moving down - shift tasks up
-            if (index > source.index && index <= destination.index) {
-              return { ...task, position: (task.position || index) - 1 }
-            }
-          } else {
-            // Moving up - shift tasks down
-            if (index >= destination.index && index < source.index) {
-              return { ...task, position: (task.position || index) + 1 }
-            }
-          }
-        }
-        return task
+      // Reordering within the same sprint - only update the moved task
+      const updatedTask = { ...draggedTask, position: destination.index }
+      setOptimisticTasks(prev => {
+        // Replace existing optimistic version or add new one
+        const filtered = prev.filter(t => t.id !== draggableId)
+        return [...filtered, updatedTask]
       })
-      setOptimisticTasks(optimisticUpdate)
 
       try {
         const response = await fetch(`/api/tasks/${draggableId}`, {
@@ -233,33 +185,33 @@ export default function ProductBacklog({
         }
 
         toast.success('Task reordered successfully')
-        // Clear optimistic state and refresh
+        // Remove this specific optimistic task and refresh
         setTimeout(() => {
-          setOptimisticTasks([])
+          setOptimisticTasks(prev => prev.filter(t => t.id !== draggableId))
           mutateTasks()
         }, 500)
       } catch (error: unknown) {
         console.error('Error reordering task:', error)
         toast.error('Failed to reorder task')
-        setOptimisticTasks([]) // Clear optimistic state to revert
+        // Remove only the failed optimistic task
+        setOptimisticTasks(prev => prev.filter(t => t.id !== draggableId))
       }
     } else {
       // Moving between sprints
       const targetSprint = sprints.find((s: Sprint) => s.id === targetSprintId)
       if (!targetSprint) return
 
-      // Optimistic update - show task moved immediately with better positioning
-      const optimisticUpdate = tasks.map((task: Task) => {
-        if (task.id === draggableId) {
-          return {
-            ...task,
-            sprintId: targetSprintId === 'backlog' ? null : targetSprintId,
-            position: destination.index
-          }
-        }
-        return task
+      // Optimistic update - only update the moved task
+      const updatedTask = {
+        ...draggedTask,
+        sprintId: targetSprintId === 'backlog' ? null : targetSprintId,
+        position: destination.index
+      }
+      setOptimisticTasks(prev => {
+        // Replace existing optimistic version or add new one
+        const filtered = prev.filter(t => t.id !== draggableId)
+        return [...filtered, updatedTask]
       })
-      setOptimisticTasks(optimisticUpdate)
 
       try {
         // Move task to new sprint
@@ -277,13 +229,14 @@ export default function ProductBacklog({
         // Success - show toast and refresh data
         toast.success(`Task moved to ${targetSprint.name}`)
         setTimeout(() => {
-          setOptimisticTasks([])
+          setOptimisticTasks(prev => prev.filter(t => t.id !== draggableId))
           mutateTasks()
           mutateSprints()
         }, 500)
       } catch (error: unknown) {
         toast.error(error instanceof Error ? error.message : 'Failed to move task')
-        setOptimisticTasks([]) // Clear optimistic state to revert
+        // Remove only the failed optimistic task
+        setOptimisticTasks(prev => prev.filter(t => t.id !== draggableId))
       }
     }
   }, [tasks, sprints, visibleSprints, mutateTasks, mutateSprints, boardData, onDataChange])
@@ -509,15 +462,15 @@ export default function ProductBacklog({
       }
 
       toast.success('Task created successfully')
-      // Clear optimistic state and refresh with real data
+      // Remove the temporary optimistic task and refresh with real data
       setTimeout(() => {
-        setOptimisticTasks([])
+        setOptimisticTasks(prev => prev.filter(t => t.id !== optimisticTask.id))
         mutateTasks()
       }, 500)
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : 'Failed to create task')
-      // Remove optimistic task on error
-      setOptimisticTasks([])
+      // Remove only the failed optimistic task
+      setOptimisticTasks(prev => prev.filter(t => t.id !== optimisticTask.id))
     }
   }
 
@@ -589,24 +542,12 @@ export default function ProductBacklog({
       {/* Sprint Columns */}
       <ScrollArea className='w-full'>
         <DragDropContext onDragEnd={handleDragEnd}>
-          <Droppable
-            droppableId="board"
-            type="COLUMN"
-            direction="horizontal"
-            ignoreContainerClipping={true}
-          >
-            {(boardProvided) => (
-              <div
-                ref={boardProvided.innerRef}
-                {...boardProvided.droppableProps}
-                className="inline-flex min-w-full gap-4 min-h-full"
-              >
-                {visibleSprints.map((sprint: Sprint, index: number) => (
-                  <DraggableSprintColumn
-                    key={sprint.id}
-                    index={index}
-                    sprint={sprint}
-                    tasks={getTasksForSprint(sprint.id)}
+          <div className="inline-flex min-w-full gap-4 min-h-full">
+            {visibleSprints.map((sprint: Sprint) => (
+              <StaticSprintColumn
+                key={sprint.id}
+                sprint={sprint}
+                tasks={getTasksForSprint(sprint.id)}
                     onTaskClick={setSelectedTask}
                     onSprintAction={handleSprintAction}
                     onAddTask={handleAddTask}
@@ -620,10 +561,7 @@ export default function ProductBacklog({
                     draggedTask={null}
                   />
                 ))}
-                {boardProvided.placeholder}
               </div>
-            )}
-          </Droppable>
         </DragDropContext>
         <ScrollBar orientation="horizontal" />
       </ScrollArea>
