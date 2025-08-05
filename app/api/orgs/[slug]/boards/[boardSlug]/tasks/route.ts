@@ -61,98 +61,125 @@ export async function GET(
     // 4. Get tasks for this board (same logic as /api/tasks?boardId=)
     const tasks = await prisma.task.findMany({
       where: { boardId: board.id },
+      orderBy: [
+        { createdAt: 'desc' }, // Most recent first
+        { id: 'asc' } // Stable sort
+      ],
       include: {
         taskAssignees: {
-          include: {
+          select: {
             user: {
               select: {
                 id: true,
                 fullName: true,
-                email: true,
-                avatarUrl: true
-              }
-            }
-          }
-        },
-        taskReviewers: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                fullName: true,
-                email: true,
                 avatarUrl: true
               }
             }
           }
         },
         taskLabels: {
-          include: {
+          select: {
             label: {
               select: {
                 id: true,
-                name: true,
-                color: true
+                color: true,
+                name: true
               }
             }
+          }
+        },
+        creator: {
+          select: {
+            id: true,
+            fullName: true,
+            avatarUrl: true
+          }
+        },
+        board: {
+          select: {
+            id: true,
+            name: true,
+            organizationId: true
+          }
+        },
+        column: {
+          select: {
+            id: true,
+            name: true
+          }
+        },
+        sprintColumn: {
+          select: {
+            id: true,
+            name: true,
+            isDone: true
+          }
+        },
+        epic: {
+          select: {
+            id: true,
+            title: true
           }
         },
         subtasks: {
           select: {
             id: true,
+            title: true
+          }
+        },
+        parent: {
+          select: {
+            id: true,
             title: true,
-            storyPoints: true,
-            priority: true,
-            itemType: true
+            taskType: true,
+            itemCode: true
           }
         },
         relationsAsTarget: {
+          where: {
+            relationType: 'blocks'
+          },
           select: {
-            relationType: true,
             sourceTask: {
               select: {
                 id: true,
                 title: true,
+                taskType: true,
                 itemCode: true
               }
             }
           }
         },
         relationsAsSource: {
+          where: {
+            relationType: 'blocks'
+          },
           select: {
-            relationType: true,
             targetTask: {
               select: {
                 id: true,
                 title: true,
+                taskType: true,
                 itemCode: true
               }
             }
           }
         }
-      },
-      orderBy: [
-        { position: 'asc' },
-        { createdAt: 'desc' }
-      ]
+      }
     })
 
-    // Transform tasks to match expected format
-    const transformedTasks = tasks.map(task => ({
+    // Map tasks to include the 'done' attribute based on sprint column isDone (same as existing API)
+    const tasksWithDoneStatus = tasks.map(task => ({
       ...task,
-      assignees: task.taskAssignees.map(a => a.user),
-      reviewers: task.taskReviewers.map(r => r.user),
-      labels: task.taskLabels.map(tl => tl.label),
-      blockedBy: task.relationsAsTarget.filter(rel => rel.relationType === 'blocks').map(rel => rel.sourceTask),
-      blocking: task.relationsAsSource.filter(rel => rel.relationType === 'blocks').map(rel => rel.targetTask)
+      done: task.sprintColumn?.isDone || false
     }))
 
     return NextResponse.json({
-      tasks: transformedTasks,
+      tasks: tasksWithDoneStatus,
       pagination: {
-        total: transformedTasks.length,
+        total: tasksWithDoneStatus.length,
         page: 1,
-        limit: transformedTasks.length,
+        limit: tasksWithDoneStatus.length,
         totalPages: 1
       }
     })
