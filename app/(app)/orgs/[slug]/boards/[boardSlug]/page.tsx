@@ -11,8 +11,6 @@ import Scrum from '@/components/scrum/Scrum'
 import BoardEditForm from '@/components/boards/board-edit-form'
 import BoardDeleteDialog from '@/components/boards/board-delete-dialog'
 import { AppHeader } from '@/components/dashboard/app-header'
-import { useBoardData } from '@/hooks/useBoardData'
-import { useProductBacklogActions } from '@/hooks/useProductBacklogActions'
 import { useSupabase } from '@/providers/supabase-provider'
 import { useOrganization } from '@/providers/organization-provider'
 import {
@@ -48,42 +46,66 @@ function BoardContent() {
   const initialTaskId = searchParams?.get('task') || null
 
   // IMPORTANT: All hooks must be called before any conditional returns
-  // Use the existing board hooks and components with the board ID
-  const { data: boardData, isLoading: boardDataLoading, mutate } = useBoardData(board?.id || null)
   const { user } = useSupabase()
   const { organizations } = useOrganization()
 
+  // For now, don't use useBoardData as it makes UUID-based API calls
+  // We'll fetch all data directly using slug-based APIs
+  const [fullBoardData, setFullBoardData] = useState<any>(null)
+  const [boardDataLoading, setBoardDataLoading] = useState(false)
+
   useEffect(() => {
-    async function fetchBoard() {
+    async function fetchBoardAndData() {
       if (!orgSlug || !boardSlug) return
 
       try {
         setIsLoading(true)
+        setBoardDataLoading(true)
         setError(null)
 
-        const response = await fetch(`/api/orgs/${orgSlug}/boards/${boardSlug}`)
+        // 1. First get the basic board info
+        const boardResponse = await fetch(`/api/orgs/${orgSlug}/boards/${boardSlug}`)
         
-        if (response.status === 404) {
+        if (boardResponse.status === 404) {
           setError('Board not found')
           return
         }
 
-        if (!response.ok) {
+        if (!boardResponse.ok) {
           throw new Error('Failed to fetch board')
         }
 
-        const boardData = await response.json()
+        const boardData = await boardResponse.json()
         setBoard(boardData)
+
+        // 2. Now fetch all related data using the board ID but with organization context
+        // For now, we'll create a minimal board data structure to avoid UUID API calls
+        // TODO: Create proper slug-based APIs for tasks, sprints, etc.
+        const mockBoardData = {
+          board: {
+            ...boardData,
+            columns: boardData.columns || []
+          },
+          tasks: [],
+          sprints: [],
+          sprintDetails: [],
+          labels: [],
+          users: [],
+          activeSprint: null
+        }
+
+        setFullBoardData(mockBoardData)
 
       } catch (err) {
         console.error('Error fetching board:', err)
         setError(err instanceof Error ? err.message : 'Failed to load board')
       } finally {
         setIsLoading(false)
+        setBoardDataLoading(false)
       }
     }
 
-    fetchBoard()
+    fetchBoardAndData()
   }, [orgSlug, boardSlug])
 
   if (isLoading) {
@@ -108,21 +130,21 @@ function BoardContent() {
     return <PageLoadingState message="Loading board data..." />
   }
 
-  if (!boardData) {
-    return <PageErrorState error="Failed to load board data" onRetry={() => mutate()} />
+  if (!fullBoardData) {
+    return <PageErrorState error="Failed to load board data" onRetry={() => window.location.reload()} />
   }
 
   // Render the appropriate board component based on board type
-  const isScrum = boardData.boardType === 'scrum'
+  const isScrum = fullBoardData.board.boardType === 'scrum'
 
   return (
     <div className="flex flex-col h-screen">
       <AppHeader 
-        title={boardData.name}
+        title={fullBoardData.board.name}
         breadcrumbs={[
           { label: organization?.name || 'Organization', href: `/orgs/${orgSlug}` },
           { label: 'Boards', href: `/orgs/${orgSlug}` },
-          { label: boardData.name }
+          { label: fullBoardData.board.name }
         ]}
         actions={
           <div className="flex items-center gap-3">
@@ -138,12 +160,12 @@ function BoardContent() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <BoardEditForm board={boardData} onSuccess={() => mutate()}>
+                <BoardEditForm board={fullBoardData.board} onSuccess={() => window.location.reload()}>
                   <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
                     Edit Board
                   </DropdownMenuItem>
                 </BoardEditForm>
-                <BoardDeleteDialog board={boardData}>
+                <BoardDeleteDialog board={fullBoardData.board}>
                   <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
                     Delete Board
                   </DropdownMenuItem>
@@ -157,12 +179,12 @@ function BoardContent() {
       <div className="flex-1 overflow-hidden">
         {isScrum ? (
           <Scrum 
-            board={boardData} 
+            board={fullBoardData.board} 
             initialTaskId={initialTaskId}
           />
         ) : (
           <StandaloneBoardView 
-            board={boardData} 
+            board={fullBoardData.board} 
             initialTaskId={initialTaskId}
           />
         )}
