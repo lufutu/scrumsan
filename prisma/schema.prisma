@@ -56,6 +56,7 @@ model User {
 model Organization {
   id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name         String
+  slug         String?  @unique // URL-friendly identifier
   description  String?
   ownerId      String?  @map("owner_id") @db.Uuid
   settings     Json?    @default("{}")
@@ -74,6 +75,7 @@ model Organization {
   invitations    TeamInvitation[]
   notifications  Notification[]
 
+  @@index([slug])
   @@map("organizations")
 }
 
@@ -133,6 +135,7 @@ model Project {
   id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   organizationId String    @map("organization_id") @db.Uuid
   name           String
+  slug           String?   // URL-friendly identifier, unique within organization
   description    String?
   logo           String?
   startDate      DateTime? @map("start_date") @db.Date
@@ -151,6 +154,8 @@ model Project {
   boardLinks   ProjectBoard[]       // Many-to-many with boards
   engagements  ProjectEngagement[]  // Team management engagements
 
+  @@unique([organizationId, slug])
+  @@index([slug])
   @@map("projects")
 }
 
@@ -194,6 +199,7 @@ model Board {
   id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   organizationId String    @map("organization_id") @db.Uuid // Required - boards belong to orgs
   name           String
+  slug           String?   // URL-friendly identifier, unique within organization
   boardType      String?   @map("board_type") // kanban, scrum
   logo           String?
   description    String?
@@ -212,6 +218,8 @@ model Board {
   customFields CustomField[]
   members      BoardMember[]  @relation("BoardMembers")
 
+  @@unique([organizationId, slug])
+  @@index([slug])
   @@map("boards")
 }
 
@@ -309,6 +317,7 @@ model Sprint {
   id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   boardId        String    @map("board_id") @db.Uuid // Required - sprints belong to boards
   name           String
+  slug           String?   // URL-friendly identifier, unique within board
   goal           String?
   status         String?   @default("planning") // planning, active, completed
   startDate      DateTime? @map("start_date") @db.Date
@@ -329,6 +338,8 @@ model Sprint {
   tasks         Task[]            // Direct relationship to tasks
   sprintColumns SprintColumn[]
 
+  @@unique([boardId, slug])
+  @@index([slug])
   @@map("sprints")
 }
 

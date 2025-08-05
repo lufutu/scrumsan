@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth-utils'
+import { generateSlug, generateUniqueSlug } from '@/lib/slug-utils'
 import { z } from 'zod'
 
 const organizationSchema = z.object({
@@ -55,10 +56,20 @@ export async function POST(req: NextRequest) {
     // Get current user and ensure they exist in our database
     const user = await getCurrentUser(supabase)
     
+    // Generate unique slug for the organization
+    const baseSlug = generateSlug(validatedData.name)
+    const existingSlugs = await prisma.organization.findMany({
+      where: { slug: { not: null } },
+      select: { slug: true }
+    }).then(orgs => orgs.map(o => o.slug!))
+    
+    const uniqueSlug = generateUniqueSlug(baseSlug, existingSlugs)
+    
     // Create organization with member in one transaction
     const organization = await prisma.organization.create({
       data: {
         name: validatedData.name,
+        slug: uniqueSlug,
         description: validatedData.description,
         ownerId: user.id,
         members: {

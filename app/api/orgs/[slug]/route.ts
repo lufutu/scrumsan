@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth-utils'
-import { resolveOrganization, createSlugRedirect } from '@/lib/slug-resolver'
-import { isUUID } from '@/lib/slug-utils'
+import { resolveOrganization } from '@/lib/slug-resolver'
+import { generateSlug, generateUniqueSlug } from '@/lib/slug-utils'
+import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
 
 const organizationSchema = z.object({
@@ -14,17 +14,17 @@ const organizationSchema = z.object({
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ slug: string }> }
 ) {
   try {
-    const { id } = await params
+    const { slug } = await params
     const supabase = await createClient()
     
     // Get current user and ensure they exist in our database
     const user = await getCurrentUser(supabase)
     
-    // Resolve organization by slug or UUID
-    const result = await resolveOrganization(id, {
+    // Resolve organization by slug (this route only accepts slugs)
+    const result = await resolveOrganization(slug, {
       members: {
         select: {
           userId: true,
@@ -48,7 +48,7 @@ export async function GET(
       )
     }
     
-    const { entity: organization, resolvedBy } = result
+    const { entity: organization } = result
     
     // Check if user has access to this organization
     const hasAccess = organization.members.some((member: any) => member.userId === user.id)
@@ -58,12 +58,6 @@ export async function GET(
         { error: 'Organization not found' },
         { status: 404 }
       )
-    }
-    
-    // If accessed by UUID but has a slug, redirect to slug URL
-    if (resolvedBy === 'uuid' && organization.slug) {
-      const redirectUrl = `/orgs/${organization.slug}`
-      return createSlugRedirect(organization.slug)
     }
     
     return NextResponse.json(organization)
@@ -78,10 +72,10 @@ export async function GET(
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ slug: string }> }
 ) {
   try {
-    const { id } = await params
+    const { slug } = await params
     const supabase = await createClient()
     const body = await req.json()
     
@@ -91,10 +85,22 @@ export async function PATCH(
     // Get current user and ensure they exist in our database
     const user = await getCurrentUser(supabase)
     
+    // Resolve organization by slug
+    const result = await resolveOrganization(slug)
+    
+    if (!result) {
+      return NextResponse.json(
+        { error: 'Organization not found' },
+        { status: 404 }
+      )
+    }
+    
+    const { entity: organization } = result
+    
     // Check if user is owner/admin
     const member = await prisma.organizationMember.findFirst({
       where: {
-        organizationId: id,
+        organizationId: organization.id,
         userId: user.id
       }
     })
@@ -106,10 +112,28 @@ export async function PATCH(
       )
     }
     
+    // If name is being updated, we might need to update the slug
+    let updateData: any = { ...validatedData }
+    
+    if (validatedData.name && validatedData.name !== organization.name) {
+      // Generate new slug based on new name
+      const baseSlug = generateSlug(validatedData.name)
+      const existingSlugs = await prisma.organization.findMany({
+        where: { 
+          id: { not: organization.id }, // Exclude current organization
+          slug: { not: null } 
+        },
+        select: { slug: true }
+      }).then(orgs => orgs.map(o => o.slug!))
+      
+      const uniqueSlug = generateUniqueSlug(baseSlug, existingSlugs)
+      updateData.slug = uniqueSlug
+    }
+    
     // Update organization
-    const organization = await prisma.organization.update({
-      where: { id },
-      data: validatedData,
+    const updatedOrganization = await prisma.organization.update({
+      where: { id: organization.id },
+      data: updateData,
       include: {
         members: {
           select: {
@@ -120,7 +144,7 @@ export async function PATCH(
       }
     })
     
-    return NextResponse.json(organization)
+    return NextResponse.json(updatedOrganization)
   } catch (error: unknown) {
     console.error('Error updating organization:', error);
     if (error instanceof z.ZodError) {
@@ -138,19 +162,31 @@ export async function PATCH(
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ slug: string }> }
 ) {
   try {
-    const { id } = await params
+    const { slug } = await params
     const supabase = await createClient()
     
     // Get current user and ensure they exist in our database
     const user = await getCurrentUser(supabase)
     
+    // Resolve organization by slug
+    const result = await resolveOrganization(slug)
+    
+    if (!result) {
+      return NextResponse.json(
+        { error: 'Organization not found' },
+        { status: 404 }
+      )
+    }
+    
+    const { entity: organization } = result
+    
     // Check if user is owner
     const member = await prisma.organizationMember.findFirst({
       where: {
-        organizationId: id,
+        organizationId: organization.id,
         userId: user.id
       }
     })
@@ -164,15 +200,15 @@ export async function DELETE(
     
     // Delete organization (cascade will handle related data)
     await prisma.organization.delete({
-      where: { id }
+      where: { id: organization.id }
     })
     
     return NextResponse.json({ success: true })
   } catch (error: unknown) {
-    console.error('Error fetching organization:', error);
+    console.error('Error deleting organization:', error);
     return NextResponse.json(
-      { message: error instanceof Error ? error.message : 'Failed to fetch organization' },
+      { message: error instanceof Error ? error.message : 'Failed to delete organization' },
       { status: 500 }
     )
   }
-} 
+}
