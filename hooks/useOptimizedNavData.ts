@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useMemo } from 'react'
 import { cacheKeys } from '@/lib/query-optimization'
-import { isUUID } from '@/lib/slug-utils'
+import { useOrganization } from '@/providers/organization-provider'
 
 // Generic fetcher function for API requests
 const fetcher = (url: string) => fetch(url).then(res => {
@@ -53,13 +53,14 @@ interface NavOrganizationData {
 }
 
 export function useOptimizedNavData(organizationId: string | null) {
-  // For now, bypass the organization API call since we're having auth issues
-  // The organization data should be available through the organization provider
-  const organization = organizationId ? { 
-    id: organizationId, 
-    name: 'Organization', // Placeholder - should come from provider
-    slug: 'pta' // Hardcoded for now until we fix the UUID issue
-  } : null
+  // Get organization data from the organization provider instead of making API calls
+  const { organizations } = useOrganization()
+  
+  // Find the organization data from the provider context
+  const organization = useMemo(() => {
+    if (!organizationId || !organizations?.length) return null
+    return organizations.find(org => org.id === organizationId) || null
+  }, [organizationId, organizations])
 
   const { data: projects = [], error: projectsError } = useQuery<NavProject[]>({
     queryKey: cacheKeys.projects(organizationId || ''),
