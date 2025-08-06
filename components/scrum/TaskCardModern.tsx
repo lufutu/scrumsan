@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { draggable } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
+import { DraggableCard } from '@/components/drag-drop/DragAnimations';
 import {
   Paperclip,
   MessageCircle,
@@ -679,16 +680,16 @@ export function TaskCardModern({
   };
 
   return (
-    <div
-      ref={dragRef}
-      className={cn(
-        "group bg-white rounded-lg border border-gray-200 hover:shadow-md transition-all cursor-pointer",
-        "shadow-sm hover:shadow-lg hover:-translate-y-0.5 transform duration-200 ease-out",
-        status === 'done' && "opacity-75",
-        isDragging && "opacity-50 transform rotate-2"
-      )}
-      onClick={onClick}
-    >
+    <DraggableCard isDragging={isDragging || false} className="w-full">
+      <div
+        ref={dragRef}
+        className={cn(
+          "group bg-white rounded-lg border border-gray-200 hover:shadow-md transition-all cursor-pointer",
+          "shadow-sm hover:shadow-lg hover:-translate-y-0.5 transform duration-200 ease-out",
+          status === 'done' && "opacity-75"
+        )}
+        onClick={onClick}
+      >
       {/* Task Header with Icon, Title, and Assignees */}
       <div className="flex items-start justify-between p-3 pb-2">
         <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -1683,6 +1684,7 @@ export function TaskCardModern({
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </DraggableCard>
   );
 }

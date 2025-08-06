@@ -8,6 +8,7 @@ import { StaticSprintColumn } from './StaticSprintColumn'
 import { SprintDialogs } from './SprintDialogs'
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area"
 import { DragDropProvider } from '@/components/drag-drop/DragDropProvider'
+import { AutoScroll } from '@/components/drag-drop/AutoScroll'
 
 import { useRouter } from 'next/navigation'
 import { Sprint, Task, ProductBacklogProps } from '@/types/shared'
@@ -462,8 +463,9 @@ export default function ProductBacklog({
       )}
 
       {/* Sprint Columns */}
-      <ScrollArea className='w-full'>
-        <div className="inline-flex min-w-full gap-4 min-h-full">
+      <AutoScroll className='w-full h-full overflow-auto' scrollSpeed="standard">
+        <ScrollArea className='w-full'>
+          <div className="inline-flex min-w-full gap-4 min-h-full">
           {visibleSprints.map((sprint: Sprint) => (
             <StaticSprintColumn
               key={sprint.id}
@@ -482,9 +484,10 @@ export default function ProductBacklog({
               organizationId={boardData?.board?.organizationId}
             />
           ))}
-        </div>
-        <ScrollBar orientation="horizontal" />
-      </ScrollArea>
+          </div>
+          <ScrollBar orientation="horizontal" />
+        </ScrollArea>
+      </AutoScroll>
 
       {/* Item Modal */}
       {selectedTask && (

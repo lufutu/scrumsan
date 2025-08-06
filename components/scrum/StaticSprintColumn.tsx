@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter'
 import { cn } from '@/lib/utils'
+import { DropZoneHighlight } from '@/components/drag-drop/DropIndicator'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Plus, MoreVertical, Trash2, Edit, Calendar, Play, Check } from 'lucide-react'
@@ -99,14 +100,17 @@ export function StaticSprintColumn({
 
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 w-80 flex-shrink-0">
-      <div
-        ref={dropRef}
-        className={cn(
-          "h-full overflow-hidden flex flex-col",
-          isDraggedOver && "bg-blue-50 border-blue-300",
-          isActiveSprint && "ring-2 ring-blue-500"
-        )}
+      <DropZoneHighlight 
+        isActive={isDraggedOver} 
+        className="h-full"
       >
+        <div
+          ref={dropRef}
+          className={cn(
+            "h-full overflow-hidden flex flex-col",
+            isActiveSprint && "ring-2 ring-blue-500"
+          )}
+        >
             <div
               className={cn(
                 "p-4 border-b border-gray-200",
@@ -265,7 +269,8 @@ export function StaticSprintColumn({
                 </Button>
               </div>
             )}
-      </div>
+        </div>
+      </DropZoneHighlight>
     </div>
   )
 }
