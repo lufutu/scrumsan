@@ -106,12 +106,15 @@ export default function ProductBacklog({
 
     let sprintTasks: Task[] = []
 
-    // For backlog sprint, return tasks with no sprintId AND no columnId AND no sprintColumnId
+    // For backlog sprint, return tasks that either:
+    // 1. Have no sprintId (traditional backlog tasks) OR
+    // 2. Have sprintId pointing to this backlog sprint (but no sprintColumnId since backlog has no columns)
     if (sprint.isBacklog) {
       sprintTasks = tasks.filter((task: Task) => 
-        !task.sprintId && 
-        !task.columnId && 
-        !task.sprintColumnId &&
+        (
+          (!task.sprintId && !task.columnId && !task.sprintColumnId) || // Traditional backlog tasks
+          (task.sprintId === sprint.id && !task.sprintColumnId) // Tasks assigned to backlog sprint
+        ) &&
         !task.labels?.includes('__followup__')
       )
     } else {
