@@ -7,7 +7,7 @@ import { ItemModal } from './ItemModal'
 import { StaticSprintColumn } from './StaticSprintColumn'
 import { SprintDialogs } from './SprintDialogs'
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area"
-import { DragDropProvider } from '@/components/drag-drop/DragDropProvider'
+import { DragDropProvider, useDragDrop } from '@/components/drag-drop/DragDropProvider'
 import { AutoScroll } from '@/components/drag-drop/AutoScroll'
 import { BoardTasksDebug } from '@/components/debug/BoardTasksDebug'
 
@@ -442,6 +442,129 @@ export default function ProductBacklog({
       initialTasks={tasks}
       onTaskMove={handleTaskMove}
     >
+      <ProductBacklogInner 
+        boardId={boardId}
+        boardColor={boardColor}
+        boardData={boardData}
+        onDataChange={onDataChange}
+        sprints={sprints}
+        sprintDetails={sprintDetails}
+        labels={labels}
+        users={users}
+        activeSprint={activeSprint}
+        visibleSprints={visibleSprints}
+        getTasksForSprint={getTasksForSprint}
+        handleTaskDrop={handleTaskDrop}
+        handleSprintAction={handleSprintAction}
+        handleAddTask={handleAddTask}
+        selectedTask={selectedTask}
+        setSelectedTask={setSelectedTask}
+        mutateTasks={mutateTasks}
+        isCreateSprintOpen={isCreateSprintOpen}
+        setIsCreateSprintOpen={setIsCreateSprintOpen}
+        newSprintData={newSprintData}
+        setNewSprintData={setNewSprintData}
+        handleCreateSprint={handleCreateSprint}
+        isEditSprintOpen={isEditSprintOpen}
+        setIsEditSprintOpen={setIsEditSprintOpen}
+        editSprintData={editSprintData}
+        setEditSprintData={setEditSprintData}
+        handleEditSprint={handleEditSprint}
+        isStartSprintOpen={isStartSprintOpen}
+        setIsStartSprintOpen={setIsStartSprintOpen}
+        startSprintData={startSprintData}
+        setStartSprintData={setStartSprintData}
+        handleStartSprint={handleStartSprint}
+        isFixingOrphanedTasks={isFixingOrphanedTasks}
+        handleFixOrphanedTasks={handleFixOrphanedTasks}
+      />
+    </DragDropProvider>
+  )
+}
+
+// Component that has access to DragDrop context
+function ProductBacklogInner({
+  boardId,
+  boardColor, 
+  boardData,
+  onDataChange,
+  sprints,
+  sprintDetails,
+  labels,
+  users,
+  activeSprint,
+  visibleSprints,
+  getTasksForSprint,
+  handleTaskDrop,
+  handleSprintAction,
+  handleAddTask,
+  selectedTask,
+  setSelectedTask,
+  mutateTasks,
+  isCreateSprintOpen,
+  setIsCreateSprintOpen,
+  newSprintData,
+  setNewSprintData,
+  handleCreateSprint,
+  isEditSprintOpen,
+  setIsEditSprintOpen,
+  editSprintData,
+  setEditSprintData,
+  handleEditSprint,
+  isStartSprintOpen,
+  setIsStartSprintOpen,
+  startSprintData,
+  setStartSprintData,
+  handleStartSprint,
+  isFixingOrphanedTasks,
+  handleFixOrphanedTasks
+}: any) {
+  // Get optimistic tasks from drag-drop context
+  const { optimisticTasks } = useDragDrop()
+  
+  // Use optimistic tasks for display
+  const tasks = optimisticTasks
+
+  // Update getTasksForSprint to use optimistic tasks
+  const getOptimisticTasksForSprint = useCallback((sprintId: string) => {
+    const sprint = sprintDetails.find((s: Sprint) => s.id === sprintId) || sprints.find((s: Sprint) => s.id === sprintId)
+    if (!sprint) return []
+
+    let sprintTasks: Task[] = []
+
+    // For backlog sprint, return tasks that either:
+    // 1. Have no sprintId (traditional backlog tasks) OR  
+    // 2. Have sprintId pointing to this backlog sprint (assigned to backlog sprint)
+    if (sprint.isBacklog) {
+      sprintTasks = tasks.filter((task: Task) => 
+        (
+          (!task.sprintId && !task.columnId && !task.sprintColumnId) || // Traditional backlog tasks
+          (task.sprintId === sprint.id) // Tasks assigned to backlog sprint
+        ) &&
+        !task.labels?.includes('__followup__')
+      )
+    } else {
+      // For regular sprints, filter optimistic tasks that belong to this sprint
+      sprintTasks = tasks.filter((task: Task) => task.sprintId === sprint.id)
+    }
+
+    return sprintTasks
+  }, [sprintDetails, sprints, tasks])
+
+  // Check for orphaned tasks using optimistic tasks
+  const orphanedTasks = tasks.filter(task => task.sprintId && !task.sprintColumnId)
+  const hasOrphanedTasks = orphanedTasks.length > 0
+
+  if (!boardData) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    )
+  }
+
+  return (
+    <>
       {/* Debug: Fix Orphaned Tasks Button */}
       {hasOrphanedTasks && (
         <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
@@ -493,7 +616,7 @@ export default function ProductBacklog({
             <StaticSprintColumn
               key={sprint.id}
               sprint={sprint}
-              tasks={getTasksForSprint(sprint.id)}
+              tasks={getOptimisticTasksForSprint(sprint.id)}
               onTaskClick={setSelectedTask}
               onSprintAction={handleSprintAction}
               onAddTask={handleAddTask}
@@ -542,6 +665,6 @@ export default function ProductBacklog({
         setStartSprintData={setStartSprintData}
         onStartSprint={handleStartSprint}
       />
-    </DragDropProvider>
+    </>
   )
 }

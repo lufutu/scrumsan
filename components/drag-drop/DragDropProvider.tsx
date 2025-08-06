@@ -91,7 +91,7 @@ export function DragDropProvider({
         }
       },
       
-      onDrop: async ({ source, location }) => {
+      onDrop: ({ source, location }) => {
         if (!DragDataTypes.isTask(source.data)) {
           clearOptimisticState()
           return
@@ -107,49 +107,56 @@ export function DragDropProvider({
         const taskId = source.data.taskId
         const targetData = dropTarget.data
 
-        try {
-          console.log('🎯 Processing drop:', { taskId, targetData })
+        console.log('🎯 Processing drop:', { taskId, targetData })
 
-          // Handle different drop target types
-          if (DragDataTypes.isSprintColumn(targetData)) {
-            // Moving to sprint column
-            applyOptimisticUpdate(taskId, {
-              sprintId: targetData.sprintId,
-              sprintColumnId: targetData.columnId
-            })
-
-            if (onTaskMove) {
-              await onTaskMove(taskId, { 
-                sprintId: targetData.sprintId,
-                columnId: targetData.columnId 
-              })
-            }
-          } else if (DragDataTypes.isBacklog(targetData)) {
-            // Moving to backlog
-            applyOptimisticUpdate(taskId, {
-              sprintId: null,
-              sprintColumnId: null,
-              columnId: null
-            })
-
-            if (onTaskMove) {
-              await onTaskMove(taskId, { 
-                sprintId: null,
-                columnId: null 
-              })
-            }
-          } else {
-            // Unknown target type
-            console.warn('🚨 Unknown drop target type:', targetData)
-            clearOptimisticState()
-            return
+        // STEP 1: Apply UI updates IMMEDIATELY (optimistic UI)
+        let optimisticUpdate = null
+        
+        if (DragDataTypes.isSprintColumn(targetData)) {
+          // Moving to sprint column
+          optimisticUpdate = {
+            sprintId: targetData.sprintId,
+            sprintColumnId: targetData.columnId,
+            columnId: null
           }
+          applyOptimisticUpdate(taskId, optimisticUpdate)
+        } else if (DragDataTypes.isBacklog(targetData)) {
+          // Moving to backlog
+          optimisticUpdate = {
+            sprintId: null,
+            sprintColumnId: null,
+            columnId: null
+          }
+          applyOptimisticUpdate(taskId, optimisticUpdate)
+        } else {
+          // Unknown target type
+          console.warn('🚨 Unknown drop target type:', targetData)
+          clearOptimisticState()
+          return
+        }
 
-          console.log('✅ Drop operation completed successfully')
+        // STEP 2: Run API call in background (non-blocking)
+        if (onTaskMove && optimisticUpdate) {
+          const apiCall = async () => {
+            try {
+              await onTaskMove(taskId, { 
+                sprintId: optimisticUpdate.sprintId,
+                columnId: optimisticUpdate.columnId 
+              })
+              console.log('✅ Background API call completed successfully')
+              // Clear optimistic state after successful API call
+              clearOptimisticState()
+            } catch (error) {
+              console.error('❌ Background API call failed, rolling back:', error)
+              rollbackTaskUpdate(taskId)
+            }
+          }
           
-        } catch (error) {
-          console.error('❌ Drop operation failed:', error)
-          rollbackTaskUpdate(taskId)
+          // Run API call without blocking UI
+          apiCall()
+        } else {
+          // No API handler, just clear optimistic state
+          clearOptimisticState()
         }
       }
     })
