@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Trash2, RefreshCw, Eye, AlertTriangle } from 'lucide-react'
+import { Trash2, RefreshCw, Eye, AlertTriangle, Wrench } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface TaskDebugInfo {
@@ -56,6 +56,26 @@ export function BoardTasksDebug({ boardId, onRefresh }: BoardTasksDebugProps) {
       toast.error('Failed to fetch debug information')
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const fixOrphanedTasks = async () => {
+    try {
+      const response = await fetch(`/api/boards/${boardId}/tasks/fix-orphaned`, {
+        method: 'POST'
+      })
+      
+      if (!response.ok) throw new Error('Failed to fix orphaned tasks')
+      
+      const data = await response.json()
+      toast.success(data.message)
+      
+      // Refresh the debug info and parent component
+      await fetchDebugInfo()
+      onRefresh?.()
+    } catch (error) {
+      console.error('Error fixing orphaned tasks:', error)
+      toast.error('Failed to fix orphaned tasks')
     }
   }
 
@@ -163,6 +183,17 @@ export function BoardTasksDebug({ boardId, onRefresh }: BoardTasksDebugProps) {
 
             {summary.total > 0 && (
               <div className="flex gap-2">
+                {summary.orphaned > 0 && (
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={fixOrphanedTasks}
+                    className="text-xs border-orange-300 text-orange-700 hover:bg-orange-50"
+                  >
+                    <Wrench className="h-3 w-3 mr-1" />
+                    Fix {summary.orphaned} Orphaned Tasks
+                  </Button>
+                )}
                 <Button 
                   variant="destructive" 
                   size="sm"
