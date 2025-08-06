@@ -279,24 +279,70 @@ export async function DELETE(
       )
     }
     
-    // Warn if board has content
-    if (board._count.tasks > 0 || board._count.sprints > 0) {
+    // Check if board has tasks - prevent deletion if any tasks exist
+    if (board._count.tasks > 0) {
       return NextResponse.json(
         { 
-          error: 'Board has content', 
+          error: 'Board has tasks', 
           details: {
             tasks: board._count.tasks,
             sprints: board._count.sprints,
-            message: 'Please delete or move all tasks and sprints before deleting the board'
+            message: 'Please delete or move all tasks before deleting the board'
+          }
+        },
+        { status: 400 }
+      )
+    }
+
+    // Check if any sprints have tasks - prevent deletion if sprints contain tasks
+    const sprintsWithTasks = await prisma.sprint.findMany({
+      where: {
+        boardId: boardId,
+        isDeleted: false
+      },
+      select: {
+        id: true,
+        name: true,
+        _count: {
+          select: {
+            tasks: true
+          }
+        }
+      }
+    })
+
+    const nonEmptySprintCount = sprintsWithTasks.filter(sprint => sprint._count.tasks > 0).length
+    if (nonEmptySprintCount > 0) {
+      const nonEmptySprints = sprintsWithTasks.filter(sprint => sprint._count.tasks > 0)
+      return NextResponse.json(
+        { 
+          error: 'Sprints contain tasks', 
+          details: {
+            tasks: board._count.tasks,
+            sprints: board._count.sprints,
+            nonEmptySprints: nonEmptySprints.length,
+            sprintNames: nonEmptySprints.map(s => s.name),
+            message: 'Please delete or move all tasks from sprints before deleting the board'
           }
         },
         { status: 400 }
       )
     }
     
-    // Delete the board (cascade will handle columns and other relations)
-    await prisma.board.delete({
-      where: { id: boardId }
+    // Delete the board and cleanup empty sprints in a transaction
+    await prisma.$transaction(async (tx) => {
+      // Delete all empty sprints for this board first
+      await tx.sprint.deleteMany({
+        where: {
+          boardId: boardId,
+          isDeleted: false
+        }
+      })
+      
+      // Delete the board (cascade will handle columns and other relations)
+      await tx.board.delete({
+        where: { id: boardId }
+      })
     })
     
     return NextResponse.json({ success: true, message: 'Board deleted successfully' })
