@@ -9,7 +9,6 @@ import { SprintDialogs } from './SprintDialogs'
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area"
 import { OptimisticDragDropProvider, useOptimisticDragDrop } from '@/components/drag-drop/OptimisticDragDropProvider'
 import { AutoScroll } from '@/components/drag-drop/AutoScroll'
-import { BoardTasksDebug } from '@/components/debug/BoardTasksDebug'
 
 import { useRouter } from 'next/navigation'
 import { Sprint, Task, ProductBacklogProps } from '@/types/shared'
@@ -44,7 +43,6 @@ export default function ProductBacklog({
   const [isStartSprintOpen, setIsStartSprintOpen] = useState(false)
   const [startingSprintId, setStartingSprintId] = useState<string | null>(null)
   const [startSprintData, setStartSprintData] = useState({ dueDate: '', goal: '' })
-  const [isFixingOrphanedTasks, setIsFixingOrphanedTasks] = useState(false)
 
   // Expose state to parent component
   const handleToggleFinishedSprints = useCallback(() => {
@@ -373,31 +371,6 @@ export default function ProductBacklog({
     }
   }
 
-  const handleFixOrphanedTasks = async () => {
-    setIsFixingOrphanedTasks(true)
-    try {
-      const response = await fetch('/api/tasks/fix-orphaned', {
-        method: 'POST'
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to fix orphaned tasks')
-      }
-
-      const result = await response.json()
-      toast.success(result.message)
-      
-      // Refresh data to show fixed tasks
-      if (onDataChange) {
-        onDataChange()
-      }
-    } catch (error: unknown) {
-      console.error('Error fixing orphaned tasks:', error)
-      toast.error(error instanceof Error ? error.message : 'Failed to fix orphaned tasks')
-    } finally {
-      setIsFixingOrphanedTasks(false)
-    }
-  }
 
   if (!boardData) {
     return (
@@ -444,8 +417,6 @@ export default function ProductBacklog({
         startSprintData={startSprintData}
         setStartSprintData={setStartSprintData}
         handleStartSprint={handleStartSprint}
-        isFixingOrphanedTasks={isFixingOrphanedTasks}
-        handleFixOrphanedTasks={handleFixOrphanedTasks}
       />
     </OptimisticDragDropProvider>
   )
@@ -482,9 +453,7 @@ function ProductBacklogInner({
   setIsStartSprintOpen,
   startSprintData,
   setStartSprintData,
-  handleStartSprint,
-  isFixingOrphanedTasks,
-  handleFixOrphanedTasks
+  handleStartSprint
 }: any) {
   // Get optimistic tasks from drag-drop context
   const { tasks: optimisticTasks } = useOptimisticDragDrop()
@@ -531,48 +500,6 @@ function ProductBacklogInner({
 
   return (
     <>
-      {/* Debug: Fix Orphaned Tasks Button */}
-      {hasOrphanedTasks && (
-        <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-          <div className="flex items-center justify-between">
-            <div>
-              <h4 className="text-sm font-medium text-yellow-800">
-                Found {orphanedTasks.length} orphaned task(s)
-              </h4>
-              <p className="text-xs text-yellow-600 mt-1">
-                These tasks are assigned to sprints but not in any columns. Click to move them to backlog.
-              </p>
-            </div>
-            <button
-              onClick={handleFixOrphanedTasks}
-              disabled={isFixingOrphanedTasks}
-              className="ml-4 px-3 py-1 bg-yellow-600 text-white text-xs rounded hover:bg-yellow-700 disabled:opacity-50"
-            >
-              {isFixingOrphanedTasks ? 'Fixing...' : 'Fix Tasks'}
-            </button>
-          </div>
-          {process.env.NODE_ENV === 'development' && (
-            <details className="mt-2">
-              <summary className="text-xs text-yellow-600 cursor-pointer">Show orphaned tasks</summary>
-              <ul className="mt-1 text-xs text-yellow-700">
-                {orphanedTasks.map(task => (
-                  <li key={task.id}>
-                    {task.title} (sprintId: {task.sprintId?.slice(0, 8)}..., sprintColumnId: {task.sprintColumnId || 'null'})
-                  </li>
-                ))}
-              </ul>
-            </details>
-          )}
-        </div>
-      )}
-
-      {/* Debug Component - only show in development or when there are issues */}
-      {(process.env.NODE_ENV === 'development' || hasOrphanedTasks) && (
-        <BoardTasksDebug 
-          boardId={boardId} 
-          onRefresh={onDataChange}
-        />
-      )}
 
       {/* Sprint Columns */}
       <AutoScroll className='w-full h-full overflow-auto' scrollSpeed="standard">
