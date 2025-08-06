@@ -51,6 +51,15 @@ This is a **VivifyScrum clone** - a comprehensive project management application
 - **Time tracking**: worklog entries, estimated vs actual hours
 - **Team collaboration**: members, invitations, permissions
 
+#### Sprint Column Architecture Rules
+- **Backlog Sprint**: NEVER has sprint columns (`sprintColumns` table should be empty)
+- **Regular Sprints**: Always have sprint columns (To Do, In Progress, Done by default)
+- **Task Assignment Logic**:
+  - Tasks in Backlog sprint: Only `sprintId` set, `sprintColumnId` always NULL
+  - Tasks in regular sprints: Both `sprintId` and `sprintColumnId` set
+  - Auto-assignment: Only assigns `sprintColumnId` for non-Backlog sprints
+- **Board Creation**: Creates sprint columns ONLY for regular sprints (Sprint 1, Sprint 2, etc.)
+
 ### Authentication & Authorization
 - **Supabase Auth** with email/password and OAuth
 - **Middleware-based route protection** (`middleware.ts`)

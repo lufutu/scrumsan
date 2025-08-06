@@ -296,15 +296,26 @@ export async function POST(req: NextRequest) {
     }
     
     // If task is assigned to a sprint but no sprint column specified, assign to first sprint column
+    // BUT only for non-Backlog sprints (Backlog sprint should never have columns)
     let sprintColumnId = validatedData.sprintColumnId
     if (validatedData.sprintId && !sprintColumnId) {
-      const firstSprintColumn = await prisma.sprintColumn.findFirst({
-        where: { sprintId: validatedData.sprintId },
-        orderBy: { position: 'asc' }
+      // Check if this is a Backlog sprint first
+      const sprint = await prisma.sprint.findUnique({
+        where: { id: validatedData.sprintId },
+        select: { isBacklog: true }
       })
-      if (firstSprintColumn) {
-        sprintColumnId = firstSprintColumn.id
+      
+      // Only assign sprint column for non-Backlog sprints
+      if (sprint && !sprint.isBacklog) {
+        const firstSprintColumn = await prisma.sprintColumn.findFirst({
+          where: { sprintId: validatedData.sprintId },
+          orderBy: { position: 'asc' }
+        })
+        if (firstSprintColumn) {
+          sprintColumnId = firstSprintColumn.id
+        }
       }
+      // For Backlog sprints, sprintColumnId remains null
     }
     
     // Create task
