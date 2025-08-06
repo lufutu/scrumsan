@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { boardId: string } }
+  { params }: { params: Promise<{ boardId: string }> }
 ) {
   try {
     const supabase = await createClient()
@@ -14,7 +14,7 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { boardId } = params
+    const { boardId } = await params
 
     // Find all orphaned tasks for this board
     // These are tasks that have sprintId but no sprintColumnId (invisible in UI)

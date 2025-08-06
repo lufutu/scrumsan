@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { boardId: string } }
+  { params }: { params: Promise<{ boardId: string }> }
 ) {
   try {
     const supabase = await createClient()
@@ -14,7 +14,7 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { boardId } = params
+    const { boardId } = await params
 
     // Get all tasks for this board, regardless of their column/sprint status
     const allTasks = await prisma.task.findMany({
@@ -106,7 +106,7 @@ function getTaskCategory(task: any): string {
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { boardId: string } }
+  { params }: { params: Promise<{ boardId: string }> }
 ) {
   try {
     const supabase = await createClient()
@@ -115,7 +115,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { boardId } = params
+    const { boardId } = await params
 
     // Delete all tasks for this board (useful for cleanup)
     const deletedTasks = await prisma.task.deleteMany({
