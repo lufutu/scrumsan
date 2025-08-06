@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { draggable } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import { DraggableCard } from '@/components/drag-drop/DragAnimations';
-import { DragPreview, DragPreviewContent } from '@/components/drag-drop/DragPreview';
+// Remove cursor-following DragPreview - we want column drop preview instead
 import { useOptimisticDragDrop } from '@/components/drag-drop/OptimisticDragDropProvider';
 import {
   Paperclip,
@@ -691,21 +691,6 @@ export function TaskCardModern({
 
   return (
     <>
-      <DragPreview 
-        isDragging={globalIsDragging && draggedTaskId === id} 
-        dragData={{ 
-          taskId: id, 
-          title, 
-          taskType 
-        }}
-      >
-        <DragPreviewContent 
-          title={title}
-          taskType={taskType}
-          itemCode={itemCode}
-        />
-      </DragPreview>
-      
       <DraggableCard isDragging={isDragging || false} className="w-full">
       <div
         ref={dragRef}

@@ -32,26 +32,18 @@ export function DragPreview({ isDragging, dragData, children }: DragPreviewProps
     if (!isDragging) return
 
     const handleMouseMove = (e: MouseEvent) => {
-      console.log('🖱️ Mouse move:', { x: e.clientX, y: e.clientY })
       setPosition({
         x: e.clientX + 10, // Offset slightly from cursor
         y: e.clientY + 10
       })
     }
 
-    console.log('🎯 Setting up mouse move listener for drag preview')
     document.addEventListener('mousemove', handleMouseMove, { passive: true })
     
     return () => {
-      console.log('🧹 Cleaning up mouse move listener')
       document.removeEventListener('mousemove', handleMouseMove)
     }
   }, [isDragging])
-  
-  // Log position changes
-  useEffect(() => {
-    console.log('📍 DragPreview position updated:', position)
-  }, [position])
 
   if (!mounted || !isDragging) return null
 
