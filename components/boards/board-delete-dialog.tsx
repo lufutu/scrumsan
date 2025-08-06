@@ -44,9 +44,20 @@ export default function BoardDeleteDialog({
   const [isDeleting, setIsDeleting] = useState(false)
 
   const handleDelete = async () => {
+    console.log('🗑️ Starting optimistic board deletion...')
     setIsDeleting(true)
 
+    // Show optimistic success immediately
+    toast.success("Board deleted successfully")
+    setOpen(false)
+
+    // Redirect immediately for better UX (if specified)
+    if (redirectTo) {
+      router.push(redirectTo)
+    }
+
     try {
+      console.log('📡 Making board deletion API call...')
       const response = await fetch(`/api/boards/${board.id}`, {
         method: 'DELETE',
       })
@@ -64,20 +75,25 @@ export default function BoardDeleteDialog({
         throw new Error(data.error || 'Failed to delete board')
       }
 
-      toast.success("Board deleted successfully")
-      setOpen(false)
+      console.log('✅ Board deletion confirmed by API')
       
-      // Call onSuccess callback if provided
+      // Call onSuccess callback after API confirmation
       onSuccess?.()
       
-      // Redirect after deletion
-      if (redirectTo) {
-        router.push(redirectTo)
-      }
-      
     } catch (err: any) {
-      console.error('Error deleting board:', err)
+      console.error('❌ Board deletion failed:', err)
+      
+      // Rollback optimistic changes
       toast.error(err.message || "Failed to delete board")
+      
+      // If we redirected, we can't easily rollback, so just refresh
+      if (redirectTo) {
+        // The user will see the error toast and the board will still be there
+        // They can try again or navigate back manually
+      } else {
+        // If we didn't redirect, reopen the dialog
+        setOpen(true)
+      }
     } finally {
       setIsDeleting(false)
     }

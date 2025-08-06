@@ -40,9 +40,25 @@ export default function BoardCreationWizard({ organizationId, onSuccess, childre
       return
     }
 
+    console.log('🏗️ Starting optimistic board creation...')
     setIsCreating(true)
 
+    // Show optimistic success immediately
+    toast({
+      title: "Success",
+      description: `${wizardData.type === 'kanban' ? 'Kanban' : 'Scrum'} board created successfully`
+    })
+
+    // Reset wizard immediately for better UX
+    setIsOpen(false)
+    const originalWizardData = { ...wizardData }
+    setWizardData({
+      name: '',
+      type: 'kanban'
+    })
+
     try {
+      console.log('📡 Making board creation API call...')
       const boardData = {
         name: wizardData.name.trim(),
         boardType: wizardData.type,
@@ -63,27 +79,23 @@ export default function BoardCreationWizard({ organizationId, onSuccess, childre
       }
 
       const newBoard = await response.json()
+      console.log('✅ Board creation confirmed by API:', newBoard.id)
 
-      toast({
-        title: "Success",
-        description: `${wizardData.type === 'kanban' ? 'Kanban' : 'Scrum'} board created successfully`
-      })
-
-      // Reset wizard
-      setIsOpen(false)
-      setWizardData({
-        name: '',
-        type: 'kanban'
-      })
-
+      // Call onSuccess with real board data
       onSuccess?.(newBoard)
 
     } catch (err: any) {
-      console.error('Error creating board:', err)
+      console.error('❌ Board creation failed:', err)
+      
+      // Rollback optimistic changes
       toast({
         title: "Error",
         description: err.message || "Failed to create board"
       })
+
+      // Restore wizard state
+      setIsOpen(true)
+      setWizardData(originalWizardData)
     } finally {
       setIsCreating(false)
     }

@@ -61,9 +61,18 @@ export default function BoardEditForm({ board, onSuccess, children }: BoardEditF
       return
     }
 
+    console.log('✏️ Starting optimistic board update...')
     setIsLoading(true)
 
+    // Show optimistic success immediately
+    toast.success("Board updated successfully")
+    setOpen(false)
+
+    // Store original data for rollback
+    const originalFormData = { ...formData }
+
     try {
+      console.log('📡 Making board update API call...')
       const response = await fetch(`/api/boards/${board.id}`, {
         method: 'PATCH',
         headers: {
@@ -82,13 +91,20 @@ export default function BoardEditForm({ board, onSuccess, children }: BoardEditF
         throw new Error(error.error || 'Failed to update board')
       }
 
-      toast.success("Board updated successfully")
-      setOpen(false)
+      console.log('✅ Board update confirmed by API')
+      
+      // Call onSuccess callback after API confirmation
       onSuccess?.()
       
     } catch (err: any) {
-      console.error('Error updating board:', err)
+      console.error('❌ Board update failed:', err)
+      
+      // Rollback optimistic changes
       toast.error(err.message || "Failed to update board")
+      
+      // Reopen form with original data
+      setOpen(true)
+      setFormData(originalFormData)
     } finally {
       setIsLoading(false)
     }

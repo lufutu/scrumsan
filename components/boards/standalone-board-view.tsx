@@ -288,7 +288,7 @@ export default function StandaloneBoardView({ board, onUpdate }: StandaloneBoard
   // For scrum boards, use the ProjectScrumBoard component
   if (localBoard.boardType === 'scrum' && localBoard.columns) {
     return (
-      <DragDropContext onDragEnd={handleDragEnd}>
+      <DragDropProvider onDragEnd={handleDragEnd}>
         <div className="h-full">
           <div className="flex items-center justify-between mb-6">
             <div>
@@ -561,13 +561,13 @@ export default function StandaloneBoardView({ board, onUpdate }: StandaloneBoard
           
           {/* Footer removed - using inline add in columns */}
         </div>
-      </DragDropContext>
+      </DragDropProvider>
     )
   }
 
   // Kanban board implementation
   return (
-    <DragDropContext onDragEnd={handleDragEnd}>
+    <DragDropProvider onDragEnd={handleDragEnd}>
       <div className="h-full">
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -869,6 +869,6 @@ export default function StandaloneBoardView({ board, onUpdate }: StandaloneBoard
           </AlertDialogContent>
         </AlertDialog>
       </div>
-    </DragDropContext>
+    </DragDropProvider>
   )
 } 

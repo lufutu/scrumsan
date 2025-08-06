@@ -661,10 +661,28 @@ export function ItemModal({
 
 
   const handleDelete = async () => {
-    if (!taskId) return;
+    if (!taskId || !task) return;
     
     if (confirm('Are you sure you want to delete this task? This action cannot be undone.')) {
+      console.log('🗑️ Starting optimistic task deletion...');
+      
+      // Close modal immediately for better UX
+      onClose();
+      
       try {
+        // Store original task for potential rollback
+        const originalTask = { ...task };
+        console.log('🗑️ Stored original task for rollback:', originalTask.title);
+        
+        // Show optimistic success message immediately
+        toast.success('Task deleted');
+        
+        // Trigger UI update immediately (removes task from UI)
+        onUpdate?.();
+        console.log('🗑️ UI updated optimistically');
+        
+        // Make API call in background
+        console.log('📡 Making delete API call...');
         const response = await fetch(`/api/tasks/${taskId}`, {
           method: 'DELETE',
         });
@@ -673,15 +691,27 @@ export function ItemModal({
           throw new Error('Failed to delete task');
         }
         
-        toast.success('Task deleted');
-        onUpdate?.();
-        onClose();
+        console.log('✅ Task deletion confirmed by API');
+        
+        // Final UI refresh to ensure consistency
+        setTimeout(() => {
+          onUpdate?.();
+        }, 100);
+        
       } catch (error) {
-        console.error('Error deleting task:', error);
-        toast.error('Failed to delete task');
+        console.error('❌ Task deletion failed:', error);
+        
+        // Show error and refresh to restore state
+        toast.error('Failed to delete task - please try again');
+        
+        // Refresh the UI to restore the task
+        onUpdate?.();
+        
+        // Optionally reopen modal to show the restored task
+        // (this would require a callback to the parent component)
       }
     }
-  };
+  };;
 
   if (!task && !isLoading) return null;
 

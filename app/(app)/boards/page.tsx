@@ -82,15 +82,21 @@ export default function BoardsPage() {
 
 
   const handleBoardCreated = async (newBoard?: { id?: string, slug?: string }) => {
-    // Refresh the boards list using SWR
-    await refresh()
-
-    // Redirect to the new board using slug-based URL
+    // Navigate immediately for better UX
     if (newBoard?.slug && activeOrg?.slug) {
       router.push(`/orgs/${activeOrg.slug}/boards/${newBoard.slug}`)
     } else if (newBoard?.id) {
       // Fallback to UUID-based URL (will redirect to slug URL via middleware)
       router.push(`/boards/${newBoard.id}`)
+    }
+
+    // Refresh the boards list in the background
+    try {
+      await refresh()
+      console.log('✅ Boards list refreshed successfully')
+    } catch (error) {
+      console.error('⚠️ Failed to refresh boards list:', error)
+      // Don't show error to user since navigation already happened
     }
   }
 

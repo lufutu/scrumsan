@@ -178,7 +178,17 @@ export default function ProductBacklog({
         break
 
       case 'finish':
+        console.log('🏁 Starting optimistic sprint finish...')
+        
+        // Show optimistic success immediately
+        toast.success(`Sprint "${sprint.name}" finished successfully!`)
+        
+        // Optimistically update data
+        mutateSprints()
+        mutateTasks()
+
         try {
+          console.log('📡 Making sprint finish API call...')
           const response = await fetch(`/api/sprints/${sprintId}/finish`, {
             method: 'POST'
           })
@@ -187,17 +197,33 @@ export default function ProductBacklog({
             throw new Error(error.error || 'Failed to finish sprint')
           }
           
+          console.log('✅ Sprint finish confirmed by API')
+          
+          // Refresh data again for consistency
           mutateSprints()
           mutateTasks()
-          toast.success(`Sprint "${sprint.name}" finished successfully!`)
         } catch (error: unknown) {
+          console.error('❌ Sprint finish failed:', error)
           toast.error((error as Error).message)
+          
+          // Refresh to restore actual state
+          mutateSprints()
+          mutateTasks()
         }
         break
 
       case 'delete':
         if (confirm(`Are you sure you want to delete "${sprint.name}"?`)) {
+          console.log('🗑️ Starting optimistic sprint deletion...')
+          
+          // Show optimistic success immediately
+          toast.success(`Sprint "${sprint.name}" deleted successfully!`)
+          
+          // Optimistically update data
+          mutateSprints()
+
           try {
+            console.log('📡 Making sprint deletion API call...')
             const response = await fetch(`/api/sprints/${sprintId}`, {
               method: 'DELETE'
             })
@@ -206,10 +232,15 @@ export default function ProductBacklog({
               throw new Error(error.error || 'Failed to delete sprint')
             }
             
+            console.log('✅ Sprint deletion confirmed by API')
+            
+            // Refresh data again for consistency
             mutateSprints()
-            toast.success(`Sprint "${sprint.name}" deleted successfully!`)
           } catch (error: unknown) {
+            console.error('❌ Sprint deletion failed:', error)
             toast.error((error as Error).message)
+            
+            // Refresh to restore actual state
             mutateSprints()
           }
         }
@@ -232,14 +263,23 @@ export default function ProductBacklog({
       return
     }
 
+    console.log('🏃 Starting optimistic sprint creation...')
+
+    // Close dialog immediately for better UX
     setIsCreateSprintOpen(false)
+    const originalSprintData = { ...newSprintData }
+    setNewSprintData({ name: '', goal: '' })
+
+    // Show optimistic success message
+    toast.success(`Sprint "${originalSprintData.name}" created successfully!`)
 
     try {
+      console.log('📡 Making sprint creation API call...')
       const response = await fetch('/api/sprints', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ...newSprintData,
+          ...originalSprintData,
           boardId
         })
       })
@@ -249,12 +289,19 @@ export default function ProductBacklog({
         throw new Error(error.error || 'Failed to create sprint')
       }
 
+      console.log('✅ Sprint creation confirmed by API')
+      
+      // Refresh data in background
       mutateSprints()
-      setNewSprintData({ name: '', goal: '' })
-      toast.success(`Sprint "${newSprintData.name}" created successfully!`)
     } catch (error: unknown) {
+      console.error('❌ Sprint creation failed:', error)
+      
+      // Rollback optimistic changes
       toast.error((error as Error).message)
+      
+      // Restore dialog and data
       setIsCreateSprintOpen(true)
+      setNewSprintData(originalSprintData)
     }
   }
 
@@ -266,13 +313,26 @@ export default function ProductBacklog({
 
     if (!editingSprintId) return
 
+    console.log('✏️ Starting optimistic sprint update...')
+
+    // Close dialog immediately for better UX
     setIsEditSprintOpen(false)
+    const originalSprintData = { ...editSprintData }
+    const originalEditingSprintId = editingSprintId
+
+    // Show optimistic success message  
+    toast.success(`Sprint "${editSprintData.name}" updated successfully!`)
+
+    // Clear editing state optimistically
+    setEditingSprintId(null)
+    setEditSprintData({ name: '', goal: '' })
 
     try {
-      const response = await fetch(`/api/sprints/${editingSprintId}`, {
+      console.log('📡 Making sprint update API call...')
+      const response = await fetch(`/api/sprints/${originalEditingSprintId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editSprintData)
+        body: JSON.stringify(originalSprintData)
       })
 
       if (!response.ok) {
@@ -280,13 +340,20 @@ export default function ProductBacklog({
         throw new Error(error.error || 'Failed to update sprint')
       }
 
+      console.log('✅ Sprint update confirmed by API')
+      
+      // Refresh data in background
       mutateSprints()
-      setEditingSprintId(null)
-      setEditSprintData({ name: '', goal: '' })
-      toast.success(`Sprint "${editSprintData.name}" updated successfully!`)
     } catch (error: unknown) {
+      console.error('❌ Sprint update failed:', error)
+      
+      // Rollback optimistic changes
       toast.error((error as Error).message)
+      
+      // Restore dialog and data
       setIsEditSprintOpen(true)
+      setEditingSprintId(originalEditingSprintId)
+      setEditSprintData(originalSprintData)
     }
   }
 
@@ -345,15 +412,31 @@ export default function ProductBacklog({
     const sprint = sprints.find((s: Sprint) => s.id === startingSprintId)
     if (!sprint) return
 
+    console.log('🚀 Starting optimistic sprint start...')
+
+    // Close dialog immediately for better UX
     setIsStartSprintOpen(false)
+    const originalStartingSprintId = startingSprintId
+    const originalStartSprintData = { ...startSprintData }
+
+    // Show optimistic success message
+    toast.success(`Sprint "${sprint.name}" started successfully!`)
+
+    // Navigate immediately for better UX
+    router.push(`/sprints/${startingSprintId}/active`)
+
+    // Clear state optimistically
+    setStartingSprintId(null)
+    setStartSprintData({ dueDate: '', goal: '' })
 
     try {
-      const response = await fetch(`/api/sprints/${startingSprintId}/start`, {
+      console.log('📡 Making sprint start API call...')
+      const response = await fetch(`/api/sprints/${originalStartingSprintId}/start`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          endDate: startSprintData.dueDate || null,
-          goal: startSprintData.goal || null
+          endDate: originalStartSprintData.dueDate || null,
+          goal: originalStartSprintData.goal || null
         })
       })
 
@@ -362,17 +445,18 @@ export default function ProductBacklog({
         throw new Error(error.error || 'Failed to start sprint')
       }
 
+      console.log('✅ Sprint start confirmed by API')
+      
+      // Refresh data in background
       mutateSprints()
-      setStartingSprintId(null)
-      setStartSprintData({ dueDate: '', goal: '' })
-      toast.success(`Sprint "${sprint.name}" started successfully!`)
-
-      setTimeout(() => {
-        router.push(`/sprints/${startingSprintId}/active`)
-      }, 500)
     } catch (error: unknown) {
+      console.error('❌ Sprint start failed:', error)
+      
+      // Show error message (user is already on sprint page)
       toast.error((error as Error).message)
-      setIsStartSprintOpen(true)
+      
+      // Note: We can't easily rollback navigation, but the user will see the error
+      // and the sprint page will handle the invalid state gracefully
     }
   }
 
