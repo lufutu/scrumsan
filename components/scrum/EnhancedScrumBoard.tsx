@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useSupabase } from '@/providers/supabase-provider'
 import { toast } from 'sonner'
 import { useLabels } from '@/hooks/useLabels'
@@ -31,13 +31,10 @@ import {
 import { TaskCardModern } from '@/components/scrum/TaskCardModern'
 import { ItemModal } from '@/components/scrum/ItemModal'
 import { ComprehensiveInlineForm } from '@/components/scrum/ComprehensiveInlineForm'
-import {
-  DragDropContext,
-  Droppable,
-  Draggable,
-  DropResult,
-  DragStart,
-} from '@hello-pangea/dnd'
+import { DragDropProvider } from '@/components/drag-drop/DragDropProvider'
+import { DragDropAPI } from '@/lib/drag-drop-api'
+import { dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter'
+import { DragDataTypes } from '@/lib/optimistic-drag-drop'
 import { cn } from '@/lib/utils'
 
 import { Task, Sprint, BoardColumn } from '@/types/shared';
@@ -48,31 +45,52 @@ interface EnhancedScrumBoardProps {
   organizationId?: string
 }
 
-const DroppableArea = ({ 
+const PragmaticDropZone = ({ 
   id, 
   children, 
-  className 
+  className,
+  onDrop
 }: { 
   id: string
   children: React.ReactNode
-  className?: string 
+  className?: string
+  onDrop?: (taskId: string) => void
 }) => {
+  const [isDraggedOver, setIsDraggedOver] = useState(false)
+  const dropRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const element = dropRef.current
+    if (!element) return
+
+    return dropTargetForElements({
+      element,
+      canDrop: ({ source }) => DragDataTypes.isTask(source.data),
+      getData: () => ({
+        type: id === 'backlog' ? 'backlog' : 'column',
+        columnId: id
+      }),
+      onDragEnter: () => setIsDraggedOver(true),
+      onDragLeave: () => setIsDraggedOver(false),
+      onDrop: ({ source }) => {
+        setIsDraggedOver(false)
+        if (DragDataTypes.isTask(source.data) && onDrop) {
+          onDrop(source.data.taskId)
+        }
+      }
+    })
+  }, [id, onDrop])
+
   return (
-    <Droppable droppableId={id}>
-      {(provided, snapshot) => (
-        <div 
-          ref={provided.innerRef}
-          {...provided.droppableProps}
-          className={cn(
-            className,
-            snapshot.isDraggingOver && "bg-blue-50 border-blue-300"
-          )}
-        >
-          {children}
-          {provided.placeholder}
-        </div>
+    <div 
+      ref={dropRef}
+      className={cn(
+        className,
+        isDraggedOver && "bg-blue-50 border-blue-300"
       )}
-    </Droppable>
+    >
+      {children}
+    </div>
   )
 }
 
@@ -238,159 +256,85 @@ export default function EnhancedScrumBoard({
     }
   }
 
-  // Drag and drop handlers
-  const handleDragStart = (start: DragStart) => {
-    setActiveId(start.draggableId)
+  // Drag and drop handlers for Pragmatic D&D
+  const handleTaskMove = useCallback(async (
+    taskId: string,
+    targetLocation: { columnId?: string | null }
+  ) => {
+    const draggedTask = backlogTasks.find(t => t.id === taskId) ||
+                       sprintColumns.flatMap(col => col.tasks).find(t => t.id === taskId)
     
-    // Find the dragged task
-    const task = backlogTasks.find(t => t.id === start.draggableId) ||
-                sprintColumns.flatMap(col => col.tasks).find(t => t.id === start.draggableId)
-    setDraggedTask(task || null)
-  }
-
-  const handleDragEnd = async (result: DropResult) => {
-    const { destination, draggableId } = result
-    setActiveId(null)
-    setDraggedTask(null)
-
-    if (!destination || !draggedTask) return
-
-    const overId = destination.droppableId
-
-    // Store original state for rollback on error
-    const originalBacklogTasks = [...backlogTasks]
-    const originalSprintColumns = sprintColumns.map(col => ({ ...col, tasks: [...col.tasks] }))
+    if (!draggedTask) {
+      toast.error('Task not found')
+      return
+    }
 
     try {
-      // If dropping on backlog
-      if (overId === 'backlog') {
+      if (targetLocation.columnId === 'backlog') {
+        // Moving to backlog
         if (activeSprint && draggedTask.sprintColumnId) {
-          // OPTIMISTIC UPDATE: Immediately move task to backlog
-          const updatedTask = { 
-            ...draggedTask, 
-            sprintColumnId: null, 
-            sprintId: null 
-          }
-          
-          // Remove from sprint column
-          const updatedSprintColumns = sprintColumns.map(col => ({
-            ...col,
-            tasks: col.tasks.filter(task => task.id !== draggedTask.id)
-          }))
-          
-          // Add to backlog
-          const updatedBacklogTasks = [...backlogTasks, updatedTask]
-          
-          // Update UI immediately
-          setSprintColumns(updatedSprintColumns)
-          setBacklogTasks(updatedBacklogTasks)
-
-          // Make API call in background
-          fetch(`/api/sprints/${activeSprint.id}/tasks/${draggedTask.id}`, {
-            method: 'DELETE'
-          })
-          .then(response => {
-            if (!response.ok) throw new Error('Failed to move task to backlog')
-            toast.success('Task moved to backlog')
-          })
-          .catch(error => {
-            // Rollback on error
-            setSprintColumns(originalSprintColumns)
-            setBacklogTasks(originalBacklogTasks)
-            toast.error(error instanceof Error ? error.message : 'Failed to move task to backlog')
-          })
-        }
-        return
-      }
-
-      // If dropping on a sprint column
-      const targetColumn = sprintColumns.find(col => col.id === overId)
-      if (targetColumn && activeSprint) {
-        // OPTIMISTIC UPDATE: Immediately move task to target column
-        const updatedTask = { 
-          ...draggedTask, 
-          sprintColumnId: overId, 
-          sprintId: activeSprint.id 
-        }
-
-        let updatedBacklogTasks = backlogTasks
-        let updatedSprintColumns = [...sprintColumns]
-
-        // Remove from backlog if it was there
-        if (!draggedTask.sprintColumnId) {
-          updatedBacklogTasks = backlogTasks.filter(task => task.id !== draggedTask.id)
-        } else {
-          // Remove from current sprint column
-          updatedSprintColumns = updatedSprintColumns.map(col => ({
-            ...col,
-            tasks: col.tasks.filter(task => task.id !== draggedTask.id)
-          }))
-        }
-
-        // Add to target column
-        updatedSprintColumns = updatedSprintColumns.map(col => {
-          if (col.id === overId) {
-            return {
-              ...col,
-              tasks: [...col.tasks, updatedTask]
+          await DragDropAPI.moveTask(
+            'to-backlog',
+            { taskId, sourceSprintId: activeSprint.id },
+            () => {
+              // Success - refresh data
+              fetchData()
+            },
+            (error) => {
+              console.error('Failed to move task to backlog:', error)
             }
-          }
-          return col
-        })
-
-        // Update UI immediately
-        setBacklogTasks(updatedBacklogTasks)
-        setSprintColumns(updatedSprintColumns)
-
-        // Make API calls in background
-        const apiCalls = []
-
-        // Add to sprint if not already in it
-        if (!draggedTask.sprintColumnId) {
-          apiCalls.push(
-            fetch(`/api/sprints/${activeSprint.id}/tasks`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ taskId: draggedTask.id })
-            })
           )
         }
-
-        // Move to target column
-        apiCalls.push(
-          fetch(`/api/sprints/${activeSprint.id}/tasks/move`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              taskId: draggableId,
-              targetColumnId: overId
-            })
-          })
-        )
-
-        Promise.all(apiCalls)
-          .then(responses => {
-            // Check if all responses are ok
-            const failedResponse = responses.find(response => !response.ok)
-            if (failedResponse) {
-              throw new Error('Failed to move task')
+      } else if (targetLocation.columnId && activeSprint) {
+        // Moving to a sprint column
+        if (!draggedTask.sprintColumnId) {
+          // From backlog to sprint column - need to add to sprint first
+          await DragDropAPI.moveTask(
+            'to-sprint',
+            { taskId, targetSprintId: activeSprint.id },
+            async () => {
+              // Then move to specific column
+              await DragDropAPI.moveTask(
+                'to-column',
+                { taskId, sprintId: activeSprint.id, columnId: targetLocation.columnId },
+                () => {
+                  fetchData()
+                },
+                (error) => {
+                  console.error('Failed to move task to column:', error)
+                }
+              )
+            },
+            (error) => {
+              console.error('Failed to add task to sprint:', error)
             }
-            toast.success('Task moved successfully')
-          })
-          .catch(error => {
-            // Rollback on error
-            setBacklogTasks(originalBacklogTasks)
-            setSprintColumns(originalSprintColumns)
-            toast.error(error instanceof Error ? error.message : 'Failed to move task')
-          })
+          )
+        } else {
+          // Moving between sprint columns
+          await DragDropAPI.moveTask(
+            'to-column',
+            { taskId, sprintId: activeSprint.id, columnId: targetLocation.columnId },
+            () => {
+              fetchData()
+            },
+            (error) => {
+              console.error('Failed to move task between columns:', error)
+            }
+          )
+        }
       }
-    } catch (error: unknown) {
-      // Rollback on immediate error
-      setBacklogTasks(originalBacklogTasks)
-      setSprintColumns(originalSprintColumns)
-      toast.error(error instanceof Error ? error.message : 'Failed to move task')
+    } catch (error) {
+      console.error('Task move operation failed:', error)
     }
-  }
+  }, [backlogTasks, sprintColumns, activeSprint, fetchData])
+
+  // Handler for drop zones
+  const handleDrop = useCallback((columnId: string) => {
+    return (taskId: string) => {
+      handleTaskMove(taskId, { columnId })
+    }
+  }, [handleTaskMove])
+
 
   // Create task
   const handleCreateTask = async (data: any, targetArea: 'backlog' | string) => {
@@ -448,8 +392,14 @@ export default function EnhancedScrumBoard({
 
   const stats = getSprintStats()
 
+  // Get all tasks for DragDropProvider
+  const allTasks = [...backlogTasks, ...sprintColumns.flatMap(col => col.tasks)]
+
   return (
-    <DragDropContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+    <DragDropProvider 
+      initialTasks={allTasks}
+      onTaskMove={handleTaskMove}
+    >
       <div className="h-full flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
@@ -595,7 +545,7 @@ export default function EnhancedScrumBoard({
                 </CardTitle>
               </CardHeader>
               <CardContent className="h-full">
-                <DroppableArea id="backlog" className="h-full">
+                <PragmaticDropZone id="backlog" className="h-full" onDrop={handleDrop('backlog')}>
                   <div className="space-y-3">
                     {/* Add Task Form */}
                     <ComprehensiveInlineForm
@@ -612,20 +562,10 @@ export default function EnhancedScrumBoard({
                     
                     {/* Backlog Tasks */}
                     {filteredBacklogTasks.map((task, index) => (
-                      <Draggable key={task.id} draggableId={task.id} index={index}>
-                        {(provided, snapshot) => (
-                          <div
-                            ref={provided.innerRef}
-                            {...provided.draggableProps}
-                            {...provided.dragHandleProps}
-                            className="p-3 bg-white border rounded-lg hover:shadow-sm cursor-move"
-                            style={{
-                              ...provided.draggableProps.style,
-                              opacity: snapshot.isDragging ? 0.5 : 1,
-                            }}
-                          >
+                      <div key={task.id} className="p-3 bg-white border rounded-lg hover:shadow-sm">
                         <TaskCardModern
                           id={task.id}
+                          itemCode={task.itemCode}
                           title={task.title}
                           description={task.description || ''}
                           taskType={task.taskType as any}
@@ -647,9 +587,7 @@ export default function EnhancedScrumBoard({
                             // Trigger refetch if needed
                           }}
                         />
-                          </div>
-                        )}
-                      </Draggable>
+                      </div>
                     ))}
                     
                     {filteredBacklogTasks.length === 0 && (
@@ -660,7 +598,7 @@ export default function EnhancedScrumBoard({
                       </div>
                     )}
                   </div>
-                </DroppableArea>
+                </PragmaticDropZone>
               </CardContent>
             </Card>
           </div>
@@ -679,31 +617,21 @@ export default function EnhancedScrumBoard({
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="h-full">
-                      <DroppableArea id={column.id} className="h-full">
+                      <PragmaticDropZone id={column.id} className="h-full" onDrop={handleDrop(column.id)}>
                         <div className="space-y-3">
                           {/* Column Tasks */}
                           {column.tasks.map((task, index) => (
-                            <Draggable key={task.id} draggableId={task.id} index={index}>
-                              {(provided, snapshot) => (
-                                <div
-                                  ref={provided.innerRef}
-                                  {...provided.draggableProps}
-                                  {...provided.dragHandleProps}
-                                  className="cursor-move"
-                                  style={{
-                                    ...provided.draggableProps.style,
-                                    opacity: snapshot.isDragging ? 0.5 : 1,
-                                  }}
-                                >
-                              <TaskCardModern
-                                id={task.id}
-                                title={task.title}
-                                description={task.description || ''}
-                                taskType={task.taskType as any}
-                                storyPoints={task.storyPoints || 0}
-                                assignees={task.taskAssignees?.map((ta: any) => ({
-                                  id: ta.user.id,
-                                  name: ta.user.fullName || ta.user.email || 'Unknown User',
+                            <TaskCardModern
+                              key={task.id}
+                              id={task.id}
+                              itemCode={task.itemCode}
+                              title={task.title}
+                              description={task.description || ''}
+                              taskType={task.taskType as any}
+                              storyPoints={task.storyPoints || 0}
+                              assignees={task.taskAssignees?.map((ta: any) => ({
+                                id: ta.user.id,
+                                name: ta.user.fullName || ta.user.email || 'Unknown User',
                                   avatar: ta.user.avatarUrl || undefined,
                                   initials: ta.user.fullName?.split(' ').map((n: string) => n[0]).join('') || 'U'
                                 })) || []}
@@ -713,14 +641,13 @@ export default function EnhancedScrumBoard({
                                   name: tl.label.name,
                                   color: tl.label.color
                                 })) || []}
-                                onClick={() => setSelectedTask(task)}
-                                onAssigneesChange={() => {
-                                  // Trigger refetch if needed
-                                }}
-                              />
-                                </div>
-                              )}
-                            </Draggable>
+                              onClick={() => setSelectedTask(task)}
+                              onAssigneesChange={() => {
+                                // Trigger refetch if needed
+                              }}
+                              sprintId={activeSprint?.id}
+                              sprintColumnId={column.id}
+                            />
                           ))}
                           
                           {/* Add Task in Column */}
@@ -740,7 +667,7 @@ export default function EnhancedScrumBoard({
                             </div>
                           )}
                         </div>
-                      </DroppableArea>
+                      </PragmaticDropZone>
                     </CardContent>
                     </Card>
                   ))}
@@ -775,6 +702,7 @@ export default function EnhancedScrumBoard({
           }}
         />
       )}
-    </DragDropContext>
+      </div>
+    </DragDropProvider>
   )
 }
