@@ -83,9 +83,12 @@ export default function ProductBacklog({
   }) => {
     const { taskId, targetSprintId, originalTask } = params
     
+    console.log('🚀 API Sync called with:', { taskId, targetSprintId, originalTask: originalTask.title })
+    
     try {
       if (targetSprintId === null) {
         // Moving to backlog
+        console.log('📤 Moving to backlog from sprint:', originalTask.sprintId)
         if (originalTask.sprintId) {
           const response = await fetch(`/api/sprints/${originalTask.sprintId}/tasks/move-to-backlog`, {
             method: 'POST',
@@ -95,12 +98,18 @@ export default function ProductBacklog({
               position: 0
             })
           })
+          
+          console.log('📤 Backlog move response status:', response.status)
           if (!response.ok) {
-            throw new Error('Failed to move task to backlog')
+            const errorData = await response.text()
+            console.error('📤 Backlog move failed:', errorData)
+            throw new Error(`Failed to move task to backlog: ${response.status} ${errorData}`)
           }
+          console.log('✅ Successfully moved task to backlog')
         }
       } else {
         // Moving to sprint
+        console.log('📥 Moving to sprint:', targetSprintId)
         const response = await fetch(`/api/sprints/${targetSprintId}/tasks`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -108,17 +117,21 @@ export default function ProductBacklog({
             taskId
           })
         })
+        
+        console.log('📥 Sprint move response status:', response.status)
         if (!response.ok) {
-          throw new Error('Failed to move task to sprint')
+          const errorData = await response.text()
+          console.error('📥 Sprint move failed:', errorData)
+          throw new Error(`Failed to move task to sprint: ${response.status} ${errorData}`)
         }
+        console.log('✅ Successfully moved task to sprint')
       }
       
-      // Refresh data after successful API call
-      if (onDataChange) {
-        onDataChange()
-      }
+      // Don't refresh immediately - let optimistic state persist for smoother UX
+      // React Query will naturally refresh in background
+      console.log('🎉 API sync completed successfully - keeping optimistic state')
     } catch (error) {
-      console.error('Failed to sync task move:', error)
+      console.error('❌ Failed to sync task move:', error)
       throw error
     }
   }, [onDataChange])

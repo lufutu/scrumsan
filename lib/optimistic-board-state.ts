@@ -27,13 +27,13 @@ export interface OptimisticBoardState {
   draggedTaskId: string | null
   
   // Actions
-  moveTaskImmediate: (taskId: string, targetSprintId: string | null, targetColumnId: string | null) => void
-  commitMove: (onSuccess?: () => void, onError?: (error: Error) => void) => Promise<void>
+  moveTaskImmediate: (taskId: string, targetSprintId: string | null, targetColumnId: string | null) => MoveOperation | null
+  commitMove: (operation: MoveOperation, onSuccess?: () => void, onError?: (error: Error) => void) => Promise<void>
   rollbackMove: () => void
   clearDragState: () => void
 }
 
-interface MoveOperation {
+export interface MoveOperation {
   taskId: string
   originalTask: Task
   targetSprintId: string | null
@@ -59,11 +59,18 @@ export function useOptimisticBoardState(
   const [originalTasks, setOriginalTasks] = useState<Task[]>(initialTasks)
   
   // Update state when external data changes (from React Query, etc)
+  // But only if we're not in the middle of a drag operation
   useEffect(() => {
     if (!isDragging && !pendingOperation) {
+      console.log('🔄 Updating optimistic state with fresh data from React Query')
       setTasks(initialTasks)
       setSprints(initialSprints)
       setOriginalTasks(initialTasks)
+    } else {
+      console.log('⏸️ Skipping React Query update - drag operation in progress', {
+        isDragging,
+        hasPendingOperation: !!pendingOperation
+      })
     }
   }, [initialTasks, initialSprints, isDragging, pendingOperation])
   
@@ -73,22 +80,30 @@ export function useOptimisticBoardState(
     targetSprintId: string | null, 
     targetColumnId: string | null
   ) => {
+    console.log('🎯 moveTaskImmediate called:', { taskId, targetSprintId, targetColumnId })
+    
     const originalTask = tasks.find(t => t.id === taskId)
     if (!originalTask) {
-      console.warn('Task not found for immediate move:', taskId)
-      return
+      console.warn('❌ Task not found for immediate move:', taskId)
+      return null
     }
     
-    // Store the operation for later API sync
-    setPendingOperation({
+    console.log('📝 Found original task:', { title: originalTask.title, currentSprintId: originalTask.sprintId })
+    
+    // Create the operation for immediate return and later API sync
+    const moveOperation: MoveOperation = {
       taskId,
       originalTask: { ...originalTask },
       targetSprintId,
       targetColumnId
-    })
+    }
+    
+    console.log('💾 Creating operation:', moveOperation)
+    setPendingOperation(moveOperation)
     
     setIsDragging(true)
     setDraggedTaskId(taskId)
+    console.log('🔄 Set drag state - isDragging: true, draggedTaskId:', taskId)
     
     // Determine the final sprintColumnId for optimistic update
     let finalSprintColumnId = targetColumnId
@@ -121,23 +136,41 @@ export function useOptimisticBoardState(
         : task
     ))
     
+    console.log('✅ moveTaskImmediate completed - returning operation for commitMove')
+    return moveOperation
+    
   }, [tasks, sprints])
   
   // Commit the move via API
   const commitMove = useCallback(async (
+    operation: MoveOperation,
     onSuccess?: () => void,
     onError?: (error: Error) => void
   ) => {
-    if (!pendingOperation || !onApiSync) {
+    console.log('🔄 commitMove called with operation:', { 
+      taskId: operation.taskId,
+      targetSprintId: operation.targetSprintId,
+      originalTaskTitle: operation.originalTask.title,
+      hasOnApiSync: !!onApiSync
+    })
+    
+    if (!onApiSync) {
+      console.log('❌ commitMove exiting early - missing onApiSync')
       setIsDragging(false)
       setDraggedTaskId(null)
       setPendingOperation(null)
       return
     }
     
+    console.log('🚀 commitMove proceeding with API sync...')
+    
     try {
+      console.log('📡 Calling onApiSync with operation:', operation)
+      
       // Call the API sync function
-      await onApiSync(pendingOperation)
+      await onApiSync(operation)
+      
+      console.log('✅ onApiSync completed successfully')
       
       // Success - update original tasks to current state
       setOriginalTasks([...tasks])
@@ -147,7 +180,7 @@ export function useOptimisticBoardState(
       // toast.success('Task moved successfully')
       
     } catch (error) {
-      console.error('Failed to sync move operation:', error)
+      console.error('❌ Failed to sync move operation:', error)
       
       // Rollback to original state
       setTasks([...originalTasks])
@@ -156,12 +189,13 @@ export function useOptimisticBoardState(
       toast.error('Failed to move task. Reverted changes.')
       
     } finally {
+      console.log('🏁 commitMove finalizing - clearing drag state')
       // Clear drag state
       setIsDragging(false)
       setDraggedTaskId(null)
       setPendingOperation(null)
     }
-  }, [pendingOperation, onApiSync, tasks, originalTasks])
+  }, [onApiSync, tasks, originalTasks])
   
   // Rollback move without API call
   const rollbackMove = useCallback(() => {

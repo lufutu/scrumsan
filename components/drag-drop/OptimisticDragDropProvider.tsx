@@ -80,7 +80,10 @@ export function OptimisticDragDropProvider({
         },
         
         onDrop: ({ source, location }) => {
+          console.log('🎯 Drop event detected:', { source: source.data, location: location.current.dropTargets })
+          
           if (!isDragDataTask(source.data)) {
+            console.log('❌ Invalid drag data - not a task:', source.data)
             boardState.clearDragState()
             return
           }
@@ -95,7 +98,7 @@ export function OptimisticDragDropProvider({
           const taskId = source.data.taskId
           const targetData = dropTarget.data
 
-          console.log('🎯 Processing drop:', { taskId, targetData })
+          console.log('🎯 Processing drop:', { taskId, targetData, taskTitle: source.data.taskTitle || 'N/A' })
 
           // Determine target location based on drop target type
           let targetSprintId: string | null = null
@@ -119,18 +122,32 @@ export function OptimisticDragDropProvider({
             return
           }
 
-          // STEP 1: Immediate UI update (no API call)
-          boardState.moveTaskImmediate(taskId, targetSprintId, targetColumnId)
+          console.log('📋 Final drop targets:', { taskId, targetSprintId, targetColumnId })
+
+          // STEP 1: Immediate UI update (optimistic)
+          console.log('🎯 STEP 1: Calling moveTaskImmediate...')
+          const operation = boardState.moveTaskImmediate(taskId, targetSprintId, targetColumnId)
+          console.log('✅ STEP 1: moveTaskImmediate completed, returned operation:', operation)
           
-          // STEP 2: Background API sync (non-blocking)
+          if (!operation) {
+            console.log('❌ No operation returned from moveTaskImmediate, aborting')
+            return
+          }
+          
+          // STEP 2: Background API sync with controlled refresh timing
+          console.log('🎯 STEP 2: Calling commitMove with operation...')
           boardState.commitMove(
+            operation,
             () => {
-              console.log('✅ Move synced successfully')
+              console.log('✅ Move synced successfully - SUCCESS CALLBACK')
+              // Don't call onDataChange here - let the optimistic state persist
+              // until React Query naturally refreshes
             },
             (error) => {
-              console.error('❌ Move sync failed:', error)
+              console.error('❌ Move sync failed - ERROR CALLBACK:', error)
             }
           )
+          console.log('✅ STEP 2: commitMove called (async operation started)')
         }
       })
       
