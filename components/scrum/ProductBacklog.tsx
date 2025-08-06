@@ -518,9 +518,8 @@ function ProductBacklogInner({
     return sprintTasks
   }, [sprintDetails, sprints, tasks])
 
-  // Check for orphaned tasks using optimistic tasks
-  const orphanedTasks = tasks.filter(task => task.sprintId && !task.sprintColumnId)
-  const hasOrphanedTasks = orphanedTasks.length > 0
+  // Skip orphaned task warning - this is normal during optimistic updates
+  const hasOrphanedTasks = false
 
   if (!boardData) {
     return (

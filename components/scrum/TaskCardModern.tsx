@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { draggable } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import { DraggableCard } from '@/components/drag-drop/DragAnimations';
 import { DragPreview, DragPreviewContent } from '@/components/drag-drop/DragPreview';
+import { useOptimisticDragDrop } from '@/components/drag-drop/OptimisticDragDropProvider';
 import {
   Paperclip,
   MessageCircle,
@@ -126,9 +127,10 @@ export function TaskCardModern({
   // Ref to track previous assignees to prevent infinite re-renders
   const prevAssigneesRef = useRef<string>('');
   
-  // Drag and drop ref and drag state
+  // Drag and drop ref and global drag state
   const dragRef = useRef<HTMLDivElement>(null);
   const [isDragState, setIsDragState] = useState(false);
+  const { isDragging: globalIsDragging, draggedTaskId } = useOptimisticDragDrop();
 
   // Sync local state with prop changes (e.g., after refresh)
   useEffect(() => {
@@ -690,7 +692,7 @@ export function TaskCardModern({
   return (
     <>
       <DragPreview 
-        isDragging={isDragState} 
+        isDragging={globalIsDragging && draggedTaskId === id} 
         dragData={{ 
           taskId: id, 
           title, 
