@@ -127,9 +127,12 @@ export default function ProductBacklog({
         console.log('✅ Successfully moved task to sprint')
       }
       
-      // Don't refresh immediately - let optimistic state persist for smoother UX
-      // React Query will naturally refresh in background
-      console.log('🎉 API sync completed successfully - keeping optimistic state')
+      // Refresh data after successful API call
+      if (onDataChange) {
+        console.log('🔄 Refreshing board data...')
+        onDataChange()
+      }
+      console.log('🎉 API sync completed successfully')
     } catch (error) {
       console.error('❌ Failed to sync task move:', error)
       throw error

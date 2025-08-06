@@ -124,30 +124,32 @@ export function OptimisticDragDropProvider({
 
           console.log('📋 Final drop targets:', { taskId, targetSprintId, targetColumnId })
 
-          // STEP 1: Immediate UI update (optimistic)
-          console.log('🎯 STEP 1: Calling moveTaskImmediate...')
-          const operation = boardState.moveTaskImmediate(taskId, targetSprintId, targetColumnId)
-          console.log('✅ STEP 1: moveTaskImmediate completed, returned operation:', operation)
+          // Simple approach: Just make the API call directly
+          console.log('🎯 Making direct API call...')
           
-          if (!operation) {
-            console.log('❌ No operation returned from moveTaskImmediate, aborting')
+          const originalTask = boardState.tasks.find(t => t.id === taskId)
+          if (!originalTask) {
+            console.log('❌ Original task not found, aborting')
             return
           }
           
-          // STEP 2: Background API sync with controlled refresh timing
-          console.log('🎯 STEP 2: Calling commitMove with operation...')
+          const operation = {
+            taskId,
+            originalTask,
+            targetSprintId,
+            targetColumnId
+          }
+          
+          // Direct API call without optimistic updates
           boardState.commitMove(
             operation,
             () => {
-              console.log('✅ Move synced successfully - SUCCESS CALLBACK')
-              // Don't call onDataChange here - let the optimistic state persist
-              // until React Query naturally refreshes
+              console.log('✅ Move synced successfully')
             },
             (error) => {
-              console.error('❌ Move sync failed - ERROR CALLBACK:', error)
+              console.error('❌ Move sync failed:', error)
             }
           )
-          console.log('✅ STEP 2: commitMove called (async operation started)')
         }
       })
       

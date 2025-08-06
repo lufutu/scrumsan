@@ -59,20 +59,11 @@ export function useOptimisticBoardState(
   const [originalTasks, setOriginalTasks] = useState<Task[]>(initialTasks)
   
   // Update state when external data changes (from React Query, etc)
-  // But only if we're not in the middle of a drag operation
   useEffect(() => {
-    if (!isDragging && !pendingOperation) {
-      console.log('🔄 Updating optimistic state with fresh data from React Query')
-      setTasks(initialTasks)
-      setSprints(initialSprints)
-      setOriginalTasks(initialTasks)
-    } else {
-      console.log('⏸️ Skipping React Query update - drag operation in progress', {
-        isDragging,
-        hasPendingOperation: !!pendingOperation
-      })
-    }
-  }, [initialTasks, initialSprints, isDragging, pendingOperation])
+    setTasks(initialTasks)
+    setSprints(initialSprints)
+    setOriginalTasks(initialTasks)
+  }, [initialTasks, initialSprints])
   
   // Immediate move operation (no API calls)
   const moveTaskImmediate = useCallback((
