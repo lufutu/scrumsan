@@ -35,13 +35,9 @@ import { useSupabase } from '@/providers/supabase-provider'
 import { useOrganization } from '@/providers/organization-provider'
 import { Task } from '@/types/shared'
 import { toast } from 'sonner'
-import {
-  DragDropContext,
-  Droppable,
-  Draggable,
-  DropResult,
-  DragStart,
-} from '@hello-pangea/dnd'
+// Removed @hello-pangea/dnd imports - migrated to Pragmatic D&D
+import { DragDropProvider } from '@/components/drag-drop/DragDropProvider'
+import { DragDropAPI } from '@/lib/drag-drop-api'
 
 type Board = {
   id: string

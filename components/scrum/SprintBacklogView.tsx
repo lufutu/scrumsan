@@ -721,9 +721,7 @@ export default function SprintBacklogView({
     toast.success(`${column.name} exported as ${format.toUpperCase()}`)
   }
 
-  // Drag state management - simplified for Pragmatic D&D
-  const [activeId, setActiveId] = useState<string | null>(null)
-  const [isDragging, setIsDragging] = useState(false)
+  // Drag state management - simplified for Pragmatic D&D (activeId already declared above)
 
 
   const SprintBoard = useMemo(() => (

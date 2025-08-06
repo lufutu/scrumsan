@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { DropIndicator as AtlaskitDropIndicator } from '@atlaskit/pragmatic-drag-and-drop-react-drop-indicator'
+// Note: Using custom drop indicator instead of Atlassian's component
 import { cn } from '@/lib/utils'
 
 interface DropIndicatorProps {

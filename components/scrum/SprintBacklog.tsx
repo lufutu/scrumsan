@@ -30,13 +30,8 @@ import {
   BarChart3,
   TrendingDown
 } from 'lucide-react'
-import {
-  DragDropContext,
-  Droppable,
-  Draggable,
-  DropResult,
-  DragStart,
-} from '@hello-pangea/dnd'
+// Removed @hello-pangea/dnd imports - migrated to Pragmatic D&D
+// Note: This component might need migration to Pragmatic D&D if still in use
 import {
   DropdownMenu,
   DropdownMenuContent,

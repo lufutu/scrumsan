@@ -702,7 +702,6 @@ export default function EnhancedScrumBoard({
           }}
         />
       )}
-      </div>
     </DragDropProvider>
   )
 }
