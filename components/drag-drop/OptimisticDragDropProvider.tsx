@@ -124,23 +124,17 @@ export function OptimisticDragDropProvider({
 
           console.log('📋 Final drop targets:', { taskId, targetSprintId, targetColumnId })
 
-          // Simple approach: Just make the API call directly
-          console.log('🎯 Making direct API call...')
+          // STEP 1: Immediate UI update (optimistic)
+          console.log('🎯 STEP 1: Immediate optimistic update...')
+          const operation = boardState.moveTaskImmediate(taskId, targetSprintId, targetColumnId)
           
-          const originalTask = boardState.tasks.find(t => t.id === taskId)
-          if (!originalTask) {
-            console.log('❌ Original task not found, aborting')
+          if (!operation) {
+            console.log('❌ No operation returned, aborting')
             return
           }
           
-          const operation = {
-            taskId,
-            originalTask,
-            targetSprintId,
-            targetColumnId
-          }
-          
-          // Direct API call without optimistic updates
+          // STEP 2: Background API sync
+          console.log('🎯 STEP 2: Background API sync...')
           boardState.commitMove(
             operation,
             () => {
