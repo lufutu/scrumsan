@@ -90,19 +90,38 @@ export function useOptimisticBoardState(
     setIsDragging(true)
     setDraggedTaskId(taskId)
     
+    // Determine the final sprintColumnId for optimistic update
+    let finalSprintColumnId = targetColumnId
+    
+    // If moving to a sprint but no specific column provided
+    if (targetSprintId && targetColumnId === null) {
+      // Find the target sprint to check if it's backlog
+      const targetSprint = sprints.find(s => s.id === targetSprintId)
+      
+      if (targetSprint && !targetSprint.isBacklog) {
+        // For regular sprints, assign to first column for optimistic UI
+        // API will handle the actual assignment, but we show immediate feedback
+        const firstColumn = targetSprint.sprintColumns?.[0]
+        if (firstColumn) {
+          finalSprintColumnId = firstColumn.id
+        }
+      }
+      // For backlog sprints, keep finalSprintColumnId as null
+    }
+    
     // Update task immediately in local state
     setTasks(prevTasks => prevTasks.map(task => 
       task.id === taskId 
         ? {
             ...task,
             sprintId: targetSprintId,
-            sprintColumnId: targetColumnId,
+            sprintColumnId: finalSprintColumnId,
             columnId: null // Clear board column when moving to sprint
           }
         : task
     ))
     
-  }, [tasks])
+  }, [tasks, sprints])
   
   // Commit the move via API
   const commitMove = useCallback(async (
