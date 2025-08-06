@@ -246,7 +246,8 @@ export async function POST(req: NextRequest) {
 
     const nextPosition = (lastSprint?.position ?? 0) + 1
 
-    // Create sprint with default columns in a transaction
+    // CRITICAL FIX: Only create columns for regular sprints, NEVER for Backlog sprints
+    // Create sprint with or without default columns based on sprint type
     const sprint = await prisma.$transaction(async (tx) => {
       // Create the sprint
       const newSprint = await tx.sprint.create({
@@ -261,28 +262,81 @@ export async function POST(req: NextRequest) {
         }
       })
 
-      // Create default columns for the sprint
-      const defaultColumns = [
-        { name: 'To Do', position: 0, isDone: false },
-        { name: 'In Progress', position: 1, isDone: false },
-        { name: 'Done', position: 2, isDone: true }
-      ]
+      // CRITICAL: Only create default columns for regular sprints
+      // Check if this is a Backlog sprint (by name or explicit flag)
+      const isBacklogSprint = newSprint.name.toLowerCase() === 'backlog' || 
+                              validatedData.isBacklog === true
 
-      await tx.sprintColumn.createMany({
-        data: defaultColumns.map(col => ({
-          ...col,
-          sprintId: newSprint.id
-        }))
-      })
+      if (!isBacklogSprint) {
+        // Create default columns only for non-Backlog sprints
+        const defaultColumns = [
+          { name: 'To Do', position: 0, isDone: false },
+          { name: 'In Progress', position: 1, isDone: false },
+          { name: 'Done', position: 2, isDone: true }
+        ]
+
+        await tx.sprintColumn.createMany({
+          data: defaultColumns.map(col => ({
+            ...col,
+            sprintId: newSprint.id
+          }))
+        })
+      }
+      // For Backlog sprints: DO NOT create any columns
 
       // Return sprint with all relationships
       return await tx.sprint.findUnique({
         where: { id: newSprint.id },
         include: {
-          board: {
+          sprintColumns: {
+            orderBy: { position: 'asc' }
+          },
+          tasks: {
             select: {
               id: true,
-              name: true
+              title: true,
+              description: true,
+              taskType: true,
+              priority: true,
+              storyPoints: true,
+              estimatedHours: true,
+              itemCode: true,
+              createdAt: true,
+              updatedAt: true,
+              position: true,
+              boardId: true,
+              sprintId: true,
+              columnId: true,
+              sprintColumnId: true,
+              board: {
+                select: {
+                  id: true,
+                  name: true,
+                  organizationId: true
+                }
+              },
+              taskAssignees: {
+                select: {
+                  user: {
+                    select: {
+                      id: true,
+                      fullName: true,
+                      avatarUrl: true
+                    }
+                  }
+                }
+              },
+              taskLabels: {
+                select: {
+                  label: {
+                    select: {
+                      id: true,
+                      color: true,
+                      name: true
+                    }
+                  }
+                }
+              }
             }
           },
           sprintColumns: {

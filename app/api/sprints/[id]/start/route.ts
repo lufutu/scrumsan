@@ -82,36 +82,41 @@ export async function POST(
       updateData.goal = body.goal
     }
     
+    // CRITICAL FIX: Only create columns for non-Backlog sprints
     // Check if sprint already has columns, if not create default ones
-    const existingColumns = await prisma.sprintColumn.findMany({
-      where: { sprintId: id }
-    })
-    
-    if (existingColumns.length === 0) {
-      // Create default sprint columns
-      await prisma.sprintColumn.createMany({
-        data: [
-          {
-            sprintId: id,
-            name: 'To Do',
-            position: 0,
-            isDone: false
-          },
-          {
-            sprintId: id,
-            name: 'In Progress',
-            position: 1,
-            isDone: false
-          },
-          {
-            sprintId: id,
-            name: 'Done',
-            position: 2,
-            isDone: true
-          }
-        ]
+    // BUT ONLY for regular sprints (Backlog sprint should NEVER have columns)
+    if (!sprint.isBacklog) {
+      const existingColumns = await prisma.sprintColumn.findMany({
+        where: { sprintId: id }
       })
+      
+      if (existingColumns.length === 0) {
+        // Create default sprint columns only for non-Backlog sprints
+        await prisma.sprintColumn.createMany({
+          data: [
+            {
+              sprintId: id,
+              name: 'To Do',
+              position: 0,
+              isDone: false
+            },
+            {
+              sprintId: id,
+              name: 'In Progress',
+              position: 1,
+              isDone: false
+            },
+            {
+              sprintId: id,
+              name: 'Done',
+              position: 2,
+              isDone: true
+            }
+          ]
+        })
+      }
     }
+    // For Backlog sprints: DO NOT create any columns
     
     // Start the sprint
     const updatedSprint = await prisma.sprint.update({
