@@ -7,13 +7,12 @@ import { ItemModal } from './ItemModal'
 import { StaticSprintColumn } from './StaticSprintColumn'
 import { SprintDialogs } from './SprintDialogs'
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area"
-import { DragDropProvider, useDragDrop } from '@/components/drag-drop/DragDropProvider'
+import { OptimisticDragDropProvider, useOptimisticDragDrop } from '@/components/drag-drop/OptimisticDragDropProvider'
 import { AutoScroll } from '@/components/drag-drop/AutoScroll'
 import { BoardTasksDebug } from '@/components/debug/BoardTasksDebug'
 
 import { useRouter } from 'next/navigation'
 import { Sprint, Task, ProductBacklogProps } from '@/types/shared'
-import { DragDropAPI } from '@/lib/drag-drop-api'
 
 interface ProductBacklogState {
   showFinishedSprints: boolean
@@ -75,6 +74,55 @@ export default function ProductBacklog({
   const users = useMemo(() => boardData?.users || [], [boardData?.users])
   const activeSprint = boardData?.activeSprint || null
 
+  // API sync function for optimistic drag-drop
+  const handleTaskMoveAPI = useCallback(async (params: {
+    taskId: string
+    targetSprintId: string | null
+    targetColumnId: string | null
+    originalTask: Task
+  }) => {
+    const { taskId, targetSprintId, originalTask } = params
+    
+    try {
+      if (targetSprintId === null) {
+        // Moving to backlog
+        if (originalTask.sprintId) {
+          const response = await fetch(`/api/sprints/${originalTask.sprintId}/tasks/move-to-backlog`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              taskId,
+              position: 0
+            })
+          })
+          if (!response.ok) {
+            throw new Error('Failed to move task to backlog')
+          }
+        }
+      } else {
+        // Moving to sprint
+        const response = await fetch(`/api/sprints/${targetSprintId}/tasks`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            taskId
+          })
+        })
+        if (!response.ok) {
+          throw new Error('Failed to move task to sprint')
+        }
+      }
+      
+      // Refresh data after successful API call
+      if (onDataChange) {
+        onDataChange()
+      }
+    } catch (error) {
+      console.error('Failed to sync task move:', error)
+      throw error
+    }
+  }, [onDataChange])
+
   // Mutation functions - simplified without React Query cache fighting
   const mutateSprints = useCallback(() => {
     if (onDataChange) onDataChange()
@@ -99,92 +147,6 @@ export default function ProductBacklog({
     })
   }, [sprints, showFinishedSprints])
 
-  // Group tasks by sprint - memoized to prevent infinite loops
-  const getTasksForSprint = useCallback((sprintId: string) => {
-    const sprint = sprintDetails.find((s: Sprint) => s.id === sprintId) || sprints.find((s: Sprint) => s.id === sprintId)
-    if (!sprint) return []
-
-    let sprintTasks: Task[] = []
-
-    // For backlog sprint, return tasks that either:
-    // 1. Have no sprintId (traditional backlog tasks) OR  
-    // 2. Have sprintId pointing to this backlog sprint (assigned to backlog sprint)
-    if (sprint.isBacklog) {
-      sprintTasks = tasks.filter((task: Task) => 
-        (
-          (!task.sprintId && !task.columnId && !task.sprintColumnId) || // Traditional backlog tasks
-          (task.sprintId === sprint.id) // Tasks assigned to backlog sprint
-        ) &&
-        !task.labels?.includes('__followup__')
-      )
-    } else {
-      // For regular sprints, return tasks from sprint relation
-      if (!sprint.tasks) return []
-      sprintTasks = sprint.tasks
-    }
-
-    return sprintTasks
-  }, [sprintDetails, sprints, tasks])
-
-  // Handle task movement with new API
-  const handleTaskMove = useCallback(async (
-    taskId: string, 
-    targetLocation: { sprintId?: string | null; columnId?: string | null }
-  ) => {
-    const currentTask = tasks.find(t => t.id === taskId)
-    if (!currentTask) {
-      toast.error('Task not found')
-      return
-    }
-
-    try {
-      if (targetLocation.sprintId === null) {
-        // Moving to backlog
-        if (currentTask.sprintId) {
-          await DragDropAPI.moveTask(
-            'to-backlog',
-            {
-              taskId,
-              sourceSprintId: currentTask.sprintId
-            },
-            () => {
-              // Success callback
-              mutateTasks()
-            },
-            (error) => {
-              // Error callback - rollback will be handled by DragDropProvider
-              console.error('Failed to move task to backlog:', error)
-            }
-          )
-        }
-      } else {
-        // Moving to sprint
-        await DragDropAPI.moveTask(
-          'to-sprint',
-          {
-            taskId,
-            targetSprintId: targetLocation.sprintId
-          },
-          () => {
-            // Success callback
-            mutateTasks()
-          },
-          (error) => {
-            // Error callback - rollback will be handled by DragDropProvider
-            console.error('Failed to move task to sprint:', error)
-          }
-        )
-      }
-    } catch (error) {
-      console.error('Task move operation failed:', error)
-    }
-  }, [tasks, mutateTasks])
-
-  // Handle task drop on sprint column
-  const handleTaskDrop = useCallback((taskId: string, targetSprintId: string) => {
-    handleTaskMove(taskId, { sprintId: targetSprintId })
-  }, [handleTaskMove])
-
   // Sprint action handlers (simplified)
   const handleSprintAction = async (action: string, sprintId: string) => {
     const sprint = sprints.find((s: Sprint) => s.id === sprintId)
@@ -201,8 +163,6 @@ export default function ProductBacklog({
         break
 
       case 'finish':
-        toast.success(`Sprint "${sprint.name}" finished successfully!`)
-        
         try {
           const response = await fetch(`/api/sprints/${sprintId}/finish`, {
             method: 'POST'
@@ -214,6 +174,7 @@ export default function ProductBacklog({
           
           mutateSprints()
           mutateTasks()
+          toast.success(`Sprint "${sprint.name}" finished successfully!`)
         } catch (error: unknown) {
           toast.error((error as Error).message)
         }
@@ -221,8 +182,6 @@ export default function ProductBacklog({
 
       case 'delete':
         if (confirm(`Are you sure you want to delete "${sprint.name}"?`)) {
-          toast.success(`Sprint "${sprint.name}" deleted successfully!`)
-          
           try {
             const response = await fetch(`/api/sprints/${sprintId}`, {
               method: 'DELETE'
@@ -233,6 +192,7 @@ export default function ProductBacklog({
             }
             
             mutateSprints()
+            toast.success(`Sprint "${sprint.name}" deleted successfully!`)
           } catch (error: unknown) {
             toast.error((error as Error).message)
             mutateSprints()
@@ -258,7 +218,6 @@ export default function ProductBacklog({
     }
 
     setIsCreateSprintOpen(false)
-    toast.success(`Sprint "${newSprintData.name}" created successfully!`)
 
     try {
       const response = await fetch('/api/sprints', {
@@ -277,6 +236,7 @@ export default function ProductBacklog({
 
       mutateSprints()
       setNewSprintData({ name: '', goal: '' })
+      toast.success(`Sprint "${newSprintData.name}" created successfully!`)
     } catch (error: unknown) {
       toast.error((error as Error).message)
       setIsCreateSprintOpen(true)
@@ -292,7 +252,6 @@ export default function ProductBacklog({
     if (!editingSprintId) return
 
     setIsEditSprintOpen(false)
-    toast.success(`Sprint "${editSprintData.name}" updated successfully!`)
 
     try {
       const response = await fetch(`/api/sprints/${editingSprintId}`, {
@@ -309,6 +268,7 @@ export default function ProductBacklog({
       mutateSprints()
       setEditingSprintId(null)
       setEditSprintData({ name: '', goal: '' })
+      toast.success(`Sprint "${editSprintData.name}" updated successfully!`)
     } catch (error: unknown) {
       toast.error((error as Error).message)
       setIsEditSprintOpen(true)
@@ -329,8 +289,6 @@ export default function ProductBacklog({
         toast.error('Sprint not found')
         return
       }
-
-      toast.success('Task created successfully')
 
       const taskData = {
         title: data.title,
@@ -356,6 +314,7 @@ export default function ProductBacklog({
       }
 
       mutateTasks()
+      toast.success('Task created successfully')
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : 'Failed to create task')
     }
@@ -368,7 +327,6 @@ export default function ProductBacklog({
     if (!sprint) return
 
     setIsStartSprintOpen(false)
-    toast.success(`Sprint "${sprint.name}" started successfully!`)
 
     try {
       const response = await fetch(`/api/sprints/${startingSprintId}/start`, {
@@ -388,6 +346,7 @@ export default function ProductBacklog({
       mutateSprints()
       setStartingSprintId(null)
       setStartSprintData({ dueDate: '', goal: '' })
+      toast.success(`Sprint "${sprint.name}" started successfully!`)
 
       setTimeout(() => {
         router.push(`/sprints/${startingSprintId}/active`)
@@ -424,7 +383,6 @@ export default function ProductBacklog({
     }
   }
 
-
   if (!boardData) {
     return (
       <div className="h-full flex items-center justify-center">
@@ -433,14 +391,11 @@ export default function ProductBacklog({
     )
   }
 
-  // Check for orphaned tasks (have sprintId but no sprintColumnId)
-  const orphanedTasks = tasks.filter(task => task.sprintId && !task.sprintColumnId)
-  const hasOrphanedTasks = orphanedTasks.length > 0
-
   return (
-    <DragDropProvider 
+    <OptimisticDragDropProvider 
       initialTasks={tasks}
-      onTaskMove={handleTaskMove}
+      initialSprints={sprints}
+      onTaskMove={handleTaskMoveAPI}
     >
       <ProductBacklogInner 
         boardId={boardId}
@@ -453,8 +408,6 @@ export default function ProductBacklog({
         users={users}
         activeSprint={activeSprint}
         visibleSprints={visibleSprints}
-        getTasksForSprint={getTasksForSprint}
-        handleTaskDrop={handleTaskDrop}
         handleSprintAction={handleSprintAction}
         handleAddTask={handleAddTask}
         selectedTask={selectedTask}
@@ -478,11 +431,11 @@ export default function ProductBacklog({
         isFixingOrphanedTasks={isFixingOrphanedTasks}
         handleFixOrphanedTasks={handleFixOrphanedTasks}
       />
-    </DragDropProvider>
+    </OptimisticDragDropProvider>
   )
 }
 
-// Component that has access to DragDrop context
+// Component that has access to optimistic DragDrop context
 function ProductBacklogInner({
   boardId,
   boardColor, 
@@ -494,8 +447,6 @@ function ProductBacklogInner({
   users,
   activeSprint,
   visibleSprints,
-  getTasksForSprint,
-  handleTaskDrop,
   handleSprintAction,
   handleAddTask,
   selectedTask,
@@ -520,7 +471,7 @@ function ProductBacklogInner({
   handleFixOrphanedTasks
 }: any) {
   // Get optimistic tasks from drag-drop context
-  const { optimisticTasks } = useDragDrop()
+  const { tasks: optimisticTasks } = useOptimisticDragDrop()
   
   // Use optimistic tasks for display
   const tasks = optimisticTasks
@@ -626,7 +577,10 @@ function ProductBacklogInner({
               isActiveSprint={sprint.id === activeSprint?.id}
               boardId={boardId}
               onTaskUpdate={mutateTasks}
-              onTaskDrop={handleTaskDrop}
+              onTaskDrop={() => {
+                // This will be handled by the OptimisticDragDropProvider
+                // No need to do anything here as drag-drop is handled globally
+              }}
               organizationId={boardData?.board?.organizationId}
             />
           ))}
