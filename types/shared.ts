@@ -238,7 +238,7 @@ export interface ProjectBoardProps {
   projectId: string
 }
 
-export interface StandaloneBoardViewProps {
+export interface KanbanBoardViewProps {
   board: Board
   onUpdate: () => void
 }

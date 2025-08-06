@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Loader2, ArrowLeft, MoreHorizontal, Kanban, Calendar } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
-import StandaloneBoardView from '@/components/boards/standalone-board-view'
+import KanbanBoardView from '@/components/boards/kanban-board-view'
 import Scrum from '@/components/scrum/Scrum'
 import BoardEditForm from '@/components/boards/board-edit-form'
 import BoardDeleteDialog from '@/components/boards/board-delete-dialog'
@@ -245,7 +245,7 @@ function BoardContent() {
               onProductBacklogStateChange={setProductBacklogState}
             />
           ) : (
-            <StandaloneBoardView board={boardWithTasks} onUpdate={mutate} />
+            <KanbanBoardView board={boardWithTasks} onUpdate={mutate} />
           )}
         </div>
     </>
