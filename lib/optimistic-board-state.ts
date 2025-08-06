@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useEffect } from 'react'
 import { Task, Sprint } from '@/types/shared'
 import { toast } from 'sonner'
 
@@ -59,13 +59,13 @@ export function useOptimisticBoardState(
   const [originalTasks, setOriginalTasks] = useState<Task[]>(initialTasks)
   
   // Update state when external data changes (from React Query, etc)
-  useState(() => {
+  useEffect(() => {
     if (!isDragging && !pendingOperation) {
       setTasks(initialTasks)
       setSprints(initialSprints)
       setOriginalTasks(initialTasks)
     }
-  })
+  }, [initialTasks, initialSprints, isDragging, pendingOperation])
   
   // Immediate move operation (no API calls)
   const moveTaskImmediate = useCallback((

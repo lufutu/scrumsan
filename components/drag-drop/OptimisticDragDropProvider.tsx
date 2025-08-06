@@ -2,7 +2,7 @@
 
 import { useEffect, createContext, useContext, ReactNode } from 'react'
 import { monitorForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter'
-import { autoScrollForElements } from '@atlaskit/pragmatic-drag-and-drop-auto-scroll/element'
+
 import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine'
 import { useOptimisticBoardState, type OptimisticBoardState } from '@/lib/optimistic-board-state'
 import { Task, Sprint } from '@/types/shared'
@@ -128,13 +128,10 @@ export function OptimisticDragDropProvider({
             }
           )
         }
-      }),
-      
-      // Auto-scroll support
-      autoScrollForElements({
-        canScroll: ({ source }) => isDragDataTask(source.data),
-        getConfiguration: () => ({ maxScrollSpeed: 'standard' })
       })
+      
+      // Note: AutoScroll will be handled by individual scroll containers
+      // No global autoScroll needed here since we have AutoScroll components in the UI
     )
   }, [boardState])
 
