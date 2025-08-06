@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils'
 import { DropZoneHighlight } from '@/components/drag-drop/DropIndicator'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Plus, MoreVertical, Trash2, Edit, Calendar, Play, Check } from 'lucide-react'
+import { Plus, MoreVertical, Trash2, Edit, Calendar, Play, Check, Archive } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -64,6 +64,9 @@ export function StaticSprintColumn({
   const dropRef = useRef<HTMLDivElement>(null)
 
   const getSprintStatus = () => {
+    if (sprint.isBacklog) {
+      return { label: 'Backlog', color: 'bg-gray-100 text-gray-600' }
+    }
     if (sprint.status === 'active') {
       return { label: 'Active', color: 'bg-green-100 text-green-800' }
     } else if (sprint.status === 'completed') {
@@ -99,7 +102,12 @@ export function StaticSprintColumn({
   }, [sprint.id, sprint.isBacklog, onTaskDrop])
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 w-80 flex-shrink-0">
+    <div className={cn(
+      "rounded-lg shadow-sm border w-80 flex-shrink-0",
+      sprint.isBacklog 
+        ? "bg-gray-50 border-gray-300 border-dashed" 
+        : "bg-white border-gray-200"
+    )}>
       <DropZoneHighlight 
         isActive={isDraggedOver} 
         className="h-full"
@@ -114,12 +122,15 @@ export function StaticSprintColumn({
             <div
               className={cn(
                 "p-4 border-b border-gray-200",
-                boardColor ? "" : "bg-gray-50"
+                sprint.isBacklog 
+                  ? "bg-gray-100" 
+                  : boardColor ? "" : "bg-gray-50"
               )}
-              style={boardColor ? { backgroundColor: `${boardColor}15` } : undefined}
+              style={!sprint.isBacklog && boardColor ? { backgroundColor: `${boardColor}15` } : undefined}
             >
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
+                  {sprint.isBacklog && <Archive className="h-5 w-5 text-gray-500" />}
                   <h3 className="font-semibold text-lg">{sprint.name}</h3>
                   <Badge className={cn("text-xs", status.color)}>
                     {status.label}

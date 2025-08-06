@@ -84,14 +84,20 @@ export default function ProductBacklog({
     if (onDataChange) onDataChange()
   }, [onDataChange])
 
-  // Filter sprints - always include backlog sprint
-  const visibleSprints = useMemo(() =>
-    sprints.filter((s: Sprint) => 
+  // Filter sprints - always include backlog sprint and ensure backlog is first
+  const visibleSprints = useMemo(() => {
+    const filteredSprints = sprints.filter((s: Sprint) => 
       !s.isDeleted && 
       (s.isBacklog || showFinishedSprints || !s.isFinished)
-    ),
-    [sprints, showFinishedSprints]
-  )
+    )
+    
+    // Sort to ensure backlog is always first
+    return filteredSprints.sort((a, b) => {
+      if (a.isBacklog && !b.isBacklog) return -1
+      if (!a.isBacklog && b.isBacklog) return 1
+      return 0
+    })
+  }, [sprints, showFinishedSprints])
 
   // Group tasks by sprint - memoized to prevent infinite loops
   const getTasksForSprint = useCallback((sprintId: string) => {
@@ -100,9 +106,14 @@ export default function ProductBacklog({
 
     let sprintTasks: Task[] = []
 
-    // For backlog sprint, return tasks with no sprintId
+    // For backlog sprint, return tasks with no sprintId AND no columnId AND no sprintColumnId
     if (sprint.isBacklog) {
-      sprintTasks = tasks.filter((task: Task) => !task.sprintId)
+      sprintTasks = tasks.filter((task: Task) => 
+        !task.sprintId && 
+        !task.columnId && 
+        !task.sprintColumnId &&
+        !task.labels?.includes('__followup__')
+      )
     } else {
       // For regular sprints, return tasks from sprint relation
       if (!sprint.tasks) return []
