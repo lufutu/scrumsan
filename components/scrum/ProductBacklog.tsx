@@ -9,6 +9,7 @@ import { SprintDialogs } from './SprintDialogs'
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area"
 import { DragDropProvider } from '@/components/drag-drop/DragDropProvider'
 import { AutoScroll } from '@/components/drag-drop/AutoScroll'
+import { BoardTasksDebug } from '@/components/debug/BoardTasksDebug'
 
 import { useRouter } from 'next/navigation'
 import { Sprint, Task, ProductBacklogProps } from '@/types/shared'
@@ -460,6 +461,14 @@ export default function ProductBacklog({
             </details>
           )}
         </div>
+      )}
+
+      {/* Debug Component - only show in development or when there are issues */}
+      {(process.env.NODE_ENV === 'development' || hasOrphanedTasks) && (
+        <BoardTasksDebug 
+          boardId={boardId} 
+          onRefresh={onDataChange}
+        />
       )}
 
       {/* Sprint Columns */}
