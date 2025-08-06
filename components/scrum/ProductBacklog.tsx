@@ -9,6 +9,7 @@ import { SprintDialogs } from './SprintDialogs'
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area"
 import { OptimisticDragDropProvider, useOptimisticDragDrop } from '@/components/drag-drop/OptimisticDragDropProvider'
 import { AutoScroll } from '@/components/drag-drop/AutoScroll'
+import { useOptimisticUpdates } from '@/lib/optimistic-updates'
 
 import { useRouter } from 'next/navigation'
 import { Sprint, Task, ProductBacklogProps } from '@/types/shared'
@@ -304,6 +305,8 @@ export default function ProductBacklog({
         return
       }
 
+      console.log('🚀 Creating task optimistically via ProductBacklog...')
+      
       const taskData = {
         title: data.title,
         description: '',
@@ -327,9 +330,11 @@ export default function ProductBacklog({
         throw new Error(error.error || 'Failed to create task')
       }
 
+      console.log('✅ Task created via API')
       mutateTasks()
       toast.success('Task created successfully')
     } catch (error: unknown) {
+      console.error('❌ Task creation failed:', error)
       toast.error(error instanceof Error ? error.message : 'Failed to create task')
     }
   }
@@ -456,10 +461,126 @@ function ProductBacklogInner({
   handleStartSprint
 }: any) {
   // Get optimistic tasks from drag-drop context
-  const { tasks: optimisticTasks } = useOptimisticDragDrop()
+  const { tasks: optimisticTasks, setTasks } = useOptimisticDragDrop()
+  
+  // Set up optimistic updates for task operations
+  const { optimisticCreate } = useOptimisticUpdates(optimisticTasks, setTasks)
   
   // Use optimistic tasks for display
   const tasks = optimisticTasks
+
+  // Create optimistic version of handleAddTask
+  const handleAddTaskOptimistic = useCallback(async (sprintId: string, data: {
+    title: string;
+    taskType: string;
+    assignees?: Array<{ id: string }>;
+    labels?: string[];
+    storyPoints?: number;
+    priority?: string;
+  }) => {
+    try {
+      const sprint = sprints.find((s: Sprint) => s.id === sprintId)
+      if (!sprint) {
+        toast.error('Sprint not found')
+        return
+      }
+
+      console.log('🚀 Starting optimistic task creation...')
+      
+      // Generate temporary task for optimistic update
+      const tempTaskId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+      const tempTask: Task = {
+        id: tempTaskId,
+        title: data.title,
+        description: '',
+        itemCode: `TEMP-${Date.now().toString().slice(-4)}`, // Temporary item code
+        boardId,
+        taskType: data.taskType as 'story' | 'bug' | 'task' | 'epic' | 'improvement',
+        storyPoints: data.storyPoints || 0,
+        priority: data.priority || 'medium',
+        sprintId,
+        columnId: null,
+        sprintColumnId: null,
+        isArchived: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        taskAssignees: data.assignees?.map(assignee => ({
+          id: `temp_assign_${assignee.id}`,
+          userId: assignee.id,
+          taskId: tempTaskId,
+          user: users.find(u => u.id === assignee.id) || {
+            id: assignee.id,
+            fullName: 'Unknown User',
+            email: 'unknown@example.com'
+          }
+        })) || [],
+        taskLabels: data.labels?.map((labelId, index) => {
+          const label = labels.find(l => l.id === labelId)
+          return {
+            id: `temp_label_${index}`,
+            taskId: tempTaskId,
+            labelId,
+            label: label || {
+              id: labelId,
+              name: 'Unknown Label',
+              color: '#6B7280'
+            }
+          }
+        }) || [],
+        labels: data.labels || []
+      }
+
+      // Execute optimistic creation with the existing system
+      await optimisticCreate(
+        tempTask,
+        async () => {
+          console.log('📡 Creating task via API...')
+          
+          const taskData = {
+            title: data.title,
+            description: '',
+            boardId,
+            taskType: data.taskType as 'story' | 'bug' | 'task' | 'epic' | 'improvement',
+            storyPoints: data.storyPoints || 0,
+            assignees: data.assignees || [],
+            labels: data.labels || [],
+            priority: data.priority,
+            sprintId
+          }
+
+          const response = await fetch('/api/tasks', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(taskData)
+          })
+
+          if (!response.ok) {
+            const error = await response.json()
+            throw new Error(error.error || 'Failed to create task')
+          }
+
+          const realTask = await response.json()
+          console.log('✅ Task created successfully via API:', realTask.id)
+          
+          // Refresh data to sync the real task data
+          if (onDataChange) {
+            console.log('🔄 Refreshing board data...')
+            setTimeout(onDataChange, 100) // Small delay to ensure API consistency
+          }
+          
+          return realTask
+        },
+        {
+          successMessage: 'Task created successfully',
+          errorMessage: 'Failed to create task'
+        }
+      )
+      
+    } catch (error: unknown) {
+      console.error('❌ Optimistic task creation failed:', error)
+      toast.error(error instanceof Error ? error.message : 'Failed to create task')
+    }
+  }, [sprints, boardId, users, labels, optimisticCreate, onDataChange])
 
   // Update getTasksForSprint to use optimistic tasks
   const getOptimisticTasksForSprint = useCallback((sprintId: string) => {
@@ -512,7 +633,7 @@ function ProductBacklogInner({
               tasks={getOptimisticTasksForSprint(sprint.id)}
               onTaskClick={setSelectedTask}
               onSprintAction={handleSprintAction}
-              onAddTask={handleAddTask}
+              onAddTask={handleAddTaskOptimistic}
               labels={labels || []}
               users={users || []}
               boardColor={boardColor}

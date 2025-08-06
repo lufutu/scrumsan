@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import { Check, X, Plus } from 'lucide-react'
 import { ITEM_TYPES, PRIORITIES, STORY_POINTS, type ItemType, type Priority } from '@/lib/constants'
+import { useOptimisticUpdates } from '@/lib/optimistic-updates'
 
 
 interface User {

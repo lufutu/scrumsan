@@ -325,7 +325,18 @@ export function ItemModal({
   const updateTask = async (updates: Partial<Task>) => {
     if (!taskId) return;
     
-    console.log('Updating task with:', updates);
+    console.log('🚀 Optimistic task update:', updates);
+    
+    // Store original task for potential rollback
+    const originalTask = task;
+    
+    // Apply optimistic update immediately
+    if (task) {
+      const optimisticTask = { ...task, ...updates };
+      console.log('✨ Applying optimistic update to UI');
+      setTask(optimisticTask);
+    }
+    
     setIsSaving(true);
     try {
       const response = await fetch(`/api/tasks/${taskId}`, {
@@ -337,11 +348,20 @@ export function ItemModal({
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Update failed:', response.status, errorText);
+        
+        // Rollback optimistic update on failure
+        console.log('❌ Rolling back optimistic update');
+        if (originalTask) {
+          setTask(originalTask);
+        }
+        
         throw new Error('Failed to update task');
       }
 
       const updatedTask = await response.json();
-      console.log('Task updated successfully:', updatedTask);
+      console.log('✅ Task updated successfully via API:', updatedTask.id);
+      
+      // Replace optimistic update with real data from server
       setTask(updatedTask);
       
       toast.success('Task updated successfully');
@@ -349,6 +369,12 @@ export function ItemModal({
     } catch (error) {
       console.error('Error updating task:', error);
       toast.error('Failed to update task');
+      
+      // Ensure rollback happened
+      if (originalTask && task !== originalTask) {
+        console.log('🔄 Ensuring rollback is applied');
+        setTask(originalTask);
+      }
     } finally {
       setIsSaving(false);
     }
