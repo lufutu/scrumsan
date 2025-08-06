@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { draggable } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import { DraggableCard } from '@/components/drag-drop/DragAnimations';
+import { DragPreview, DragPreviewContent } from '@/components/drag-drop/DragPreview';
 import {
   Paperclip,
   MessageCircle,
@@ -125,8 +126,9 @@ export function TaskCardModern({
   // Ref to track previous assignees to prevent infinite re-renders
   const prevAssigneesRef = useRef<string>('');
   
-  // Drag and drop ref
+  // Drag and drop ref and drag state
   const dragRef = useRef<HTMLDivElement>(null);
+  const [isDragState, setIsDragState] = useState(false);
 
   // Sync local state with prop changes (e.g., after refresh)
   useEffect(() => {
@@ -154,7 +156,13 @@ export function TaskCardModern({
         sprintColumnId: sprintColumnId || null,
         title,
         taskType
-      })
+      }),
+      onDragStart: () => {
+        setIsDragState(true);
+      },
+      onDrop: () => {
+        setIsDragState(false);
+      }
     });
   }, [id, sprintId, sprintColumnId, title, taskType]);
 
@@ -680,7 +688,23 @@ export function TaskCardModern({
   };
 
   return (
-    <DraggableCard isDragging={isDragging || false} className="w-full">
+    <>
+      <DragPreview 
+        isDragging={isDragState} 
+        dragData={{ 
+          taskId: id, 
+          title, 
+          taskType 
+        }}
+      >
+        <DragPreviewContent 
+          title={title}
+          taskType={taskType}
+          itemCode={itemCode}
+        />
+      </DragPreview>
+      
+      <DraggableCard isDragging={isDragging || false} className="w-full">
       <div
         ref={dragRef}
         className={cn(
@@ -1686,5 +1710,6 @@ export function TaskCardModern({
       )}
       </div>
     </DraggableCard>
+    </>
   );
 }

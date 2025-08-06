@@ -109,6 +109,10 @@ export function OptimisticDragDropProvider({
             // Moving to backlog
             targetSprintId = null
             targetColumnId = null
+          } else if (isDragDataSprint(targetData)) {
+            // Moving to sprint (general sprint drop, not specific column)
+            targetSprintId = targetData.sprintId
+            targetColumnId = null // Will be assigned to first column by API
           } else {
             console.warn('🚨 Unknown drop target type:', targetData)
             boardState.clearDragState()
@@ -176,6 +180,19 @@ function isDragDataSprintColumn(data: unknown): data is {
     data.type === 'sprint-column' &&
     'sprintId' in data &&
     'columnId' in data
+  )
+}
+
+function isDragDataSprint(data: unknown): data is { 
+  type: 'sprint'
+  sprintId: string 
+} {
+  return (
+    typeof data === 'object' && 
+    data !== null && 
+    'type' in data && 
+    data.type === 'sprint' &&
+    'sprintId' in data
   )
 }
 
