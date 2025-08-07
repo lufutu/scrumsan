@@ -22,6 +22,7 @@ interface NavProject {
       name: string
       slug: string | null
       boardType: string | null
+      logo: string | null
     }
   }>
 }
@@ -31,6 +32,7 @@ interface NavBoard {
   name: string
   slug: string | null
   boardType: string | null
+  logo: string | null
   organizationId: string
 }
 
@@ -47,6 +49,7 @@ interface NavOrganizationData {
   id: string
   name: string
   slug: string | null
+  logo: string | null
   projects: NavProject[]
   boards: NavBoard[] // standalone boards
   activeSprints: NavSprint[]
@@ -98,6 +101,7 @@ export function useOptimizedNavData(organizationId: string | null) {
       id: organizationId,
       name: organization.name,
       slug: organization.slug,
+      logo: organization.logo,
       projects: projects || [],
       boards: standaloneBoards || [],
       activeSprints: activeSprints || []
