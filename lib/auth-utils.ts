@@ -59,8 +59,14 @@ export async function ensureUserExists(user: User) {
 export async function getCurrentUser(supabase: any) {
   const { data: { user }, error: userError } = await supabase.auth.getUser()
   
-  if (userError || !user) {
-    throw new Error('Unauthorized')
+  if (userError) {
+    console.error('Supabase auth error:', userError)
+    throw new Error(`Authentication failed: ${userError.message}`)
+  }
+  
+  if (!user) {
+    console.error('No user found in session')
+    throw new Error('No authenticated user found')
   }
   
   // Ensure user exists in our database

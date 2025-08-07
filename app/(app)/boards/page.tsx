@@ -81,10 +81,15 @@ export default function BoardsPage() {
   }, [error, toast])
 
 
-  const handleBoardCreated = async (newBoard?: { id?: string, slug?: string }) => {
-    // Navigate immediately for better UX
-    if (newBoard?.slug && activeOrg?.slug) {
-      router.push(`/orgs/${activeOrg.slug}/boards/${newBoard.slug}`)
+  const handleBoardCreated = async (newBoard?: { 
+    id?: string, 
+    slug?: string,
+    organization?: { slug?: string }
+  }) => {
+    // Navigate immediately for better UX using slug-based URLs
+    const orgSlug = newBoard?.organization?.slug || activeOrg?.slug
+    if (newBoard?.slug && orgSlug) {
+      router.push(`/orgs/${orgSlug}/boards/${newBoard.slug}`)
     } else if (newBoard?.id) {
       // Fallback to UUID-based URL (will redirect to slug URL via middleware)
       router.push(`/boards/${newBoard.id}`)

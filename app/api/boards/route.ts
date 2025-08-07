@@ -200,10 +200,17 @@ export async function POST(req: NextRequest) {
         })
       }
       
-      // Return board with columns and sprints
+      // Return board with columns, sprints, and organization
       return await tx.board.findUnique({
         where: { id: board.id },
         include: {
+          organization: {
+            select: {
+              id: true,
+              name: true,
+              slug: true
+            }
+          },
           columns: {
             orderBy: { position: 'asc' }
           },

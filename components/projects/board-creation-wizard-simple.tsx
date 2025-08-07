@@ -87,16 +87,23 @@ export default function BoardCreationWizard({ organizationId, onSuccess, childre
 
       // If there's a logo file, upload it
       if (logoFile) {
-        const logoFormData = new FormData()
-        logoFormData.append('logo', logoFile)
-        
-        const logoResponse = await fetch(`/api/boards/${newBoard.id}/logo`, {
-          method: 'POST',
-          body: logoFormData,
-        })
-        
-        if (!logoResponse.ok) {
-          console.error('Failed to upload board logo')
+        try {
+          const logoFormData = new FormData()
+          logoFormData.append('logo', logoFile)
+          
+          const logoResponse = await fetch(`/api/boards/${newBoard.id}/logo`, {
+            method: 'POST',
+            body: logoFormData,
+          })
+          
+          if (!logoResponse.ok) {
+            const logoError = await logoResponse.json()
+            console.error('Failed to upload board logo:', logoError)
+            // Don't fail the entire creation if logo upload fails
+          }
+        } catch (logoError) {
+          console.error('Logo upload error:', logoError)
+          // Don't fail the entire creation if logo upload fails
         }
       }
 
