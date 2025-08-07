@@ -26,7 +26,15 @@ export async function GET() {
           }
         }
       },
-      include: {
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        description: true,
+        logo: true,
+        ownerId: true,
+        createdAt: true,
+        updatedAt: true,
         members: {
           select: {
             userId: true,
