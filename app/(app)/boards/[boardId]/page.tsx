@@ -15,6 +15,7 @@ import { useBoardData } from '@/hooks/useBoardData'
 import { useProductBacklogActions } from '@/hooks/useProductBacklogActions'
 import { useSupabase } from '@/providers/supabase-provider'
 import { useOrganization } from '@/providers/organization-provider'
+import { useBoardRealtimeSync } from '@/hooks/useBoardRealtimeSync'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -50,6 +51,9 @@ function BoardContent() {
 
   const { data: boardData, error, isLoading, mutate } = useBoardData(boardId)
   const board = boardData?.board
+  
+  // Enable realtime sync for this board
+  const { isConnected, status } = useBoardRealtimeSync(boardId)
 
   if (!boardId) {
     return (

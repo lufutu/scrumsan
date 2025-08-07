@@ -11,6 +11,22 @@ export function createClient() {
                 detectSessionInUrl: true,
                 flowType: 'pkce'
             },
+            realtime: {
+                params: {
+                    eventsPerSecond: 50, // Increase for high-frequency updates
+                },
+                // For self-hosted instances, ensure proper heartbeat
+                heartbeatIntervalMs: 30000,
+                reconnectAfterMs: (tries: number) => {
+                    // Exponential backoff with max 30 seconds
+                    return Math.min(1000 * Math.pow(2, tries), 30000)
+                }
+            },
+            global: {
+                headers: {
+                    'X-Client-Info': 'scrumsan-realtime'
+                }
+            }
         }
     )
 }
