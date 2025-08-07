@@ -29,7 +29,7 @@ export function CreateOrganizationDialog({
   open,
   onOpenChange,
 }: CreateOrganizationDialogProps) {
-  const { refreshOrganizations } = useOrganization()
+  const { refreshOrganizations, setActiveOrg } = useOrganization()
   const { supabase } = useSupabase()
   const [isLoading, setIsLoading] = useState(false)
   const [formData, setFormData] = useState({
@@ -79,6 +79,9 @@ export function CreateOrganizationDialog({
 
       // Refresh organizations list
       await refreshOrganizations()
+      
+      // Set the new organization as active
+      setActiveOrg(newOrg)
       
       toast.success('Organization created successfully!')
 

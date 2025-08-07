@@ -130,7 +130,17 @@ export function TaskCardModern({
   // Drag and drop ref and global drag state
   const dragRef = useRef<HTMLDivElement>(null);
   const [isDragState, setIsDragState] = useState(false);
-  const { isDragging: globalIsDragging, draggedTaskId } = useOptimisticDragDrop();
+  
+  // Try to use the optimistic drag drop context if available
+  let globalIsDragging = false;
+  let draggedTaskId: string | null = null;
+  try {
+    const dragContext = useOptimisticDragDrop();
+    globalIsDragging = dragContext.isDragging;
+    draggedTaskId = dragContext.draggedTaskId;
+  } catch (e) {
+    // Context not available - that's ok, just use defaults
+  }
 
   // Sync local state with prop changes (e.g., after refresh)
   useEffect(() => {

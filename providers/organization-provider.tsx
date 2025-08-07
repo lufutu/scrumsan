@@ -70,6 +70,17 @@ export function OrganizationProvider({ children }: OrganizationProviderProps) {
       clearTimeout(timeoutId)
       
       if (!response.ok) {
+        // Handle specific error cases
+        if (response.status === 404) {
+          // No organizations found is not an error for new users
+          setOrganizations([])
+          hasLoadedOrganizations.current = true
+          debugLoadingState('OrganizationProvider', { 
+            status: 'no organizations found', 
+            count: 0 
+          });
+          return
+        }
         throw new Error('Failed to fetch organizations')
       }
       
@@ -103,7 +114,11 @@ export function OrganizationProvider({ children }: OrganizationProviderProps) {
 
   // Separate effect to handle setting active org after organizations are loaded
   useEffect(() => {
-    if (hasLoadedOrganizations.current && organizations.length > 0 && !hasSetInitialActiveOrg.current) {
+    // Set active org if:
+    // 1. Organizations are loaded AND
+    // 2. There are organizations available AND
+    // 3. Either no active org is set OR the initial org hasn't been set yet
+    if (hasLoadedOrganizations.current && organizations.length > 0 && (!activeOrg || !hasSetInitialActiveOrg.current)) {
       // Safely access localStorage with fallback
       let savedActiveOrgId: string | null = null
       try {
@@ -128,7 +143,7 @@ export function OrganizationProvider({ children }: OrganizationProviderProps) {
       
       hasSetInitialActiveOrg.current = true
     }
-  }, [organizations])
+  }, [organizations, activeOrg])
 
   const setActiveOrg = useCallback((org: Organization) => {
     setActiveOrgState(org)

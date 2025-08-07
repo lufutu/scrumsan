@@ -65,7 +65,17 @@ export function StaticSprintColumn({
   const dropRef = useRef<HTMLDivElement>(null)
   
   // Get global drag state for drop preview
-  const { isDragging, draggedTaskId, tasks: allTasks } = useOptimisticDragDrop()
+  let isDragging = false;
+  let draggedTaskId: string | null = null;
+  let allTasks: Task[] = [];
+  try {
+    const dragContext = useOptimisticDragDrop();
+    isDragging = dragContext.isDragging;
+    draggedTaskId = dragContext.draggedTaskId;
+    allTasks = dragContext.tasks;
+  } catch (e) {
+    // Context not available - that's ok, just use defaults
+  }
   const draggedTask = isDragging && draggedTaskId ? allTasks.find(t => t.id === draggedTaskId) : null
 
   const getSprintStatus = () => {
