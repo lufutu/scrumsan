@@ -19,6 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Edit2, Loader2, Upload, X } from 'lucide-react'
 import { SingleImageUpload } from '@/components/ui/single-image-upload'
 import Image from 'next/image'
+import { useBoardLogo } from '@/hooks/useBoardLogo'
 
 interface Board {
   id: string
@@ -52,6 +53,10 @@ export default function BoardEditForm({ board, onSuccess, children }: BoardEditF
   const [logoFile, setLogoFile] = useState<File | null>(null)
   const [currentLogo, setCurrentLogo] = useState(board.logo)
   const [removeLogo, setRemoveLogo] = useState(false)
+  
+  // Get signed URL for current logo
+  const { logoUrl } = useBoardLogo(board.id, currentLogo)
+  const displayLogo = logoUrl || (currentLogo?.startsWith('http') ? currentLogo : null)
   const [formData, setFormData] = useState({
     name: board.name,
     description: board.description || '',
@@ -238,11 +243,11 @@ export default function BoardEditForm({ board, onSuccess, children }: BoardEditF
 
           <div className="space-y-2">
             <Label htmlFor="boardLogo">Board Logo</Label>
-            {currentLogo && !removeLogo ? (
+            {displayLogo && !removeLogo ? (
               <div className="flex items-center gap-4">
                 <div className="relative w-20 h-20 rounded-lg overflow-hidden border">
                   <Image
-                    src={currentLogo}
+                    src={displayLogo}
                     alt="Board logo"
                     fill
                     className="object-cover"

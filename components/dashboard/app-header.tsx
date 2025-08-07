@@ -8,6 +8,7 @@ import { Separator } from '@/components/ui/separator';
 import { ChevronRight, Home } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Image from 'next/image';
+import { useBoardLogo } from '@/hooks/useBoardLogo';
 
 interface BreadcrumbItem {
   label: string;
@@ -22,6 +23,7 @@ interface AppHeaderProps {
   actions?: React.ReactNode;
   className?: string;
   logo?: string | null;
+  boardId?: string;
 }
 
 export function AppHeader({
@@ -30,8 +32,13 @@ export function AppHeader({
   actions,
   className,
   logo,
+  boardId,
 }: AppHeaderProps) {
   const pathname = usePathname();
+
+  // Get signed URL for board logo if needed
+  const { logoUrl } = useBoardLogo(boardId || '', logo)
+  const displayLogo = logoUrl || (logo?.startsWith('http') ? logo : null)
 
   // Generate breadcrumbs from pathname if not provided
   const generateBreadcrumbs = (): BreadcrumbItem[] => {
@@ -132,11 +139,11 @@ export function AppHeader({
         <Separator orientation="vertical" className="mx-2 h-6" />
         
         {/* Logo if provided */}
-        {logo && (
+        {displayLogo && (
           <>
             <div className="relative w-8 h-8 rounded overflow-hidden border bg-white">
               <Image
-                src={logo}
+                src={displayLogo}
                 alt="Board logo"
                 fill
                 className="object-cover"

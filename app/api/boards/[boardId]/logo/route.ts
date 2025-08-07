@@ -70,17 +70,18 @@ export async function POST(
     }
 
     // Upload to S3
-    const { url: logoUrl } = await uploadBoardLogoToS3(boardId, file)
+    const uploadResult = await uploadBoardLogoToS3(boardId, file)
 
-    // Update board with logo URL
+    // Update board with logo filename (not full URL)
     const updatedBoard = await prisma.board.update({
       where: { id: boardId },
-      data: { logo: logoUrl }
+      data: { logo: uploadResult.filename }
     })
 
     return NextResponse.json({ 
-      logo: logoUrl,
-      board: updatedBoard 
+      success: true,
+      filename: uploadResult.filename,
+      url: uploadResult.url
     })
   } catch (error: unknown) {
     console.error('Error uploading board logo:', error)
@@ -129,7 +130,11 @@ export async function DELETE(
     // Delete from S3 if logo exists
     if (board.logo) {
       try {
-        await deleteFileFromS3ByUrl(board.logo)
+        // Construct logo URL and delete it
+        const region = process.env.AWS_REGION || 'ap-southeast-1'
+        const bucket = process.env.AWS_S3_BUCKET || 'scrumsan'
+        const logoUrl = `https://${bucket}.s3.${region}.amazonaws.com/boards/${boardId}/logos/${board.logo}`
+        await deleteFileFromS3ByUrl(logoUrl)
       } catch (error) {
         console.warn('Failed to delete logo from S3:', error)
         // Continue with database update even if S3 deletion fails

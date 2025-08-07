@@ -233,6 +233,7 @@ function BoardContent() {
         breadcrumbs={breadcrumbs}
         actions={headerActions}
         logo={board.logo}
+        boardId={board.id}
       />
         <div className='px-4 py-6'>
           {board.boardType === 'scrum' ? (
