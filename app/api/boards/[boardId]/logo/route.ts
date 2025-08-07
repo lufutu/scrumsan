@@ -2,15 +2,16 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth-utils'
+import { uploadBoardLogoToS3, deleteFileFromS3ByUrl } from '@/lib/aws/s3'
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { boardId: string } }
+  { params }: { params: Promise<{ boardId: string }> }
 ) {
   try {
     const supabase = await createClient()
     const user = await getCurrentUser(supabase)
-    const { boardId } = params
+    const { boardId } = await params
 
     // Check if user has access to this board
     const board = await prisma.board.findFirst({
@@ -49,36 +50,36 @@ export async function POST(
       )
     }
 
-    // Upload to Supabase Storage
-    const fileName = `board-logos/${boardId}/${Date.now()}-${file.name}`
-    const { data: uploadData, error: uploadError } = await supabase.storage
-      .from('avatars')
-      .upload(fileName, file, {
-        cacheControl: '3600',
-        upsert: false
-      })
-
-    if (uploadError) {
-      console.error('Error uploading file:', uploadError)
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
+    if (!allowedTypes.includes(file.type)) {
       return NextResponse.json(
-        { error: 'Failed to upload file' },
-        { status: 500 }
+        { error: 'Invalid file type. Only JPEG, PNG, and WebP are allowed.' },
+        { status: 400 }
       )
     }
 
-    // Get public URL
-    const { data: { publicUrl } } = supabase.storage
-      .from('avatars')
-      .getPublicUrl(uploadData.path)
+    // Delete existing logo if it exists
+    if (board.logo) {
+      try {
+        await deleteFileFromS3ByUrl(board.logo)
+      } catch (error) {
+        console.warn('Failed to delete existing logo:', error)
+        // Continue with upload even if deletion fails
+      }
+    }
+
+    // Upload to S3
+    const { url: logoUrl } = await uploadBoardLogoToS3(boardId, file)
 
     // Update board with logo URL
     const updatedBoard = await prisma.board.update({
       where: { id: boardId },
-      data: { logo: publicUrl }
+      data: { logo: logoUrl }
     })
 
     return NextResponse.json({ 
-      logo: publicUrl,
+      logo: logoUrl,
       board: updatedBoard 
     })
   } catch (error: unknown) {
@@ -92,12 +93,12 @@ export async function POST(
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { boardId: string } }
+  { params }: { params: Promise<{ boardId: string }> }
 ) {
   try {
     const supabase = await createClient()
     const user = await getCurrentUser(supabase)
-    const { boardId } = params
+    const { boardId } = await params
 
     // Check if user has access to this board
     const board = await prisma.board.findFirst({
@@ -125,12 +126,14 @@ export async function DELETE(
       )
     }
 
-    // Delete from storage if logo exists
+    // Delete from S3 if logo exists
     if (board.logo) {
-      const path = board.logo.split('/').slice(-3).join('/')
-      await supabase.storage
-        .from('avatars')
-        .remove([path])
+      try {
+        await deleteFileFromS3ByUrl(board.logo)
+      } catch (error) {
+        console.warn('Failed to delete logo from S3:', error)
+        // Continue with database update even if S3 deletion fails
+      }
     }
 
     // Update board to remove logo

@@ -182,6 +182,25 @@ export async function uploadOrganizationLogoToS3(
 }
 
 /**
+ * Upload board logo to S3
+ * @param boardId - The board ID
+ * @param file - The logo file
+ */
+export async function uploadBoardLogoToS3(
+  boardId: string,
+  file: File
+): Promise<{ filename: string; url: string; key: string }> {
+  const folder = `boards/${boardId}/logos`
+  const result = await uploadFileToS3(file, folder)
+  
+  return {
+    filename: result.path.split('/').pop()!,
+    url: result.url,
+    key: result.key
+  }
+}
+
+/**
  * Upload task attachment to S3
  * @param taskId - The task ID
  * @param file - The attachment file
