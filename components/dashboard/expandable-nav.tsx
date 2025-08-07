@@ -7,6 +7,9 @@ import { ChevronRight, Building2, FolderOpen, Kanban, Calendar, Plus, Zap, Users
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
+import { useOrganizationLogo } from '@/hooks/useOrganizationLogo'
+import { useBoardLogo } from '@/hooks/useBoardLogo'
+import Image from 'next/image'
 import {
   SidebarGroup,
   SidebarGroupContent,
@@ -47,6 +50,56 @@ type Organization = Tables<'organizations'> & {
 
 interface ExpandableNavProps {
   className?: string
+}
+
+// Utility function for board icons
+const getBoardIcon = (boardType?: string | null) => {
+  return boardType === 'scrum' ? Calendar : Kanban
+}
+
+const getBoardTypeLabel = (boardType?: string | null) => {
+  return boardType === 'scrum' ? 'Scrum' : 'Kanban'
+}
+
+// Helper component for organization logo/icon
+function OrgLogoOrIcon({ org }: { org: Organization }) {
+  const { logoUrl } = useOrganizationLogo(org.id, org.logo)
+  
+  if (logoUrl) {
+    return (
+      <div className="relative w-4 h-4 rounded overflow-hidden bg-white">
+        <Image
+          src={logoUrl}
+          alt={org.name}
+          fill
+          className="object-cover"
+        />
+      </div>
+    )
+  }
+  
+  return <Building2 className="h-4 w-4" />
+}
+
+// Helper component for board logo/icon
+function BoardLogoOrIcon({ board }: { board: Board }) {
+  const { logoUrl } = useBoardLogo(board.id, board.logo)
+  const BoardIcon = getBoardIcon(board.boardType)
+  
+  if (logoUrl) {
+    return (
+      <div className="relative w-4 h-4 rounded overflow-hidden bg-white">
+        <Image
+          src={logoUrl}
+          alt={board.name}
+          fill
+          className="object-cover"
+        />
+      </div>
+    )
+  }
+  
+  return <BoardIcon className="h-4 w-4" />
 }
 
 export function ExpandableNav({ className }: ExpandableNavProps) {
@@ -126,13 +179,7 @@ export function ExpandableNav({ className }: ExpandableNavProps) {
     })
   }
 
-  const getBoardIcon = (boardType?: string | null) => {
-    return boardType === 'scrum' ? Calendar : Kanban
-  }
 
-  const getBoardTypeLabel = (boardType?: string | null) => {
-    return boardType === 'scrum' ? 'Scrum' : 'Kanban'
-  }
 
   if (isLoading) {
     return (
@@ -173,7 +220,7 @@ export function ExpandableNav({ className }: ExpandableNavProps) {
                       )}
                     >
                       <div className="flex items-center gap-2">
-                        <Building2 className="h-4 w-4" />
+                        <OrgLogoOrIcon org={org} />
                         <span className="truncate">{org.name}</span>
                       </div>
                       {hasContent && (
@@ -226,7 +273,6 @@ export function ExpandableNav({ className }: ExpandableNavProps) {
                                   <CollapsibleContent>
                                     <SidebarMenuSub>
                                       {projectBoards.map((board) => {
-                                        const BoardIcon = getBoardIcon(board.boardType)
                                         // Use slug-based URL when both board and org have slugs, fallback to UUID
                                         const boardPath = board.slug && org.slug 
                                           ? `/orgs/${org.slug}/boards/${board.slug}` 
@@ -242,7 +288,7 @@ export function ExpandableNav({ className }: ExpandableNavProps) {
                                               )}
                                             >
                                               <Link href={boardPath} className="flex items-center gap-2">
-                                                <BoardIcon className="h-3 w-3" />
+                                                <BoardLogoOrIcon board={board} />
                                                 <span className="truncate">{board.name}</span>
                                                 <span className="text-xs text-muted-foreground ml-auto">
                                                   {getBoardTypeLabel(board.boardType)}
@@ -276,7 +322,6 @@ export function ExpandableNav({ className }: ExpandableNavProps) {
 
                       {/* Standalone Boards */}
                       {org.boards?.map((board) => {
-                        const BoardIcon = getBoardIcon(board.boardType)
                         // Use slug-based URL when both board and org have slugs, fallback to UUID
                         const boardPath = board.slug && org.slug 
                           ? `/orgs/${org.slug}/boards/${board.slug}` 
@@ -292,7 +337,7 @@ export function ExpandableNav({ className }: ExpandableNavProps) {
                               )}
                             >
                               <Link href={boardPath} className="flex items-center gap-2">
-                                <BoardIcon className="h-4 w-4" />
+                                <BoardLogoOrIcon board={board} />
                                 <span className="truncate">{board.name}</span>
                                 <span className="text-xs text-muted-foreground ml-auto">
                                   {getBoardTypeLabel(board.boardType)}
