@@ -7,6 +7,7 @@ import { SidebarTrigger } from '@/components/animate-ui/radix/sidebar';
 import { Separator } from '@/components/ui/separator';
 import { ChevronRight, Home } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import Image from 'next/image';
 
 interface BreadcrumbItem {
   label: string;
@@ -20,6 +21,7 @@ interface AppHeaderProps {
   breadcrumbs?: BreadcrumbItem[];
   actions?: React.ReactNode;
   className?: string;
+  logo?: string | null;
 }
 
 export function AppHeader({
@@ -27,6 +29,7 @@ export function AppHeader({
   breadcrumbs: customBreadcrumbs,
   actions,
   className,
+  logo,
 }: AppHeaderProps) {
   const pathname = usePathname();
 
@@ -127,6 +130,21 @@ export function AppHeader({
         <SidebarTrigger className="-ml-1" />
         
         <Separator orientation="vertical" className="mx-2 h-6" />
+        
+        {/* Logo if provided */}
+        {logo && (
+          <>
+            <div className="relative w-8 h-8 rounded overflow-hidden border bg-white">
+              <Image
+                src={logo}
+                alt="Board logo"
+                fill
+                className="object-cover"
+              />
+            </div>
+            <Separator orientation="vertical" className="mx-2 h-6" />
+          </>
+        )}
         
         {/* Breadcrumbs */}
         <div className="flex items-center flex-1 min-w-0">

@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Plus, Kanban, Calendar, Loader2 } from 'lucide-react'
+import { SingleImageUpload } from '@/components/ui/single-image-upload'
 
 interface BoardCreationWizardProps {
   organizationId: string
@@ -26,6 +27,7 @@ export default function BoardCreationWizard({ organizationId, onSuccess, childre
   const { toast } = useToast()
   const [isOpen, setIsOpen] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
+  const [logoFile, setLogoFile] = useState<File | null>(null)
   const [wizardData, setWizardData] = useState<WizardData>({
     name: '',
     type: 'kanban'
@@ -52,10 +54,12 @@ export default function BoardCreationWizard({ organizationId, onSuccess, childre
     // Reset wizard immediately for better UX
     setIsOpen(false)
     const originalWizardData = { ...wizardData }
+    const originalLogoFile = logoFile
     setWizardData({
       name: '',
       type: 'kanban'
     })
+    setLogoFile(null)
 
     try {
       console.log('📡 Making board creation API call...')
@@ -81,6 +85,21 @@ export default function BoardCreationWizard({ organizationId, onSuccess, childre
       const newBoard = await response.json()
       console.log('✅ Board creation confirmed by API:', newBoard.id)
 
+      // If there's a logo file, upload it
+      if (logoFile) {
+        const logoFormData = new FormData()
+        logoFormData.append('logo', logoFile)
+        
+        const logoResponse = await fetch(`/api/boards/${newBoard.id}/logo`, {
+          method: 'POST',
+          body: logoFormData,
+        })
+        
+        if (!logoResponse.ok) {
+          console.error('Failed to upload board logo')
+        }
+      }
+
       // Call onSuccess with real board data
       onSuccess?.(newBoard)
 
@@ -96,6 +115,7 @@ export default function BoardCreationWizard({ organizationId, onSuccess, childre
       // Restore wizard state
       setIsOpen(true)
       setWizardData(originalWizardData)
+      setLogoFile(originalLogoFile)
     } finally {
       setIsCreating(false)
     }
@@ -171,6 +191,17 @@ export default function BoardCreationWizard({ organizationId, onSuccess, childre
                 </SelectItem>
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="boardLogo">Board Logo (Optional)</Label>
+            <SingleImageUpload
+              onChange={setLogoFile}
+              accept="image/*"
+              maxSize={5}
+              disabled={isCreating}
+              placeholder="Upload board logo"
+            />
           </div>
 
           <div className="p-4 bg-muted/50 rounded-lg">

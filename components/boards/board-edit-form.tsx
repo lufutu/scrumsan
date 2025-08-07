@@ -16,7 +16,9 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Edit2, Loader2 } from 'lucide-react'
+import { Edit2, Loader2, Upload, X } from 'lucide-react'
+import { SingleImageUpload } from '@/components/ui/single-image-upload'
+import Image from 'next/image'
 
 interface Board {
   id: string
@@ -24,6 +26,7 @@ interface Board {
   description?: string | null
   boardType?: string | null
   color?: string | null
+  logo?: string | null
 }
 
 interface BoardEditFormProps {
@@ -46,6 +49,9 @@ const BOARD_COLORS = [
 export default function BoardEditForm({ board, onSuccess, children }: BoardEditFormProps) {
   const [open, setOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [logoFile, setLogoFile] = useState<File | null>(null)
+  const [currentLogo, setCurrentLogo] = useState(board.logo)
+  const [removeLogo, setRemoveLogo] = useState(false)
   const [formData, setFormData] = useState({
     name: board.name,
     description: board.description || '',
@@ -92,6 +98,29 @@ export default function BoardEditForm({ board, onSuccess, children }: BoardEditF
       }
 
       console.log('✅ Board update confirmed by API')
+
+      // Handle logo upload/removal
+      if (removeLogo && currentLogo) {
+        // Remove existing logo
+        await fetch(`/api/boards/${board.id}/logo`, {
+          method: 'DELETE',
+        })
+        setCurrentLogo(null)
+      } else if (logoFile) {
+        // Upload new logo
+        const logoFormData = new FormData()
+        logoFormData.append('logo', logoFile)
+        
+        const logoResponse = await fetch(`/api/boards/${board.id}/logo`, {
+          method: 'POST',
+          body: logoFormData,
+        })
+        
+        if (logoResponse.ok) {
+          const { logo } = await logoResponse.json()
+          setCurrentLogo(logo)
+        }
+      }
       
       // Call onSuccess callback after API confirmation
       onSuccess?.()
@@ -120,6 +149,9 @@ export default function BoardEditForm({ board, onSuccess, children }: BoardEditF
         boardType: board.boardType || 'kanban',
         color: board.color || '#3B82F6',
       })
+      setLogoFile(null)
+      setRemoveLogo(false)
+      setCurrentLogo(board.logo)
     }
   }
 
@@ -202,6 +234,79 @@ export default function BoardEditForm({ board, onSuccess, children }: BoardEditF
                 />
               ))}
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="boardLogo">Board Logo</Label>
+            {currentLogo && !removeLogo ? (
+              <div className="flex items-center gap-4">
+                <div className="relative w-20 h-20 rounded-lg overflow-hidden border">
+                  <Image
+                    src={currentLogo}
+                    alt="Board logo"
+                    fill
+                    className="object-cover"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setRemoveLogo(false)
+                      setLogoFile(null)
+                      const input = document.createElement('input')
+                      input.type = 'file'
+                      input.accept = 'image/*'
+                      input.onchange = (e) => {
+                        const file = (e.target as HTMLInputElement).files?.[0]
+                        if (file) {
+                          setLogoFile(file)
+                        }
+                      }
+                      input.click()
+                    }}
+                    disabled={isLoading}
+                  >
+                    <Upload className="h-4 w-4 mr-2" />
+                    Change
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setRemoveLogo(true)}
+                    disabled={isLoading}
+                  >
+                    <X className="h-4 w-4 mr-2" />
+                    Remove
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <SingleImageUpload
+                onChange={setLogoFile}
+                accept="image/*"
+                maxSize={5}
+                disabled={isLoading}
+                placeholder="Upload board logo"
+              />
+            )}
+            {removeLogo && (
+              <p className="text-sm text-muted-foreground">
+                Logo will be removed when you save changes.
+                <Button
+                  type="button"
+                  variant="link"
+                  size="sm"
+                  onClick={() => setRemoveLogo(false)}
+                  className="ml-2 h-auto p-0"
+                >
+                  Cancel
+                </Button>
+              </p>
+            )}
           </div>
 
           <DialogFooter>
