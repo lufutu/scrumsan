@@ -89,6 +89,9 @@ model OrganizationMember {
   timelineEvents      TimelineEvent[]
 
   @@unique([organizationId, userId])
+  @@index([organizationId])
+  @@index([userId])
+  @@index([permissionSetId])
   @@map("organization_members")
 }
 
@@ -112,6 +115,10 @@ model TeamInvitation {
   permissionSet       PermissionSet? @relation(fields: [permissionSetId], references: [id])
 
   @@unique([organizationId, email], name: "organizationId_email")
+  @@index([organizationId])
+  @@index([invitedBy])
+  @@index([acceptedBy])
+  @@index([permissionSetId])
   @@map("team_invitations")
 }
 
@@ -138,6 +145,8 @@ model Project {
 
   @@unique([organizationId, slug])
   @@index([slug])
+  @@index([organizationId])
+  @@index([createdBy])
   @@map("projects")
 }
 
@@ -155,6 +164,8 @@ model ProjectMember {
   user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([projectId, userId])
+  @@index([projectId])
+  @@index([userId])
   @@map("project_members")
 }
 
@@ -167,6 +178,8 @@ model ProjectBoard {
   project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@unique([projectId, boardId])
+  @@index([projectId])
+  @@index([boardId])
   @@map("project_boards")
 }
 
@@ -193,6 +206,8 @@ model Board {
 
   @@unique([organizationId, slug])
   @@index([slug])
+  @@index([organizationId])
+  @@index([createdBy])
   @@map("boards")
 }
 
@@ -205,6 +220,7 @@ model BoardColumn {
   board     Board?   @relation(fields: [boardId], references: [id], onDelete: Cascade)
   tasks     Task[]
 
+  @@index([boardId])
   @@map("board_columns")
 }
 
@@ -257,6 +273,18 @@ model Task {
   sprintColumn      SprintColumn?          @relation("SprintColumnTasks", fields: [sprintColumnId], references: [id])
   sprint            Sprint?                @relation(fields: [sprintId], references: [id])
 
+  // Performance indexes for foreign keys
+  @@index([boardId])
+  @@index([columnId])
+  @@index([sprintId])
+  @@index([sprintColumnId])
+  @@index([createdBy])
+  @@index([parentId])
+  @@index([epicId])
+  // Composite indexes for common query patterns
+  @@index([boardId, columnId])
+  @@index([boardId, sprintId])
+  @@index([boardId, sprintColumnId])
   @@map("tasks")
 }
 
@@ -272,6 +300,9 @@ model TaskRelation {
   targetTask   Task     @relation("TargetTask", fields: [targetTaskId], references: [id], onDelete: Cascade)
 
   @@unique([sourceTaskId, targetTaskId, relationType])
+  @@index([sourceTaskId])
+  @@index([targetTaskId])
+  @@index([createdBy])
   @@map("task_relations")
 }
 
@@ -300,6 +331,9 @@ model Sprint {
 
   @@unique([boardId, slug])
   @@index([slug])
+  @@index([boardId])
+  @@index([parentSprintId])
+  @@index([boardId, status])
   @@map("sprints")
 }
 
@@ -314,6 +348,7 @@ model SprintColumn {
   sprint    Sprint   @relation(fields: [sprintId], references: [id], onDelete: Cascade)
   tasks     Task[]   @relation("SprintColumnTasks")
 
+  @@index([sprintId])
   @@map("sprint_columns")
 }
 
@@ -326,6 +361,9 @@ model Comment {
   task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
   user      User?    @relation(fields: [userId], references: [id])
 
+  @@index([taskId])
+  @@index([userId])
+  @@index([taskId, createdAt(sort: Desc)])
   @@map("comments")
 }
 
@@ -342,6 +380,8 @@ model Attachment {
   task           Task?    @relation(fields: [taskId], references: [id], onDelete: Cascade)
   uploadedByUser User?    @relation(fields: [uploadedBy], references: [id])
 
+  @@index([taskId])
+  @@index([uploadedBy])
   @@map("attachments")
 }
 
@@ -355,6 +395,8 @@ model TaskChecklist {
   creator   User                @relation(fields: [createdBy], references: [id])
   task      Task                @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
+  @@index([taskId])
+  @@index([createdBy])
   @@map("task_checklists")
 }
 
@@ -371,6 +413,9 @@ model TaskChecklistItem {
   completedByUser User?         @relation("ChecklistItemCompletedBy", fields: [completedBy], references: [id])
   creator         User          @relation(fields: [createdBy], references: [id])
 
+  @@index([checklistId])
+  @@index([completedBy])
+  @@index([createdBy])
   @@map("task_checklist_items")
 }
 
@@ -386,6 +431,8 @@ model TaskWorklog {
   task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
   user        User     @relation(fields: [userId], references: [id])
 
+  @@index([taskId])
+  @@index([userId])
   @@map("task_worklog")
 }
 
@@ -400,6 +447,7 @@ model Label {
   taskLabels  TaskLabel[]
 
   @@unique([boardId, name])
+  @@index([boardId])
   @@map("labels")
 }
 
@@ -411,6 +459,8 @@ model TaskLabel {
   task    Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
   @@unique([taskId, labelId])
+  @@index([taskId])
+  @@index([labelId])
   @@map("task_labels")
 }
 
@@ -422,6 +472,8 @@ model TaskAssignee {
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([taskId, userId])
+  @@index([taskId])
+  @@index([userId])
   @@map("task_assignees")
 }
 
@@ -433,6 +485,8 @@ model TaskReviewer {
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([taskId, userId])
+  @@index([taskId])
+  @@index([userId])
   @@map("task_reviewers")
 }
 
@@ -450,6 +504,7 @@ model CustomField {
   board        Board                  @relation(fields: [boardId], references: [id], onDelete: Cascade)
   values       TaskCustomFieldValue[]
 
+  @@index([boardId])
   @@map("custom_fields")
 }
 
@@ -462,6 +517,8 @@ model TaskCustomFieldValue {
   task          Task        @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
   @@unique([taskId, customFieldId])
+  @@index([taskId])
+  @@index([customFieldId])
   @@map("task_custom_field_values")
 }
 
@@ -477,6 +534,7 @@ model PermissionSet {
   organization   Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   invitations    TeamInvitation[]
 
+  @@index([organizationId])
   @@map("permission_sets")
 }
 
@@ -493,6 +551,8 @@ model ProjectEngagement {
   organizationMember   OrganizationMember @relation(fields: [organizationMemberId], references: [id], onDelete: Cascade)
   project              Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
+  @@index([organizationMemberId])
+  @@index([projectId])
   @@map("project_engagements")
 }
 
@@ -509,6 +569,8 @@ model TimeOffEntry {
   approver             User?              @relation("TimeOffApprover", fields: [approvedBy], references: [id])
   organizationMember   OrganizationMember @relation(fields: [organizationMemberId], references: [id], onDelete: Cascade)
 
+  @@index([organizationMemberId])
+  @@index([approvedBy])
   @@map("time_off_entries")
 }
 
@@ -544,6 +606,8 @@ model TimelineEvent {
   creator              User               @relation("TimelineEventCreator", fields: [createdBy], references: [id])
   organizationMember   OrganizationMember @relation(fields: [organizationMemberId], references: [id], onDelete: Cascade)
 
+  @@index([organizationMemberId])
+  @@index([createdBy])
   @@map("timeline_events")
 }
 
@@ -556,6 +620,7 @@ model CustomRole {
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@unique([organizationId, name])
+  @@index([organizationId])
   @@map("custom_roles")
 }
 
@@ -576,6 +641,8 @@ model AuditLog {
   @@index([organizationId, timestamp])
   @@index([userId, timestamp])
   @@index([resourceType, timestamp])
+  @@index([organizationId])
+  @@index([userId])
   @@map("audit_logs")
 }
 
@@ -601,6 +668,9 @@ model Notification {
   @@index([userId, isRead, createdAt])
   @@index([organizationId, createdAt])
   @@index([entityType, entityId])
+  @@index([userId])
+  @@index([organizationId])
+  @@index([triggeredBy])
   @@map("notifications")
 }
 
@@ -613,6 +683,8 @@ model TaskFollower {
   user      User     @relation("UserTaskFollows", fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([taskId, userId])
+  @@index([taskId])
+  @@index([userId])
   @@map("task_followers")
 }
 
@@ -626,6 +698,8 @@ model BoardMember {
   user      User     @relation("UserBoardMemberships", fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([boardId, userId])
+  @@index([boardId])
+  @@index([userId])
   @@map("board_members")
 }
 
@@ -644,5 +718,7 @@ model TaskActivity {
 
   @@index([taskId, createdAt])
   @@index([userId, createdAt])
+  @@index([taskId])
+  @@index([userId])
   @@map("task_activities")
 }
