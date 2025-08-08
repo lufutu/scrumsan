@@ -112,15 +112,7 @@ export async function POST(req: NextRequest) {
           sprintId,
           sprintColumnId,
           position: nextPosition + i,
-          createdBy: user.id,
-          // Store AI reasoning and acceptance criteria in metadata
-          metadata: {
-            aiGenerated: true,
-            reasoning: taskData.reasoning,
-            sprintRecommendation: taskData.sprintRecommendation,
-            suggestedAssignee: taskData.assigneeId, // Store original suggestion even if not UUID
-            acceptanceCriteria: taskData.acceptanceCriteria || [] // Store acceptance criteria in metadata for now
-          }
+          createdBy: user.id
         },
         include: {
           assignees: {
@@ -237,6 +229,35 @@ export async function POST(req: NextRequest) {
           })
           // Don't fail the whole operation for checklist creation issues
         }
+      }
+
+      // Create TaskActivity record to indicate AI generation
+      try {
+        await prisma.taskActivity.create({
+          data: {
+            taskId: task.id,
+            userId: user.id,
+            activityType: 'task_created_ai',
+            description: 'Task created by AI Magic Generator',
+            metadata: {
+              aiGenerated: true,
+              reasoning: taskData.reasoning,
+              sprintRecommendation: taskData.sprintRecommendation,
+              suggestedAssignee: taskData.assigneeId,
+              acceptanceCriteria: taskData.acceptanceCriteria || []
+            }
+          }
+        })
+        logger.log('Created AI generation activity record', {
+          taskId: task.id,
+          activityType: 'task_created_ai'
+        })
+      } catch (activityError) {
+        logger.warn('Failed to create AI generation activity record', {
+          taskId: task.id,
+          error: activityError instanceof Error ? activityError.message : 'Unknown error'
+        })
+        // Don't fail the whole operation for activity creation issues
       }
 
       createdTasks.push(task)
