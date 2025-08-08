@@ -92,6 +92,7 @@ model OrganizationMember {
   @@index([organizationId])
   @@index([userId])
   @@index([permissionSetId])
+  @@index([userId, organizationId]) // Composite index for user's organizations query
   @@map("organization_members")
 }
 

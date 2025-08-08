@@ -19,46 +19,43 @@ export async function GET() {
     const supabase = await createClient()
     const user = await getCurrentUser(supabase)
     
-    // Get organizations where user is a member - OPTIMIZED QUERY
+    // Get organizations where user is a member - HIGHLY OPTIMIZED QUERY
+    // Using direct SQL join for better performance
     const organizations = await measureQueryPerformance(
       'GET /api/organizations',
-      async () => await prisma.organization.findMany({
-        where: {
-          members: {
-            some: {
-              userId: user.id
-            }
-          }
-        },
-        select: {
-          id: true,
-          name: true,
-          slug: true,
-          description: true,
-          logo: true,
-          ownerId: true,
-          createdAt: true,
-          members: {
-            where: {
-              userId: user.id // Only return current user's membership
-            },
-            select: {
-              userId: true,
-              role: true
-            }
-          },
-          _count: {
-            select: {
-              members: true,
-              projects: true,
-              boards: true
-            }
-          }
-        }
-      })
+      async () => await prisma.$queryRaw`
+        SELECT 
+          o.id,
+          o.name,
+          o.slug,
+          o.description,
+          o.logo,
+          o.owner_id as "ownerId",
+          o.created_at as "createdAt",
+          json_build_object(
+            'userId', om.user_id,
+            'role', om.role
+          ) as "memberInfo"
+        FROM organizations o
+        INNER JOIN organization_members om ON o.id = om.organization_id
+        WHERE om.user_id = ${user.id}::uuid
+        ORDER BY o.created_at DESC
+      `
     )
     
-    return NextResponse.json(organizations)
+    // Transform the raw query result to match the expected format
+    const formattedOrganizations = organizations.map((org: any) => ({
+      id: org.id,
+      name: org.name,
+      slug: org.slug,
+      description: org.description,
+      logo: org.logo,
+      ownerId: org.ownerId,
+      createdAt: org.createdAt,
+      members: org.memberInfo ? [org.memberInfo] : []
+    }))
+    
+    return NextResponse.json(formattedOrganizations)
   } catch (error: unknown) {
     logger.error('GET /api/organizations error:', error)
     return NextResponse.json(
