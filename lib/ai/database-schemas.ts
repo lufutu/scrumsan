@@ -54,7 +54,7 @@ export const DatabaseTaskGenerationSchema = z.object({
   boardType: z.enum(['scrum', 'kanban']).optional(),
   tasks: z.array(DatabaseTaskSchema).min(1, 'At least one task must be generated').max(20, 'Too many tasks generated'),
   
-  // Optional planning metadata
+  // Optional planning metadata - allow null or object
   sprintPlan: z.object({
     sprintCount: z.number().min(1).max(5).optional(),
     sprintsNeeded: z.array(z.object({
@@ -62,14 +62,14 @@ export const DatabaseTaskGenerationSchema = z.object({
       taskCount: z.number(),
       reasoning: z.string().optional()
     })).optional()
-  }).optional(),
+  }).nullable().optional(),
   
   projectInsights: z.object({
     estimatedDuration: z.string().optional(),
     complexity: z.enum(['simple', 'moderate', 'complex', 'very-complex']).optional(),
     teamSizeRecommendation: z.string().optional(),
     riskFactors: z.array(z.string()).optional().default([])
-  }).optional()
+  }).nullable().optional()
 })
 
 // Type exports

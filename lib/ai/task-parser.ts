@@ -174,8 +174,8 @@ REQUIRED OUTPUT FORMAT:
   "totalTasks": number of tasks generated,
   "boardType": "${context.boardType || 'scrum'}",
   "tasks": [array of task objects],
-  "sprintPlan": {...} (optional),
-  "projectInsights": {...} (optional)
+  "sprintPlan": null or {...} (optional - can be null or omitted),
+  "projectInsights": null or {...} (optional - can be null or omitted)
 }
 
 IMPORTANT: Always include the "summary" field with a brief overview of the generated tasks.`
