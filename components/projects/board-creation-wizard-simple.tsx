@@ -7,8 +7,11 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Plus, Kanban, Calendar, Loader2 } from 'lucide-react'
+import { Plus, Kanban, Calendar, Loader2, Sparkles, Upload } from 'lucide-react'
 import { SingleImageUpload } from '@/components/ui/single-image-upload'
+import { MagicTaskGenerator } from '@/components/ai/MagicTaskGenerator'
+import { Textarea } from '@/components/ui/textarea'
+import { Checkbox } from '@/components/ui/checkbox'
 
 interface BoardCreationWizardProps {
   organizationId: string
@@ -21,6 +24,8 @@ type BoardType = 'kanban' | 'scrum'
 interface WizardData {
   name: string
   type: BoardType
+  useAI: boolean
+  aiPrompt: string
 }
 
 export default function BoardCreationWizard({ organizationId, onSuccess, children }: BoardCreationWizardProps) {
@@ -28,9 +33,13 @@ export default function BoardCreationWizard({ organizationId, onSuccess, childre
   const [isOpen, setIsOpen] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
   const [logoFile, setLogoFile] = useState<File | null>(null)
+  const [showMagicGenerator, setShowMagicGenerator] = useState(false)
+  const [createdBoardId, setCreatedBoardId] = useState<string | null>(null)
   const [wizardData, setWizardData] = useState<WizardData>({
     name: '',
-    type: 'kanban'
+    type: 'kanban',
+    useAI: false,
+    aiPrompt: ''
   })
 
   const handleCreateBoard = async () => {
@@ -51,15 +60,9 @@ export default function BoardCreationWizard({ organizationId, onSuccess, childre
       description: `${wizardData.type === 'kanban' ? 'Kanban' : 'Scrum'} board created successfully`
     })
 
-    // Reset wizard immediately for better UX
-    setIsOpen(false)
+    // Store original data for potential rollback
     const originalWizardData = { ...wizardData }
     const originalLogoFile = logoFile
-    setWizardData({
-      name: '',
-      type: 'kanban'
-    })
-    setLogoFile(null)
 
     try {
       console.log('📡 Making board creation API call...')
@@ -107,8 +110,18 @@ export default function BoardCreationWizard({ organizationId, onSuccess, childre
         }
       }
 
-      // Call onSuccess with real board data
-      onSuccess?.(newBoard)
+      // Store board ID for AI generation
+      setCreatedBoardId(newBoard.id)
+
+      // If AI is enabled, show Magic Task Generator
+      if (wizardData.useAI) {
+        setShowMagicGenerator(true)
+        // Don't close the wizard yet - let AI generation complete first
+      } else {
+        // Reset wizard and close
+        resetWizard()
+        onSuccess?.(newBoard)
+      }
 
     } catch (err: any) {
       console.error('❌ Board creation failed:', err)
@@ -126,6 +139,31 @@ export default function BoardCreationWizard({ organizationId, onSuccess, childre
     } finally {
       setIsCreating(false)
     }
+  }
+
+  const resetWizard = () => {
+    setIsOpen(false)
+    setWizardData({
+      name: '',
+      type: 'kanban',
+      useAI: false,
+      aiPrompt: ''
+    })
+    setLogoFile(null)
+    setShowMagicGenerator(false)
+    setCreatedBoardId(null)
+  }
+
+  const handleAITasksCreated = (tasks: any[]) => {
+    // Tasks have been created successfully
+    toast({
+      title: "Success",
+      description: `AI generated ${tasks.length} tasks successfully!`
+    })
+    
+    // Reset wizard and close
+    resetWizard()
+    onSuccess?.({ id: createdBoardId })
   }
 
   return (
@@ -158,14 +196,31 @@ export default function BoardCreationWizard({ organizationId, onSuccess, childre
         </DialogHeader>
 
         <div className="space-y-6">
-          <div className="space-y-2">
+          <div className="space-y-3">
             <Label htmlFor="boardName">Board Name *</Label>
-            <Input
-              id="boardName"
-              placeholder="Enter board name"
-              value={wizardData.name}
-              onChange={(e) => setWizardData(prev => ({ ...prev, name: e.target.value }))}
-            />
+            <div className="flex items-center gap-3">
+              <Input
+                id="boardName"
+                placeholder="Enter board name"
+                value={wizardData.name}
+                onChange={(e) => setWizardData(prev => ({ ...prev, name: e.target.value }))}
+                className="flex-1"
+              />
+              <div className="flex-shrink-0">
+                <SingleImageUpload
+                  onChange={setLogoFile}
+                  accept="image/*"
+                  maxSize={5}
+                  disabled={isCreating}
+                  placeholder="Logo"
+                  variant="compact"
+                  className="w-12 h-12"
+                />
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Board logo is optional and appears next to the board name
+            </p>
           </div>
 
           <div className="space-y-2">
@@ -200,15 +255,47 @@ export default function BoardCreationWizard({ organizationId, onSuccess, childre
             </Select>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="boardLogo">Board Logo (Optional)</Label>
-            <SingleImageUpload
-              onChange={setLogoFile}
-              accept="image/*"
-              maxSize={5}
-              disabled={isCreating}
-              placeholder="Upload board logo"
-            />
+          {/* AI Magic Task Generator Section */}
+          <div className="space-y-4 p-4 bg-purple-50 rounded-lg border border-purple-200">
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-purple-600" />
+              <h3 className="font-medium text-purple-900">AI Magic Task Generator</h3>
+            </div>
+            
+            <div className="flex items-start gap-3">
+              <Checkbox
+                id="useAI"
+                checked={wizardData.useAI}
+                onCheckedChange={(checked) => setWizardData(prev => ({ ...prev, useAI: checked as boolean }))}
+                className="mt-1"
+              />
+              <div className="flex-1 space-y-2">
+                <Label htmlFor="useAI" className="text-sm font-medium cursor-pointer">
+                  Generate initial tasks with AI
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Describe your project and let AI create structured tasks automatically
+                </p>
+                
+                {wizardData.useAI && (
+                  <Textarea
+                    placeholder="Describe what you want to build (e.g., 'A task management app with user authentication, task creation, and team collaboration features')"
+                    value={wizardData.aiPrompt}
+                    onChange={(e) => setWizardData(prev => ({ ...prev, aiPrompt: e.target.value }))}
+                    rows={3}
+                    className="text-sm"
+                    disabled={isCreating}
+                  />
+                )}
+              </div>
+            </div>
+            
+            {wizardData.useAI && wizardData.aiPrompt && (
+              <div className="flex items-center gap-2 text-xs text-purple-700 bg-purple-100 p-2 rounded">
+                <Sparkles className="h-3 w-3" />
+                <span>AI will generate tasks after board creation</span>
+              </div>
+            )}
           </div>
 
           <div className="p-4 bg-muted/50 rounded-lg">
@@ -241,6 +328,23 @@ export default function BoardCreationWizard({ organizationId, onSuccess, childre
             </Button>
           </div>
         </div>
+
+        {/* Magic Task Generator Modal */}
+        {showMagicGenerator && createdBoardId && (
+          <MagicTaskGenerator
+            isOpen={showMagicGenerator}
+            onClose={() => {
+              setShowMagicGenerator(false)
+              resetWizard()
+              onSuccess?.({ id: createdBoardId })
+            }}
+            boardId={createdBoardId}
+            boardType={wizardData.type}
+            organizationId={organizationId}
+            initialPrompt={wizardData.aiPrompt}
+            onTasksCreated={handleAITasksCreated}
+          />
+        )}
       </DialogContent>
     </Dialog>
   )
