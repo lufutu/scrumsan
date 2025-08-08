@@ -176,8 +176,8 @@ export async function POST(req: NextRequest) {
       aiInput.images = validatedData.images
     }
 
-    // Generate tasks using AI
-    const generation = await aiTaskParser.generateTasks(aiInput)
+    // Generate tasks using database-aligned AI schema
+    const generation = await aiTaskParser.generateDatabaseTasks(aiInput)
 
     // Log successful generation
     logger.log('AI Generate Tasks API: Successfully generated tasks', {

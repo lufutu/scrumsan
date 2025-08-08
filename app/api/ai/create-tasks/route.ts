@@ -6,21 +6,10 @@ import { logger } from '@/lib/logger'
 import { z } from 'zod'
 import { TaskNotificationTriggers } from '@/lib/notification-triggers'
 import { TaskActivityTriggers } from '@/lib/activity-service'
+import { DatabaseTaskSchema, prepareTaskForDatabase } from '@/lib/ai/database-schemas'
 
 const createTasksFromAISchema = z.object({
-  tasks: z.array(z.object({
-    title: z.string().min(1),
-    description: z.string().optional(),
-    taskType: z.string().default('story'),
-    priority: z.string().default('medium'),
-    storyPoints: z.number().nullable().optional(),
-    estimatedHours: z.number().nullable().optional(),
-    labels: z.array(z.string()).optional(),
-    assigneeId: z.string().nullable().optional(),
-    acceptanceCriteria: z.array(z.string()).optional(),
-    sprintRecommendation: z.string().optional(),
-    reasoning: z.string().optional()
-  })),
+  tasks: z.array(DatabaseTaskSchema),
   boardId: z.string().uuid(),
   columnId: z.string().uuid().optional(),
   sprintId: z.string().uuid().optional(),
@@ -90,29 +79,28 @@ export async function POST(req: NextRequest) {
     const createdTasks = []
     
     for (let i = 0; i < tasks.length; i++) {
-      const taskData = tasks[i]
+      const aiTask = tasks[i]
       
       // Generate item code
       const boardInitials = board.organizationId.substring(0, 2).toUpperCase()
       const taskCount = await prisma.task.count({ where: { boardId } })
       const itemCode = `${boardInitials}-${taskCount + i + 1}`
 
-      // Create task
+      // Prepare database-ready task data
+      const { taskData, metadata } = prepareTaskForDatabase(aiTask, {
+        boardId,
+        columnId,
+        sprintId,
+        sprintColumnId,
+        position: nextPosition + i,
+        createdBy: user.id
+      })
+
+      // Create task using database-ready data
       const task = await prisma.task.create({
         data: {
-          title: taskData.title,
-          description: taskData.description || '',
-          itemCode,
-          taskType: taskData.taskType,
-          priority: taskData.priority,
-          storyPoints: taskData.storyPoints,
-          estimatedHours: taskData.estimatedHours,
-          boardId,
-          columnId,
-          sprintId,
-          sprintColumnId,
-          position: nextPosition + i,
-          createdBy: user.id
+          ...taskData,
+          itemCode // Add generated item code
         },
         include: {
           assignees: {
@@ -143,66 +131,56 @@ export async function POST(req: NextRequest) {
         }
       })
 
-      // Handle assignee if specified (skip if it's not a valid UUID)
-      if (taskData.assigneeId) {
-        // Check if it's a valid UUID format
-        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-        if (uuidRegex.test(taskData.assigneeId)) {
+      // Handle suggested assignees (names from AI, not UUIDs)
+      const suggestedNames = aiTask.aiMetadata?.suggestedAssigneeNames || []
+      if (suggestedNames.length > 0) {
+        logger.log('AI suggested assignees by name', {
+          taskId: task.id,
+          suggestedNames
+        })
+        // TODO: Future enhancement - match names to actual user IDs and create assignments
+      }
+
+      // Handle labels from AI metadata
+      const labelNames = aiTask.aiMetadata?.labels || []
+      if (labelNames.length > 0) {
+        for (const labelName of labelNames) {
           try {
-            await prisma.taskAssignee.create({
+            const label = await prisma.boardLabel.upsert({
+              where: {
+                boardId_name: {
+                  boardId,
+                  name: labelName
+                }
+              },
+              create: {
+                boardId,
+                name: labelName,
+                color: '#3B82F6', // Default blue color
+                createdBy: user.id
+              },
+              update: {}
+            })
+
+            await prisma.taskLabel.create({
               data: {
                 taskId: task.id,
-                userId: taskData.assigneeId,
-                assignedBy: user.id
+                labelId: label.id
               }
             })
-          } catch (error) {
-            logger.warn('Failed to assign user to AI-generated task', {
+          } catch (labelError) {
+            logger.warn('Failed to create label for AI-generated task', {
               taskId: task.id,
-              assigneeId: taskData.assigneeId,
-              error: error instanceof Error ? error.message : 'Unknown error'
+              labelName,
+              error: labelError instanceof Error ? labelError.message : 'Unknown error'
             })
-            // Don't fail the whole operation for assignment issues
           }
-        } else {
-          logger.log('AI generated non-UUID assignee, storing as metadata', {
-            taskId: task.id,
-            suggestedAssignee: taskData.assigneeId
-          })
         }
       }
 
-      // Handle labels if specified
-      if (taskData.labels && taskData.labels.length > 0) {
-        // Get or create labels
-        for (const labelName of taskData.labels) {
-          const label = await prisma.boardLabel.upsert({
-            where: {
-              boardId_name: {
-                boardId,
-                name: labelName
-              }
-            },
-            create: {
-              boardId,
-              name: labelName,
-              color: '#3B82F6', // Default blue color
-              createdBy: user.id
-            },
-            update: {}
-          })
-
-          await prisma.taskLabel.create({
-            data: {
-              taskId: task.id,
-              labelId: label.id
-            }
-          })
-        }
-      }
-
-      // Create acceptance criteria as a checklist if provided
-      if (taskData.acceptanceCriteria && taskData.acceptanceCriteria.length > 0) {
+      // Create acceptance criteria as a checklist if provided in AI metadata
+      const acceptanceCriteria = aiTask.aiMetadata?.acceptanceCriteria || []
+      if (acceptanceCriteria.length > 0) {
         try {
           const checklist = await prisma.taskChecklist.create({
             data: {
@@ -210,7 +188,7 @@ export async function POST(req: NextRequest) {
               name: 'Acceptance Criteria',
               createdBy: user.id,
               items: {
-                create: taskData.acceptanceCriteria.map((criteria, index) => ({
+                create: acceptanceCriteria.map((criteria) => ({
                   content: criteria,
                   createdBy: user.id
                 }))
@@ -220,7 +198,7 @@ export async function POST(req: NextRequest) {
           logger.log('Created acceptance criteria checklist', {
             taskId: task.id,
             checklistId: checklist.id,
-            itemCount: taskData.acceptanceCriteria.length
+            itemCount: acceptanceCriteria.length
           })
         } catch (checklistError) {
           logger.warn('Failed to create acceptance criteria checklist', {
@@ -240,11 +218,8 @@ export async function POST(req: NextRequest) {
             activityType: 'task_created_ai',
             description: 'Task created by AI Magic Generator',
             metadata: {
-              aiGenerated: true,
-              reasoning: taskData.reasoning,
-              sprintRecommendation: taskData.sprintRecommendation,
-              suggestedAssignee: taskData.assigneeId,
-              acceptanceCriteria: taskData.acceptanceCriteria || []
+              ...metadata, // Contains all AI metadata from the database schema
+              databaseSchemaVersion: '1.0' // Track which schema version was used
             }
           }
         })

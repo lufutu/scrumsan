@@ -1,6 +1,7 @@
 import { generateObject } from 'ai'
 import { openai } from '@ai-sdk/openai'
 import { AITaskGenerationSchema, type AITaskInput, type AITaskGeneration, type AITask } from './schemas'
+import { DatabaseTaskGenerationSchema, type DatabaseTaskGeneration } from './database-schemas'
 import { logger } from '@/lib/logger'
 
 /**
@@ -11,7 +12,45 @@ export class AITaskParser {
   private model = openai('gpt-4o-mini') // Cost-effective model for task generation
 
   /**
-   * Generate tasks from natural language input
+   * Generate database-aligned tasks from natural language input
+   * This method ensures AI generates data that matches our Prisma schema exactly
+   */
+  async generateDatabaseTasks(input: AITaskInput): Promise<DatabaseTaskGeneration> {
+    try {
+      logger.log('AI Task Parser: Starting database-aligned task generation', {
+        inputLength: input.input.length,
+        boardType: input.context.boardType,
+        maxTasks: input.options?.maxTasks
+      })
+
+      const prompt = this.buildDatabaseAlignedPrompt(input)
+      
+      // Use different model and approach if images are provided
+      const hasImages = input.images && input.images.length > 0
+      const modelToUse = hasImages ? openai('gpt-4o') : this.model // gpt-4o supports vision
+      
+      const { object } = await generateObject({
+        model: modelToUse,
+        schema: DatabaseTaskGenerationSchema,
+        prompt,
+        temperature: 0.7,
+        maxTokens: 4000,
+      })
+
+      logger.log('AI Task Parser: Successfully generated database-aligned tasks', {
+        taskCount: object.tasks.length,
+        boardType: object.boardType
+      })
+
+      return object
+    } catch (error) {
+      logger.error('AI Task Parser: Database-aligned generation failed', error)
+      throw new Error('Failed to generate tasks. Please try again with different input.')
+    }
+  }
+
+  /**
+   * Generate tasks from natural language input (legacy method)
    */
   async generateTasks(input: AITaskInput): Promise<AITaskGeneration> {
     try {
@@ -48,7 +87,92 @@ export class AITaskParser {
   }
 
   /**
-   * Build the AI prompt based on input context
+   * Build database-aligned prompt that enforces exact schema compliance
+   */
+  private buildDatabaseAlignedPrompt(input: AITaskInput): string {
+    const { context, options } = input
+    
+    let prompt = `You are an expert product manager generating tasks that will be inserted directly into a database. 
+You MUST follow the exact field specifications below to avoid database errors.
+
+REQUIREMENTS:
+${input.input}
+
+CONTEXT:
+- Board Type: ${context.boardType || 'scrum'}
+- Organization: ${context.organizationId}
+- Max Tasks: ${options?.maxTasks || 10}
+- Detail Level: ${options?.detailLevel || 'detailed'}`
+
+    if (context.existingTasks && context.existingTasks.length > 0) {
+      prompt += `\n- Existing Tasks: ${context.existingTasks.map(t => `"${t.title}" (${t.taskType})`).join(', ')}`
+    }
+
+    if (context.teamMembers && context.teamMembers.length > 0) {
+      prompt += `\n- Team Members: ${context.teamMembers.map(m => m.name).join(', ')}`
+    }
+
+    prompt += `
+
+DATABASE SCHEMA REQUIREMENTS (STRICT COMPLIANCE REQUIRED):
+
+TASK FIELDS - Use ONLY these exact fields and data types:
+- title: string (required, max 255 chars)
+- description: string|null (optional)
+- taskType: MUST be one of: "story", "improvement", "bug", "task", "note", "idea"  
+- priority: MUST be one of: "critical", "high", "medium", "low"
+- storyPoints: number|null (fibonacci: 1,2,3,5,8,13,21)
+- estimatedHours: number|null (0-1000)
+- effortUnits: number|null (0-1000)  
+- estimationType: "story_points" or "effort_units"
+- itemValue: string|null
+- position: number|null
+- dueDate: string|null (ISO date format like "2024-01-15")
+- isPriority: boolean (default false)
+
+FOREIGN KEY FIELDS (leave null - will be set by API):
+- boardId: will be set by API
+- columnId: null
+- sprintId: null  
+- sprintColumnId: null
+- epicId: null
+- parentId: null
+
+AI METADATA (separate from main task data):
+- reasoning: why you chose these values
+- sprintRecommendation: "backlog", "sprint-1", "sprint-2", or "current"
+- suggestedAssigneeNames: array of team member names (not IDs)
+- acceptanceCriteria: array of strings
+- dependencies: array of dependency descriptions
+- labels: array of label names
+
+CRITICAL RULES:
+1. Never use fields not listed above - they don't exist in the database
+2. Use exact enum values for taskType and priority  
+3. Keep all foreign keys as null - API will set them
+4. Put AI suggestions in aiMetadata, not main fields
+5. Generate ${options?.maxTasks || 10} or fewer tasks
+6. Each task must be actionable and specific
+
+${context.boardType === 'scrum' ? `
+SCRUM BOARD RULES:
+- Set sprintRecommendation in aiMetadata for each task
+- Break large features into multiple tasks
+- Consider dependencies between tasks
+` : `
+KANBAN BOARD RULES:  
+- All tasks start in backlog/todo
+- Focus on continuous flow
+- Minimize task dependencies
+`}
+
+Generate tasks that match this exact schema to prevent database insertion errors.`
+
+    return prompt
+  }
+
+  /**
+   * Build the AI prompt based on input context (legacy method)
    */
   private buildPrompt(input: AITaskInput): string {
     const { context, options } = input
