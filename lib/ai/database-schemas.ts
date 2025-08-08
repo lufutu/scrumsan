@@ -27,7 +27,7 @@ export const DatabaseTaskSchema = z.object({
   isPriority: z.boolean().optional().default(false),
   
   // Foreign key relationships - will be set by the API
-  boardId: z.string().uuid(), // Required - set by API
+  boardId: z.string().uuid().nullable().optional(), // Will be set by API
   columnId: z.string().uuid().nullable().optional(),
   sprintId: z.string().uuid().nullable().optional(), 
   sprintColumnId: z.string().uuid().nullable().optional(),
@@ -110,10 +110,13 @@ export const prepareTaskForDatabase = (
     // Core task data that goes directly to Prisma Task.create()
     taskData: {
       ...taskData,
-      boardId: context.boardId,
-      columnId: context.columnId,
-      sprintId: context.sprintId,
-      sprintColumnId: context.sprintColumnId,
+      // Override AI-generated foreign keys with actual context values
+      boardId: context.boardId, // Always override with actual boardId
+      columnId: context.columnId || null,
+      sprintId: context.sprintId || null,
+      sprintColumnId: context.sprintColumnId || null,
+      epicId: null, // Always null for AI-generated tasks
+      parentId: null, // Always null for AI-generated tasks
       position: context.position,
       createdBy: context.createdBy,
       // Convert date string to Date object
