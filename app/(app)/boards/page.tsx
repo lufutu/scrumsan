@@ -86,13 +86,23 @@ export default function BoardsPage() {
     slug?: string,
     organization?: { slug?: string }
   }) => {
+    console.log('🔍 handleBoardCreated called with:', JSON.stringify(newBoard, null, 2))
+    console.log('🔍 activeOrg:', JSON.stringify(activeOrg, null, 2))
+    
     // Navigate immediately for better UX using slug-based URLs
     const orgSlug = newBoard?.organization?.slug || activeOrg?.slug
+    console.log('🔍 Computed orgSlug:', orgSlug)
+    console.log('🔍 Board slug:', newBoard?.slug)
+    
     if (newBoard?.slug && orgSlug) {
-      router.push(`/orgs/${orgSlug}/boards/${newBoard.slug}`)
+      const targetUrl = `/orgs/${orgSlug}/boards/${newBoard.slug}`
+      console.log('✅ Using slug-based URL:', targetUrl)
+      router.push(targetUrl)
     } else if (newBoard?.id) {
-      // Fallback to UUID-based URL (will redirect to slug URL via middleware)
-      router.push(`/boards/${newBoard.id}`)
+      const fallbackUrl = `/boards/${newBoard.id}`
+      console.log('⚠️ Falling back to UUID URL:', fallbackUrl)
+      console.log('⚠️ Reason - slug missing:', !newBoard?.slug, 'orgSlug missing:', !orgSlug)
+      router.push(fallbackUrl)
     }
 
     // Refresh the boards list in the background

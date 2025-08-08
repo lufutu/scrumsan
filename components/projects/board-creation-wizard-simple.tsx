@@ -124,6 +124,7 @@ export default function BoardCreationWizard({ organizationId, onSuccess, childre
       } else {
         // Reset wizard and close
         resetWizard()
+        console.log('Board creation success - API returned:', JSON.stringify(newBoard, null, 2))
         console.log('Board creation success - passing to onSuccess:', {
           id: newBoard.id,
           slug: newBoard.slug,
@@ -175,6 +176,7 @@ export default function BoardCreationWizard({ organizationId, onSuccess, childre
     // Reset wizard and close
     resetWizard()
     // For AI creation, pass the complete board data for proper redirect
+    console.log('AI tasks created - stored board data:', JSON.stringify(createdBoardData, null, 2))
     console.log('AI tasks created - passing full board data for redirect:', {
       id: createdBoardData?.id,
       slug: createdBoardData?.slug,
