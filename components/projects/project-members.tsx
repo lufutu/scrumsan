@@ -374,7 +374,7 @@ export default function ProjectMembers({ projectId }: ProjectMembersProps) {
                       {isCurrentUser && <span className="text-muted-foreground ml-2">(You)</span>}
                     </div>
                     <div className="text-sm text-muted-foreground">
-                      Joined {new Date(member.created_at || '').toLocaleDateString()}
+                      Joined {new Date(member.createdAt || '').toLocaleDateString()}
                     </div>
                   </div>
                   

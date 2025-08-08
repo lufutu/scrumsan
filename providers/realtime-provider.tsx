@@ -27,12 +27,29 @@ export function RealtimeProvider({ children, projectId }: { children: ReactNode;
     const fetchCurrentUser = async () => {
       const { data } = await supabase.auth.getUser()
       if (data.user) {
-        const { data: profile } = await supabase.from("profiles").select("full_name").eq("id", data.user.id).single()
-
-        setCurrentUser({
-          id: data.user.id,
-          name: profile?.full_name || "Anonymous User",
-        })
+        // Use Prisma API to get user data instead of direct Supabase query
+        try {
+          const response = await fetch(`/api/users/${data.user.id}`)
+          if (response.ok) {
+            const user = await response.json()
+            setCurrentUser({
+              id: data.user.id,
+              name: user.fullName || data.user.email?.split('@')[0] || "Anonymous User",
+            })
+          } else {
+            // Fallback to auth metadata
+            setCurrentUser({
+              id: data.user.id,
+              name: data.user.user_metadata?.full_name || data.user.email?.split('@')[0] || "Anonymous User",
+            })
+          }
+        } catch (error) {
+          // Fallback to auth metadata
+          setCurrentUser({
+            id: data.user.id,
+            name: data.user.user_metadata?.full_name || data.user.email?.split('@')[0] || "Anonymous User",
+          })
+        }
       }
     }
 

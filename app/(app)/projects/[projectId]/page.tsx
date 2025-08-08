@@ -190,7 +190,7 @@ export default function ProjectDetailsPage({ params }: { params: Promise<{ proje
               </span>
             )}
             <span>
-              Created: <strong>{new Date(project.created_at || '').toLocaleDateString()}</strong>
+              Created: <strong>{new Date(project.createdAt || '').toLocaleDateString()}</strong>
             </span>
           </div>
         </div>

@@ -284,9 +284,9 @@ export default function BoardsPage() {
                           {getBoardTypeLabel(board.boardType)}
                         </Badge>
                       </div>
-                      {board.created_at && (
+                      {board.createdAt && (
                         <CardDescription>
-                          Created {new Date(board.created_at).toLocaleDateString()}
+                          Created {new Date(board.createdAt).toLocaleDateString()}
                         </CardDescription>
                       )}
                     </CardHeader>

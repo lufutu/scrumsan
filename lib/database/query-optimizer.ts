@@ -328,17 +328,15 @@ export function createOptimizedBoardQuery(boardId: string, options?: {
       name: true,
       slug: true,
       description: true,
-      type: true,
+      boardType: true,
       logo: true,
-      organization_id: true,
-      project_id: true,
-      created_at: true,
-      updated_at: true,
+      organizationId: true,
+      createdAt: true,
       columns: {
         orderBy: { position: 'asc' }
       },
       sprints: {
-        orderBy: { created_at: 'desc' },
+        orderBy: { createdAt: 'desc' },
         include: {
           sprintColumns: {
             orderBy: { position: 'asc' }
