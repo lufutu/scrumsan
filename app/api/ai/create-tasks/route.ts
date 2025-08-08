@@ -75,16 +75,65 @@ export async function POST(req: NextRequest) {
       nextPosition = (lastTask?.position || 0) + 1
     }
 
+    // Get the current max item code number for this board
+    const boardInitials = board.organizationId.substring(0, 2).toUpperCase()
+    const lastTaskWithCode = await prisma.task.findFirst({
+      where: {
+        boardId,
+        itemCode: {
+          startsWith: `${boardInitials}-`
+        }
+      },
+      orderBy: { itemCode: 'desc' },
+      select: { itemCode: true }
+    })
+
+    // Extract the highest number from existing item codes
+    let baseCodeNumber = 0
+    if (lastTaskWithCode?.itemCode) {
+      const match = lastTaskWithCode.itemCode.match(/\d+$/)
+      if (match) {
+        baseCodeNumber = parseInt(match[0], 10)
+      }
+    }
+
     // Create tasks in database
     const createdTasks = []
     
     for (let i = 0; i < tasks.length; i++) {
       const aiTask = tasks[i]
       
-      // Generate item code
-      const boardInitials = board.organizationId.substring(0, 2).toUpperCase()
-      const taskCount = await prisma.task.count({ where: { boardId } })
-      const itemCode = `${boardInitials}-${taskCount + i + 1}`
+      // Generate unique item code with retry logic
+      let itemCode = `${boardInitials}-${baseCodeNumber + i + 1}`
+      let retryCount = 0
+      const maxRetries = 10
+      
+      while (retryCount < maxRetries) {
+        try {
+          // Check if this item code already exists
+          const existingTask = await prisma.task.findUnique({
+            where: { itemCode },
+            select: { id: true }
+          })
+          
+          if (!existingTask) {
+            break // Code is unique, we can use it
+          }
+          
+          // Code exists, increment and try again
+          baseCodeNumber++
+          itemCode = `${boardInitials}-${baseCodeNumber + i + 1}`
+          retryCount++
+        } catch (checkError) {
+          // If check fails, try to proceed anyway
+          break
+        }
+      }
+      
+      if (retryCount >= maxRetries) {
+        // Fallback to timestamp-based code if we can't find a unique one
+        itemCode = `${boardInitials}-${Date.now()}-${i}`
+      }
 
       // Prepare database-ready task data
       const { taskData, metadata } = prepareTaskForDatabase(aiTask, {
@@ -96,16 +145,87 @@ export async function POST(req: NextRequest) {
         createdBy: user.id
       })
 
-      // Create task using database-ready data
-      const task = await prisma.task.create({
-        data: {
-          ...taskData,
-          itemCode // Add generated item code
-        },
-        include: {
-          taskAssignees: {
-            select: {
-              user: {
+      let task
+      try {
+        // Create task using database-ready data
+        task = await prisma.task.create({
+          data: {
+            ...taskData,
+            itemCode // Add generated item code
+          },
+          include: {
+            taskAssignees: {
+              select: {
+                user: {
+                  select: {
+                    id: true,
+                    fullName: true,
+                    avatarUrl: true
+                  }
+                }
+              }
+            },
+            taskLabels: {
+              select: {
+                label: {
+                  select: {
+                    id: true,
+                    name: true,
+                    color: true
+                  }
+                }
+              }
+            },
+            creator: {
+              select: {
+                id: true,
+                fullName: true,
+                avatarUrl: true
+              }
+            }
+          }
+        })
+      } catch (createError: any) {
+        // If we get a unique constraint error on item_code, try with timestamp
+        if (createError.code === 'P2002' && createError.meta?.target?.includes('item_code')) {
+          logger.warn('Item code collision detected, using timestamp fallback', {
+            attemptedCode: itemCode,
+            error: createError.message
+          })
+          
+          // Generate a guaranteed unique code using timestamp
+          itemCode = `${boardInitials}-${Date.now()}-${i}`
+          
+          // Retry with new code
+          task = await prisma.task.create({
+            data: {
+              ...taskData,
+              itemCode
+            },
+            include: {
+              taskAssignees: {
+                select: {
+                  user: {
+                    select: {
+                      id: true,
+                      fullName: true,
+                      avatarUrl: true
+                    }
+                  }
+                }
+              },
+              taskLabels: {
+                select: {
+                  label: {
+                    select: {
+                      id: true,
+                      name: true,
+                      color: true
+                    }
+                  }
+                }
+              },
+              creator: {
                 select: {
                   id: true,
                   fullName: true,
@@ -113,27 +233,12 @@ export async function POST(req: NextRequest) {
                 }
               }
             }
-          },
-          taskLabels: {
-            select: {
-              label: {
-                select: {
-                  id: true,
-                  name: true,
-                  color: true
-                }
-              }
-            }
-          },
-          creator: {
-            select: {
-              id: true,
-              fullName: true,
-              avatarUrl: true
-            }
-          }
+          })
+        } else {
+          // Re-throw other errors
+          throw createError
         }
-      })
+      }
 
       // Handle suggested assignees (names from AI, not UUIDs)
       const suggestedNames = aiTask.aiMetadata?.suggestedAssigneeNames || []
