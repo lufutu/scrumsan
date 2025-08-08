@@ -194,7 +194,7 @@ export default function BoardCreationWizard({ organizationId, onSuccess, childre
         )}
       </DialogTrigger>
       <DialogContent 
-        className="sm:max-w-[700px]"
+        className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto"
         aria-describedby="simple-board-creation-description"
         onInteractOutside={(e) => {
           // Prevent closing during creation to avoid focus issues
@@ -224,7 +224,7 @@ export default function BoardCreationWizard({ organizationId, onSuccess, childre
                   disabled={isCreating}
                   placeholder="Logo"
                   variant="compact"
-                  className="w-10 h-10"
+                  className="w-8 h-8"
                 />
               </div>
               <Input
@@ -300,8 +300,8 @@ export default function BoardCreationWizard({ organizationId, onSuccess, childre
                       placeholder="Describe what you want to build (e.g., 'A task management app with user authentication, task creation, and team collaboration features')"
                       value={wizardData.aiPrompt}
                       onChange={(e) => setWizardData(prev => ({ ...prev, aiPrompt: e.target.value }))}
-                      rows={3}
-                      className="text-sm"
+                      rows={4}
+                      className="text-sm resize-none min-h-[100px] max-h-[200px] overflow-y-auto"
                       disabled={isCreating}
                     />
                     
