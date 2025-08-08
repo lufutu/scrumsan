@@ -37,20 +37,20 @@ export const getBoardTasksOptimized = {
     id: true,
     title: true,
     description: true,
-    item_code: true,
-    type: true,
+    itemCode: true,
+    taskType: true,
     priority: true,
-    story_points: true,
+    storyPoints: true,
     position: true,
-    column_id: true,
-    sprint_id: true,
-    sprint_column_id: true,
-    board_id: true,
-    parent_id: true,
-    epic_id: true,
-    due_date: true,
-    created_at: true,
-    updated_at: true,
+    columnId: true,
+    sprintId: true,
+    sprintColumnId: true,
+    boardId: true,
+    parentId: true,
+    epicId: true,
+    dueDate: true,
+    createdAt: true,
+    updatedAt: true,
     // Only include counts for relations to avoid loading all data
     _count: {
       select: {
@@ -116,13 +116,13 @@ export const getTaskDetailsOptimized = {
         user: true
       },
       orderBy: {
-        created_at: 'desc' as const
+        createdAt: 'desc' as const
       },
       take: 20 // Initial load of recent comments
     },
     attachments: {
       orderBy: {
-        uploaded_at: 'desc' as const
+        uploadedAt: 'desc' as const
       }
     },
     subtasks: {
@@ -135,7 +135,7 @@ export const getTaskDetailsOptimized = {
       select: {
         id: true,
         title: true,
-        item_code: true,
+        itemCode: true,
       }
     },
     sourceRelations: {
@@ -144,7 +144,7 @@ export const getTaskDetailsOptimized = {
           select: {
             id: true,
             title: true,
-            item_code: true,
+            itemCode: true,
           }
         }
       }
@@ -155,7 +155,7 @@ export const getTaskDetailsOptimized = {
           select: {
             id: true,
             title: true,
-            item_code: true,
+            itemCode: true,
           }
         }
       }
@@ -173,8 +173,7 @@ export const getOrganizationDataOptimized = {
     name: true,
     slug: true,
     logo: true,
-    created_at: true,
-    updated_at: true,
+    createdAt: true,
     _count: {
       select: {
         projects: true,
@@ -198,7 +197,7 @@ export const getOrganizationDataOptimized = {
       },
       take: 10, // Limit initial member load
       orderBy: {
-        joined_at: 'desc' as const
+        createdAt: 'desc' as const
       }
     }
   }

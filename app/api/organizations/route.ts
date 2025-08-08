@@ -37,8 +37,7 @@ export async function GET() {
           description: true,
           logo: true,
           ownerId: true,
-          created_at: true,
-          updated_at: true,
+          createdAt: true,
           members: {
             where: {
               userId: user.id // Only return current user's membership
