@@ -3,7 +3,7 @@ import { cookies } from 'next/headers'
 import { NextResponse, type NextRequest } from 'next/server'
 import { isUUID } from '@/lib/slug-utils'
 
-const publicRoutes = ['/', '/login', '/signup', '/auth/callback', '/auth/verify-email']
+const publicRoutes = ['/', '/login', '/signup', '/auth/callback', '/auth/verify-email', '/auth/reset-password', '/auth/forgot-password']
 const protectedRoutes = ['/dashboard', '/projects', '/organizations', '/settings', '/profile', '/orgs', '/boards']
 
 /**
@@ -135,6 +135,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // If user is signed in and trying to access auth pages, redirect to home
+  // Exception: allow access to reset password page even when logged in
   if (user && ['/login', '/signup'].includes(pathname)) {
     return NextResponse.redirect(new URL('/', request.url))
   }

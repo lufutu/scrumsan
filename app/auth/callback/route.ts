@@ -9,6 +9,18 @@ export async function GET(request: Request) {
   const returnUrl = requestUrl.searchParams.get('returnUrl')
 
   if (code) {
+    // For password reset flows, pass code directly without exchanging for session
+    // This prevents auto-login before password reset
+    if (returnUrl?.includes('/auth/reset-password')) {
+      const resetUrl = new URL(returnUrl, request.url)
+      resetUrl.searchParams.set('code', code)
+      resetUrl.searchParams.set('type', 'recovery')
+      
+      logger.log('Password reset: redirecting with code to', resetUrl.toString())
+      return NextResponse.redirect(resetUrl)
+    }
+
+    // For normal auth flows, exchange code for session
     try {
       const supabase = await createClient()
       
@@ -18,17 +30,6 @@ export async function GET(request: Request) {
       if (error) {
         logger.error('Auth callback error:', error)
         return NextResponse.redirect(new URL('/login?error=auth_callback_error', request.url))
-      }
-
-      // For password reset flows, redirect with session tokens
-      if (returnUrl?.includes('/auth/reset-password') && data.session) {
-        const resetUrl = new URL('/auth/reset-password', request.url)
-        resetUrl.searchParams.set('access_token', data.session.access_token)
-        resetUrl.searchParams.set('refresh_token', data.session.refresh_token)
-        resetUrl.searchParams.set('type', 'recovery')
-        
-        logger.log('Password reset: redirecting with tokens to', resetUrl.toString())
-        return NextResponse.redirect(resetUrl)
       }
 
       // If we have a user, ensure they exist in our database

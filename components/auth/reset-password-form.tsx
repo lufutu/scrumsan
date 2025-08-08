@@ -28,7 +28,7 @@ export function ResetPasswordForm() {
 
   // Check if we have valid reset token parameters
   useEffect(() => {
-    const checkTokenValidity = () => {
+    const checkTokenValidity = async () => {
       const accessToken = searchParams.get('access_token')
       const refreshToken = searchParams.get('refresh_token')
       const type = searchParams.get('type')
@@ -42,6 +42,29 @@ export function ResetPasswordForm() {
           access_token: accessToken,
           refresh_token: refreshToken,
         })
+      } else if (code && type === 'recovery') {
+        // Handle password reset code - exchange for session without setting it globally
+        try {
+          const supabase = createClient()
+          const { data, error } = await supabase.auth.exchangeCodeForSession(code)
+          
+          if (error) {
+            console.error('Token exchange error:', error)
+            setIsValidToken(false)
+            return
+          }
+          
+          if (data.session) {
+            setIsValidToken(true)
+            // Set session only for this password reset operation
+            await supabase.auth.setSession(data.session)
+          } else {
+            setIsValidToken(false)
+          }
+        } catch (error) {
+          console.error('Code exchange error:', error)
+          setIsValidToken(false)
+        }
       } else if (code) {
         // Handle case where user came directly with code - redirect to callback
         const callbackUrl = `/auth/callback?code=${code}&returnUrl=${encodeURIComponent('/auth/reset-password')}`
@@ -92,6 +115,9 @@ export function ResetPasswordForm() {
       if (error) throw error
 
       setSuccess(true)
+      
+      // Sign out to prevent auto-login after password reset
+      await supabase.auth.signOut()
       
       // Redirect to login after 3 seconds
       setTimeout(() => {
