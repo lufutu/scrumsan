@@ -194,7 +194,7 @@ export default function BoardCreationWizard({ organizationId, onSuccess, childre
         )}
       </DialogTrigger>
       <DialogContent 
-        className="sm:max-w-[500px]"
+        className="sm:max-w-[700px]"
         aria-describedby="simple-board-creation-description"
         onInteractOutside={(e) => {
           // Prevent closing during creation to avoid focus issues
@@ -215,15 +215,8 @@ export default function BoardCreationWizard({ organizationId, onSuccess, childre
         <div className="space-y-6">
           <div className="space-y-3">
             <Label htmlFor="boardName">Board Name *</Label>
-            <div className="relative">
-              <Input
-                id="boardName"
-                placeholder="Enter board name"
-                value={wizardData.name}
-                onChange={(e) => setWizardData(prev => ({ ...prev, name: e.target.value }))}
-                className="pr-12"
-              />
-              <div className="absolute right-2 top-1/2 -translate-y-1/2">
+            <div className="flex items-center gap-3">
+              <div className="flex-shrink-0">
                 <SingleImageUpload
                   onChange={setLogoFile}
                   accept="image/*"
@@ -231,9 +224,16 @@ export default function BoardCreationWizard({ organizationId, onSuccess, childre
                   disabled={isCreating}
                   placeholder="Logo"
                   variant="compact"
-                  className="w-8 h-8"
+                  className="w-10 h-10"
                 />
               </div>
+              <Input
+                id="boardName"
+                placeholder="Enter board name"
+                value={wizardData.name}
+                onChange={(e) => setWizardData(prev => ({ ...prev, name: e.target.value }))}
+                className="flex-1"
+              />
             </div>
             <p className="text-xs text-muted-foreground">
               Board logo is optional and appears next to the board name
