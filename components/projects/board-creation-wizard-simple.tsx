@@ -36,6 +36,7 @@ export default function BoardCreationWizard({ organizationId, onSuccess, childre
   const [logoFile, setLogoFile] = useState<File | null>(null)
   const [showMagicGenerator, setShowMagicGenerator] = useState(false)
   const [createdBoardId, setCreatedBoardId] = useState<string | null>(null)
+  const [createdBoardData, setCreatedBoardData] = useState<any>(null)
   const [wizardData, setWizardData] = useState<WizardData>({
     name: '',
     type: 'kanban',
@@ -112,8 +113,9 @@ export default function BoardCreationWizard({ organizationId, onSuccess, childre
         }
       }
 
-      // Store board ID for AI generation
+      // Store board ID and data for AI generation
       setCreatedBoardId(newBoard.id)
+      setCreatedBoardData(newBoard)
 
       // If AI is enabled, show Magic Task Generator
       if (wizardData.useAI) {
@@ -122,6 +124,11 @@ export default function BoardCreationWizard({ organizationId, onSuccess, childre
       } else {
         // Reset wizard and close
         resetWizard()
+        console.log('Board creation success - passing to onSuccess:', {
+          id: newBoard.id,
+          slug: newBoard.slug,
+          organization: newBoard.organization
+        })
         onSuccess?.(newBoard)
       }
 
@@ -155,6 +162,7 @@ export default function BoardCreationWizard({ organizationId, onSuccess, childre
     setLogoFile(null)
     setShowMagicGenerator(false)
     setCreatedBoardId(null)
+    setCreatedBoardData(null)
   }
 
   const handleAITasksCreated = (tasks: any[]) => {
@@ -166,7 +174,13 @@ export default function BoardCreationWizard({ organizationId, onSuccess, childre
     
     // Reset wizard and close
     resetWizard()
-    onSuccess?.({ id: createdBoardId })
+    // For AI creation, pass the complete board data for proper redirect
+    console.log('AI tasks created - passing full board data for redirect:', {
+      id: createdBoardData?.id,
+      slug: createdBoardData?.slug,
+      organization: createdBoardData?.organization
+    })
+    onSuccess?.(createdBoardData || { id: createdBoardId })
   }
 
   const handleAddAIImage = (files: File[]) => {
