@@ -348,8 +348,8 @@ export async function POST(req: NextRequest) {
       // Trigger notifications and activities
       try {
         await Promise.all([
-          TaskNotificationTriggers.onTaskCreated(task, user.id),
-          TaskActivityTriggers.onTaskCreated(task, user.id)
+          TaskNotificationTriggers.onTaskCreated(task.id, user.id),
+          TaskActivityTriggers.onTaskCreated(task.id, user.id)
         ])
       } catch (notificationError) {
         logger.error('Failed to trigger task notifications', notificationError)
