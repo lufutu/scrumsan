@@ -82,7 +82,8 @@ export async function GET(req: NextRequest) {
       }
     })
     
-    return NextResponse.json(boards)
+    // Return in the expected format with boards array
+    return NextResponse.json({ boards })
   } catch (error: unknown) {
     console.error('Error fetching boards:', error)
     return NextResponse.json(
