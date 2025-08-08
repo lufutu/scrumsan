@@ -450,6 +450,145 @@ This rule has **ZERO TOLERANCE** - maintaining clean schema is critical for appl
 - **Extract client components** when using browser-only APIs
 - **Use useEffect for URL parameter handling** after hydration
 
+### 🚨 CRITICAL: Database Indexing Rule (MANDATORY FOR ALL MIGRATIONS)
+
+#### ⚠️ ABSOLUTELY REQUIRED: Always Add Indexes When Creating Database Migrations ⚠️
+- **EVERY foreign key MUST have an index** - No exceptions
+- **EVERY commonly queried field MUST be indexed**
+- **ALL junction tables MUST have composite indexes**
+- **Performance is NOT optional** - Indexes are critical for scale
+
+#### 🔴 MANDATORY INDEXING PATTERNS (Zero Tolerance)
+When creating ANY Prisma model, ALWAYS add these indexes:
+
+**Foreign Key Indexes (Required for ALL foreign keys)**:
+```prisma
+model Task {
+  boardId    String  @map("board_id") @db.Uuid
+  columnId   String? @map("column_id") @db.Uuid
+  createdBy  String? @map("created_by") @db.Uuid
+  
+  // MANDATORY: Index every foreign key
+  @@index([boardId])
+  @@index([columnId])
+  @@index([createdBy])
+}
+```
+
+**Junction Table Indexes (Required for ALL many-to-many relationships)**:
+```prisma
+model TaskAssignee {
+  taskId String @map("task_id") @db.Uuid
+  userId String @map("user_id") @db.Uuid
+  
+  // MANDATORY: Index both foreign keys + composite unique
+  @@unique([taskId, userId])
+  @@index([taskId])
+  @@index([userId])
+}
+```
+
+**Composite Indexes (Required for common query patterns)**:
+```prisma
+model Task {
+  boardId        String  @map("board_id") @db.Uuid
+  columnId       String? @map("column_id") @db.Uuid
+  sprintId       String? @map("sprint_id") @db.Uuid
+  
+  // MANDATORY: Composite indexes for common queries
+  @@index([boardId, columnId])
+  @@index([boardId, sprintId])
+  @@index([boardId, createdAt(sort: Desc)])
+}
+```
+
+**Timestamp Indexes (Required for sorting and filtering)**:
+```prisma
+model Comment {
+  taskId    String   @map("task_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+  
+  // MANDATORY: Timestamp indexes for sorting
+  @@index([taskId, createdAt(sort: Desc)])
+  @@index([userId, createdAt(sort: Desc)])
+}
+```
+
+#### 📋 INDEXING CHECKLIST (Check ALL before migration)
+For EVERY new model or field:
+- [ ] All foreign key fields have `@@index([fieldName])`
+- [ ] Junction tables have individual + composite indexes
+- [ ] Timestamp fields used for sorting have indexes
+- [ ] Common filter fields (organizationId, userId, status) are indexed
+- [ ] Query patterns have appropriate composite indexes
+- [ ] No unused indexes (remove if not needed)
+
+#### 🛡️ PERFORMANCE REQUIREMENTS
+- **Query Response Time**: <100ms for indexed queries
+- **No Full Table Scans**: All queries must use indexes
+- **Scalability**: Must handle 100k+ records efficiently
+- **Foreign Key Performance**: JOINs must be lightning fast
+
+#### ⚠️ ENFORCEMENT MECHANISMS
+1. **Pre-Migration Review**: Check all indexes before `prisma migrate dev`
+2. **Database Analysis**: Use `EXPLAIN ANALYZE` for complex queries
+3. **Performance Testing**: Monitor query times after deployment
+4. **Production Monitoring**: Watch for slow queries in Supabase dashboard
+
+#### 🚀 COMMON INDEXING PATTERNS BY MODEL TYPE
+
+**Organization-related models**:
+```prisma
+@@index([organizationId])
+@@index([organizationId, createdAt(sort: Desc)])
+@@index([organizationId, userId]) // For member lookups
+```
+
+**Task-related models**:
+```prisma
+@@index([taskId])
+@@index([taskId, createdAt(sort: Desc)])
+@@index([userId, taskId]) // For user's tasks
+```
+
+**Board-related models**:
+```prisma
+@@index([boardId])
+@@index([boardId, position]) // For ordering
+@@index([boardId, userId]) // For permissions
+```
+
+#### ❌ FORBIDDEN PRACTICES (Never Do This)
+- Creating models without foreign key indexes
+- Adding fields that will be filtered without indexes  
+- Junction tables without individual foreign key indexes
+- Timestamp fields without sorting indexes
+- Complex queries without EXPLAIN ANALYZE testing
+- Production deployment without index verification
+
+#### ✅ VERIFICATION STEPS (Required Before Production)
+1. **Test Query Performance**: All common queries <100ms
+2. **Check Index Usage**: Verify indexes are actually used
+3. **Monitor Database**: No slow query warnings
+4. **Load Testing**: Performance under realistic data volumes
+
+#### 🔧 MIGRATION WORKFLOW
+```bash
+# 1. Create model with proper indexes in schema.prisma
+# 2. Verify all foreign keys have indexes
+# 3. Add composite indexes for common patterns
+# 4. Test locally
+bunx prisma migrate dev --name descriptive_name
+
+# 5. Deploy to production
+bunx prisma migrate deploy
+
+# 6. Monitor performance in production
+```
+
+This rule has **ZERO TOLERANCE** - No migration without proper indexing. Database performance is critical for user experience and application scalability.
+
 ### 🚀 CRITICAL: Optimistic UI Rule (MANDATORY FOR ALL FEATURES)
 
 #### Core Principle: Always Update UI First, Validate Later

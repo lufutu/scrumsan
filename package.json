@@ -17,7 +17,8 @@
     "db:generate": "bunx prisma generate",
     "db:studio": "bunx prisma studio",
     "db:push": "bunx prisma db push",
-    "db:reset": "bunx prisma migrate reset"
+    "db:reset": "bunx prisma migrate reset",
+    "db:check-indexes": "node scripts/check-database-indexes.js"
   },
   "dependencies": {
     "@atlaskit/pragmatic-drag-and-drop": "^1.7.4",
