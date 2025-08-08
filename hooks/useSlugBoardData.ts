@@ -87,16 +87,6 @@ export const useSlugBoardData = (orgSlug: string | null, boardSlug: string | nul
     enabled: shouldFetchDetails,
   })
 
-  // Debug tasks query
-  console.log('Slug Tasks query debug:', {
-    shouldFetchDetails,
-    orgSlug,
-    boardSlug,
-    tasks,
-    tasksError,
-    tasksLength: tasks?.length
-  })
-
   const { data: labels, error: labelsError } = useQuery<Label[]>({
     queryKey: ['slug-labels', orgSlug, boardSlug],
     queryFn: () => fetcher(`/api/orgs/${orgSlug}/boards/${boardSlug}/labels`),

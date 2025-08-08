@@ -1,5 +1,6 @@
 import { User } from '@supabase/supabase-js'
 import { prisma } from './prisma'
+import { logger } from './logger'
 
 /**
  * Ensures a Supabase Auth user exists in our Prisma database
@@ -27,7 +28,7 @@ export async function ensureUserExists(user: User) {
     if (existingUserByEmail) {
       // User exists with same email but different ID (migration from cloud to self-hosted)
       if (existingUserByEmail.id !== user.id) {
-        console.log(`Migrating user ${user.email} from ID ${existingUserByEmail.id} to ${user.id}`)
+        logger.info(`Migrating user ${user.email} from ID ${existingUserByEmail.id} to ${user.id}`)
         
         // Update the existing user's ID to match the new Supabase auth ID
         const updatedUser = await prisma.user.update({
@@ -68,7 +69,7 @@ export async function ensureUserExists(user: User) {
   } catch (error: any) {
     // If it's a database connection error, log it but don't throw
     if (error.code === 'P1001') {
-      console.error('Database connection error in ensureUserExists:', error.message)
+      logger.error('Database connection error in ensureUserExists:', error.message)
       // Return a minimal user object to allow the app to continue
       return {
         id: user.id,
@@ -77,7 +78,7 @@ export async function ensureUserExists(user: User) {
         avatarUrl: user.user_metadata?.avatar_url || null
       }
     }
-    console.error('Error ensuring user exists:', error)
+    logger.error('Error ensuring user exists:', error)
     throw new Error('Failed to sync user data')
   }
 }
@@ -89,12 +90,12 @@ export async function getCurrentUser(supabase: any) {
   const { data: { user }, error: userError } = await supabase.auth.getUser()
   
   if (userError) {
-    console.error('Supabase auth error:', userError)
+    logger.error('Supabase auth error:', userError)
     throw new Error(`Authentication failed: ${userError.message}`)
   }
   
   if (!user) {
-    console.error('No user found in session')
+    logger.error('No user found in session')
     throw new Error('No authenticated user found')
   }
   

@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { ensureUserExists } from '@/lib/auth-utils'
+import { logger } from '@/lib/logger'
 
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url)
@@ -15,7 +16,7 @@ export async function GET(request: Request) {
       const { data, error } = await supabase.auth.exchangeCodeForSession(code)
       
       if (error) {
-        console.error('Auth callback error:', error)
+        logger.error('Auth callback error:', error)
         return NextResponse.redirect(new URL('/login?error=auth_callback_error', request.url))
       }
 
@@ -24,12 +25,12 @@ export async function GET(request: Request) {
         try {
           await ensureUserExists(data.user)
         } catch (dbError) {
-          console.error('Database user creation error:', dbError)
+          logger.error('Database user creation error:', dbError)
           // Continue with redirect even if DB sync fails, user can try again
         }
       }
     } catch (error) {
-      console.error('Auth callback error:', error)
+      logger.error('Auth callback error:', error)
       return NextResponse.redirect(new URL('/login?error=auth_callback_error', request.url))
     }
   }

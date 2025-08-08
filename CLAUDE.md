@@ -355,6 +355,37 @@ This rule has **ZERO TOLERANCE** - maintaining clean schema is critical for appl
   ```
 - **This applies to ALL pages and components** - existing and new
 
+### 🚨 CRITICAL: Logging Rule (MANDATORY)
+- **NEVER use console.log, console.error, console.warn directly**
+- **ALWAYS use the logger utility from `/lib/logger.ts`**
+- **Logger automatically hides logs in production** (except errors)
+- **Import and use like this**:
+  ```typescript
+  import { logger } from '@/lib/logger'
+  
+  // Instead of console.log
+  logger.log('Debug message')
+  logger.info('Information')
+  logger.debug('Debug info')
+  
+  // Instead of console.error
+  logger.error('Error occurred', error)
+  
+  // Instead of console.warn
+  logger.warn('Warning message')
+  
+  // Special logging utilities
+  logger.api.request('GET', '/api/users')
+  logger.db.query('findMany', 'User', { where: { ... } })
+  logger.component.mount('TaskCard', props)
+  ```
+- **Benefits**:
+  - ✅ No console output in production (cleaner, more secure)
+  - ✅ Consistent log formatting with prefixes
+  - ✅ Better debugging with categorized logs
+  - ✅ Performance monitoring capabilities
+  - ✅ Easy to enable/disable specific log categories
+
 ### IMPORTANT: Modal Behavior Rule
 - **ItemModal must NEVER auto-close** on any action (save, create, etc.)
 - **Use Dialog props to prevent closing**:
