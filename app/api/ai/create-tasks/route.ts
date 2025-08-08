@@ -103,28 +103,32 @@ export async function POST(req: NextRequest) {
           itemCode // Add generated item code
         },
         include: {
-          assignees: {
-            include: {
+          taskAssignees: {
+            select: {
               user: {
                 select: {
                   id: true,
                   fullName: true,
-                  email: true,
                   avatarUrl: true
                 }
               }
             }
           },
-          labels: {
-            include: {
-              label: true
+          taskLabels: {
+            select: {
+              label: {
+                select: {
+                  id: true,
+                  name: true,
+                  color: true
+                }
+              }
             }
           },
           creator: {
             select: {
               id: true,
               fullName: true,
-              email: true,
               avatarUrl: true
             }
           }
@@ -146,7 +150,7 @@ export async function POST(req: NextRequest) {
       if (labelNames.length > 0) {
         for (const labelName of labelNames) {
           try {
-            const label = await prisma.boardLabel.upsert({
+            const label = await prisma.label.upsert({
               where: {
                 boardId_name: {
                   boardId,
@@ -156,8 +160,7 @@ export async function POST(req: NextRequest) {
               create: {
                 boardId,
                 name: labelName,
-                color: '#3B82F6', // Default blue color
-                createdBy: user.id
+                color: '#3B82F6' // Default blue color
               },
               update: {}
             })
