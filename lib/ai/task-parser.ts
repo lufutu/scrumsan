@@ -166,7 +166,19 @@ KANBAN BOARD RULES:
 - Minimize task dependencies
 `}
 
-Generate tasks that match this exact schema to prevent database insertion errors.`
+Generate tasks that match this exact schema to prevent database insertion errors.
+
+REQUIRED OUTPUT FORMAT:
+{
+  "summary": "Brief description of what these tasks accomplish",
+  "totalTasks": number of tasks generated,
+  "boardType": "${context.boardType || 'scrum'}",
+  "tasks": [array of task objects],
+  "sprintPlan": {...} (optional),
+  "projectInsights": {...} (optional)
+}
+
+IMPORTANT: Always include the "summary" field with a brief overview of the generated tasks.`
 
     return prompt
   }
