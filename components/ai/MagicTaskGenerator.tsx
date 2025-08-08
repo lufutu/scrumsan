@@ -477,7 +477,7 @@ export function MagicTaskGenerator({
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   rows={6}
-                  className="resize-none"
+                  className="resize-none min-h-[150px] max-h-[300px] overflow-y-auto"
                 />
                 <div className="flex justify-between items-center text-xs text-muted-foreground">
                   <span>{input.length} characters</span>
