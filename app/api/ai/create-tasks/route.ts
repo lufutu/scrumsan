@@ -16,7 +16,7 @@ const createTasksFromAISchema = z.object({
     storyPoints: z.number().nullable().optional(),
     estimatedHours: z.number().nullable().optional(),
     labels: z.array(z.string()).optional(),
-    assigneeId: z.string().uuid().nullable().optional(),
+    assigneeId: z.string().nullable().optional(),
     acceptanceCriteria: z.array(z.string()).optional(),
     sprintRecommendation: z.string().optional(),
     reasoning: z.string().optional()
@@ -118,7 +118,8 @@ export async function POST(req: NextRequest) {
           metadata: {
             aiGenerated: true,
             reasoning: taskData.reasoning,
-            sprintRecommendation: taskData.sprintRecommendation
+            sprintRecommendation: taskData.sprintRecommendation,
+            suggestedAssignee: taskData.assigneeId // Store original suggestion even if not UUID
           }
         },
         include: {
@@ -150,15 +151,33 @@ export async function POST(req: NextRequest) {
         }
       })
 
-      // Handle assignee if specified
+      // Handle assignee if specified (skip if it's not a valid UUID)
       if (taskData.assigneeId) {
-        await prisma.taskAssignee.create({
-          data: {
-            taskId: task.id,
-            userId: taskData.assigneeId,
-            assignedBy: user.id
+        // Check if it's a valid UUID format
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+        if (uuidRegex.test(taskData.assigneeId)) {
+          try {
+            await prisma.taskAssignee.create({
+              data: {
+                taskId: task.id,
+                userId: taskData.assigneeId,
+                assignedBy: user.id
+              }
+            })
+          } catch (error) {
+            logger.warn('Failed to assign user to AI-generated task', {
+              taskId: task.id,
+              assigneeId: taskData.assigneeId,
+              error: error instanceof Error ? error.message : 'Unknown error'
+            })
+            // Don't fail the whole operation for assignment issues
           }
-        })
+        } else {
+          logger.log('AI generated non-UUID assignee, storing as metadata', {
+            taskId: task.id,
+            suggestedAssignee: taskData.assigneeId
+          })
+        }
       }
 
       // Handle labels if specified

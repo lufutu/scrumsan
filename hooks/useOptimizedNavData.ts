@@ -71,7 +71,7 @@ export function useOptimizedNavData(organizationId: string | null) {
     enabled: !!organizationId,
   })
 
-  const { data: allBoards = [], error: boardsError } = useQuery<NavBoard[]>({
+  const { data: boardsResponse = { boards: [] }, error: boardsError } = useQuery<{ boards: NavBoard[] }>({
     queryKey: cacheKeys.boards(organizationId || ''),
     queryFn: () => fetcher(`/api/boards?organizationId=${organizationId}`),
     enabled: !!organizationId,
@@ -93,7 +93,7 @@ export function useOptimizedNavData(organizationId: string | null) {
     )
 
     // Filter out project-linked boards to get standalone boards
-    const standaloneBoards = allBoards.filter(board => 
+    const standaloneBoards = (boardsResponse?.boards || []).filter(board => 
       !projectLinkedBoardIds.has(board.id)
     )
 
@@ -106,11 +106,11 @@ export function useOptimizedNavData(organizationId: string | null) {
       boards: standaloneBoards || [],
       activeSprints: activeSprints || []
     }
-  }, [organizationId, organization, projects, allBoards, activeSprints])
+  }, [organizationId, organization, projects, boardsResponse, activeSprints])
 
   const isLoading = !organizationId || 
     (!projects && !projectsError) || 
-    (!allBoards && !boardsError) || 
+    (!boardsResponse && !boardsError) || 
     (!activeSprints && !sprintsError)
 
   const error = projectsError || boardsError || sprintsError
