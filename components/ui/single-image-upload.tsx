@@ -18,6 +18,7 @@ interface SingleImageUploadProps {
   placeholder?: string;
   showFileName?: boolean;
   aspectRatio?: 'square' | 'landscape' | 'portrait' | 'auto';
+  variant?: 'default' | 'compact';
 }
 
 export function SingleImageUpload({
@@ -31,6 +32,7 @@ export function SingleImageUpload({
   placeholder = 'Upload image',
   showFileName = true,
   aspectRatio = 'square',
+  variant = 'default',
 }: SingleImageUploadProps) {
   const [dragOver, setDragOver] = React.useState(false);
   const [preview, setPreview] = React.useState<string | null>(null);
@@ -143,6 +145,11 @@ export function SingleImageUpload({
 
   // Get aspect ratio classes
   const getAspectRatioClass = () => {
+    // For compact variant, don't apply any size constraints
+    if (variant === 'compact') {
+      return 'aspect-square';
+    }
+    
     switch (aspectRatio) {
       case 'square':
         return 'aspect-square';
@@ -156,7 +163,7 @@ export function SingleImageUpload({
   };
 
   return (
-    <div className={cn('space-y-3', className)}>
+    <div className={cn(variant !== 'compact' && 'space-y-3', className)}>
       {displayImage ? (
         // Image Preview Mode
         <div className="space-y-3">
@@ -165,7 +172,7 @@ export function SingleImageUpload({
               className={cn(
                 'relative overflow-hidden rounded-lg border-2 border-dashed border-gray-200 bg-gray-50',
                 getAspectRatioClass(),
-                'max-w-xs' // Limit width for better UX
+                variant !== 'compact' && 'max-w-xs' // Only limit width for default variant
               )}
             >
               <Image
@@ -216,7 +223,7 @@ export function SingleImageUpload({
           </div>
 
           {/* File info */}
-          {showFileName && fileName && (
+          {showFileName && fileName && variant !== 'compact' && (
             <div className="space-y-1">
               <p className="text-sm font-medium text-gray-900">{fileName}</p>
               {fileSize && (
@@ -257,34 +264,40 @@ export function SingleImageUpload({
               : 'border-gray-300 hover:border-gray-400',
             disabled && 'opacity-50 cursor-not-allowed',
             getAspectRatioClass(),
-            'min-h-[120px]' // Ensure minimum height
+            variant !== 'compact' && 'min-h-[120px]' // Only apply min-height for default variant
           )}
           onDrop={handleDrop}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onClick={handleClick}
         >
-          <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6">
-            <div className={cn(
-              'flex flex-col items-center gap-2',
-              dragOver && 'scale-105 transition-transform'
-            )}>
-              <div className="p-3 rounded-full bg-gray-100">
-                <ImageIcon className="w-6 h-6 text-gray-600" />
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-1">
+            {variant === 'compact' ? (
+              // Compact variant - just show icon
+              <ImageIcon className="w-4 h-4 text-gray-400" />
+            ) : (
+              // Default variant - full upload UI
+              <div className={cn(
+                'flex flex-col items-center gap-2',
+                dragOver && 'scale-105 transition-transform'
+              )}>
+                <div className="p-3 rounded-full bg-gray-100">
+                  <ImageIcon className="w-6 h-6 text-gray-600" />
+                </div>
+                
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-gray-900">
+                    {dragOver ? 'Drop image here' : placeholder}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    Drag & drop or click to browse
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    PNG, JPG, WebP or SVG • Max {maxSize}MB
+                  </p>
+                </div>
               </div>
-              
-              <div className="space-y-1">
-                <p className="text-sm font-medium text-gray-900">
-                  {dragOver ? 'Drop image here' : placeholder}
-                </p>
-                <p className="text-xs text-gray-500">
-                  Drag & drop or click to browse
-                </p>
-                <p className="text-xs text-gray-400">
-                  PNG, JPG, WebP or SVG • Max {maxSize}MB
-                </p>
-              </div>
-            </div>
+            )}
           </div>
         </div>
       )}
