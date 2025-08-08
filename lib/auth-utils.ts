@@ -19,19 +19,48 @@ export async function ensureUserExists(user: User) {
                       user.user_metadata?.picture ||
                       null
 
-    const dbUser = await prisma.user.upsert({
-      where: { id: user.id },
-      create: {
+    // First, check if a user with this email already exists (migration case)
+    const existingUserByEmail = await prisma.user.findUnique({
+      where: { email: user.email! }
+    })
+
+    if (existingUserByEmail) {
+      // User exists with same email but different ID (migration from cloud to self-hosted)
+      if (existingUserByEmail.id !== user.id) {
+        console.log(`Migrating user ${user.email} from ID ${existingUserByEmail.id} to ${user.id}`)
+        
+        // Update the existing user's ID to match the new Supabase auth ID
+        const updatedUser = await prisma.user.update({
+          where: { email: user.email! },
+          data: {
+            id: user.id,  // Update to new Supabase ID
+            fullName,
+            avatarUrl,
+          }
+        })
+        
+        return updatedUser
+      }
+      
+      // User exists with same ID and email, just update metadata
+      const updatedUser = await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          fullName,
+          avatarUrl,
+        }
+      })
+      
+      return updatedUser
+    }
+
+    // No existing user, create new one
+    const dbUser = await prisma.user.create({
+      data: {
         id: user.id,
         email: user.email!,
         fullName,
         avatarUrl,
-      },
-      update: {
-        fullName,
-        avatarUrl,
-        // Update email in case it changed (though unlikely)
-        email: user.email!,
       }
     })
     
