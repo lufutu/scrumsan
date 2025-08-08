@@ -21,6 +21,7 @@
     "db:check-indexes": "node scripts/check-database-indexes.js"
   },
   "dependencies": {
+    "@ai-sdk/openai": "^2.0.5",
     "@atlaskit/pragmatic-drag-and-drop": "^1.7.4",
     "@atlaskit/pragmatic-drag-and-drop-auto-scroll": "^2.1.1",
     "@atlaskit/pragmatic-drag-and-drop-react-drop-indicator": "^3.2.2",
@@ -57,6 +58,7 @@
     "@tanstack/react-query": "^5.83.0",
     "@tanstack/react-query-devtools": "^5.83.0",
     "@tanstack/react-table": "^8.21.3",
+    "ai": "^5.0.8",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
@@ -66,6 +68,7 @@
     "motion": "^12.23.9",
     "next": "15.3.2",
     "next-themes": "^0.4.6",
+    "openai": "^5.12.1",
     "prisma": "^6.12.0",
     "radix-ui": "^1.4.2",
     "react": "^19.0.0",
@@ -76,7 +79,7 @@
     "recharts": "^2.15.3",
     "sonner": "^2.0.3",
     "tailwind-merge": "^3.2.0",
-    "zod": "^3.24.4"
+    "zod": "^4.0.15"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

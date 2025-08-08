@@ -28,6 +28,7 @@ import { GripVertical, Plus, MoreHorizontal, Edit, Trash2, Settings } from 'luci
 import { TaskCardModern } from '@/components/scrum/TaskCardModern'
 import { ComprehensiveInlineForm } from '@/components/scrum/ComprehensiveInlineForm'
 import { ItemModal } from '@/components/scrum/ItemModal'
+import { MagicImportButton } from '@/components/ai/MagicImportButton'
 import { useUsers } from '@/hooks/useUsers'
 import { useLabels } from '@/hooks/useLabels'
 import { useBoardColumns } from '@/hooks/useBoardColumns'
@@ -360,6 +361,22 @@ export default function KanbanBoardView({ board, onUpdate }: KanbanBoardViewProp
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                          <DropdownMenuItem asChild>
+                            <div className="w-full">
+                              <MagicImportButton
+                                boardId={board.id}
+                                boardType="kanban"
+                                organizationId={board.organizationId}
+                                columnId={column.id}
+                                columnName={column.name}
+                                onTasksCreated={() => onUpdate()}
+                                variant="ghost"
+                                size="sm"
+                                className="w-full justify-start h-8 px-2"
+                              />
+                            </div>
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
                           <DropdownMenuItem onClick={() => {
                             const newName = prompt('Enter new column name:', column.name)
                             if (newName && newName.trim()) handleRenameColumn(column.id, newName.trim())

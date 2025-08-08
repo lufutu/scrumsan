@@ -31,6 +31,7 @@ import {
 import { TaskCardModern } from '@/components/scrum/TaskCardModern'
 import { ItemModal } from '@/components/scrum/ItemModal'
 import { ComprehensiveInlineForm } from '@/components/scrum/ComprehensiveInlineForm'
+import { MagicImportButton } from '@/components/ai/MagicImportButton'
 import { DragDropProvider } from '@/components/drag-drop/DragDropProvider'
 import { DragDropAPI } from '@/lib/drag-drop-api'
 import { dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter'
@@ -541,7 +542,17 @@ export default function EnhancedScrumBoard({
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center justify-between">
                   <span>Product Backlog</span>
-                  <Badge variant="secondary">{filteredBacklogTasks.length}</Badge>
+                  <div className="flex items-center gap-2">
+                    <MagicImportButton
+                      boardId={boardId}
+                      boardType="scrum"
+                      organizationId={organizationId || ''}
+                      columnName="Product Backlog"
+                      onTasksCreated={() => window.location.reload()}
+                      size="sm"
+                    />
+                    <Badge variant="secondary">{filteredBacklogTasks.length}</Badge>
+                  </div>
                 </CardTitle>
               </CardHeader>
               <CardContent className="h-full">
