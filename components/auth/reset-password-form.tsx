@@ -32,6 +32,7 @@ export function ResetPasswordForm() {
       const accessToken = searchParams.get('access_token')
       const refreshToken = searchParams.get('refresh_token')
       const type = searchParams.get('type')
+      const code = searchParams.get('code')
 
       if (type === 'recovery' && accessToken && refreshToken) {
         setIsValidToken(true)
@@ -41,13 +42,18 @@ export function ResetPasswordForm() {
           access_token: accessToken,
           refresh_token: refreshToken,
         })
+      } else if (code) {
+        // Handle case where user came directly with code - redirect to callback
+        const callbackUrl = `/auth/callback?code=${code}&returnUrl=${encodeURIComponent('/auth/reset-password')}`
+        router.replace(callbackUrl)
+        return
       } else {
         setIsValidToken(false)
       }
     }
 
     checkTokenValidity()
-  }, [searchParams])
+  }, [searchParams, router])
 
   // Validate password in real-time
   useEffect(() => {

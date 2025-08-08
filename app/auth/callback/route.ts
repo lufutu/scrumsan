@@ -20,6 +20,17 @@ export async function GET(request: Request) {
         return NextResponse.redirect(new URL('/login?error=auth_callback_error', request.url))
       }
 
+      // For password reset flows, redirect with session tokens
+      if (returnUrl?.includes('/auth/reset-password') && data.session) {
+        const resetUrl = new URL('/auth/reset-password', request.url)
+        resetUrl.searchParams.set('access_token', data.session.access_token)
+        resetUrl.searchParams.set('refresh_token', data.session.refresh_token)
+        resetUrl.searchParams.set('type', 'recovery')
+        
+        logger.log('Password reset: redirecting with tokens to', resetUrl.toString())
+        return NextResponse.redirect(resetUrl)
+      }
+
       // If we have a user, ensure they exist in our database
       if (data.user) {
         try {
