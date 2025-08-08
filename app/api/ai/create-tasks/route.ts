@@ -113,13 +113,13 @@ export async function POST(req: NextRequest) {
           sprintColumnId,
           position: nextPosition + i,
           createdBy: user.id,
-          acceptanceCriteria: taskData.acceptanceCriteria || [],
-          // Store AI reasoning in metadata for now
+          // Store AI reasoning and acceptance criteria in metadata
           metadata: {
             aiGenerated: true,
             reasoning: taskData.reasoning,
             sprintRecommendation: taskData.sprintRecommendation,
-            suggestedAssignee: taskData.assigneeId // Store original suggestion even if not UUID
+            suggestedAssignee: taskData.assigneeId, // Store original suggestion even if not UUID
+            acceptanceCriteria: taskData.acceptanceCriteria || [] // Store acceptance criteria in metadata for now
           }
         },
         include: {
@@ -206,6 +206,36 @@ export async function POST(req: NextRequest) {
               labelId: label.id
             }
           })
+        }
+      }
+
+      // Create acceptance criteria as a checklist if provided
+      if (taskData.acceptanceCriteria && taskData.acceptanceCriteria.length > 0) {
+        try {
+          const checklist = await prisma.taskChecklist.create({
+            data: {
+              taskId: task.id,
+              name: 'Acceptance Criteria',
+              createdBy: user.id,
+              items: {
+                create: taskData.acceptanceCriteria.map((criteria, index) => ({
+                  content: criteria,
+                  createdBy: user.id
+                }))
+              }
+            }
+          })
+          logger.log('Created acceptance criteria checklist', {
+            taskId: task.id,
+            checklistId: checklist.id,
+            itemCount: taskData.acceptanceCriteria.length
+          })
+        } catch (checklistError) {
+          logger.warn('Failed to create acceptance criteria checklist', {
+            taskId: task.id,
+            error: checklistError instanceof Error ? checklistError.message : 'Unknown error'
+          })
+          // Don't fail the whole operation for checklist creation issues
         }
       }
 
