@@ -47,6 +47,11 @@ export const AITaskGenerationSchema = z.object({
 // Input schema for validation
 export const AITaskInputSchema = z.object({
   input: z.string().min(10, 'Please provide more detailed requirements').max(10000, 'Input too long'),
+  images: z.array(z.object({
+    data: z.string(), // base64 encoded image data
+    mimeType: z.string(),
+    name: z.string()
+  })).optional().default([]),
   context: z.object({
     boardType: z.enum(['scrum', 'kanban']).optional(),
     boardId: z.string().uuid().optional(),

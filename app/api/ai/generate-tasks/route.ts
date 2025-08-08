@@ -35,6 +35,11 @@ const generateTasksRequestSchema = z.object({
   boardId: z.string().uuid().optional(),
   columnId: z.string().uuid().optional(),
   sprintId: z.string().uuid().optional(),
+  images: z.array(z.object({
+    data: z.string(), // base64 encoded image data
+    mimeType: z.string(),
+    name: z.string()
+  })).optional().default([]),
   options: z.object({
     maxTasks: z.number().min(1).max(20).default(10),
     detailLevel: z.enum(['basic', 'detailed', 'comprehensive']).default('detailed'),
@@ -164,6 +169,11 @@ export async function POST(req: NextRequest) {
         ...aiInput.options,
         ...validatedData.options
       }
+    }
+
+    // Add images if provided
+    if (validatedData.images?.length > 0) {
+      aiInput.images = validatedData.images
     }
 
     // Generate tasks using AI

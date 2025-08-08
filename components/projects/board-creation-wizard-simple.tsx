@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Plus, Kanban, Calendar, Loader2, Sparkles, Upload } from 'lucide-react'
+import { Plus, Kanban, Calendar, Loader2, Sparkles, Upload, ImageIcon, X } from 'lucide-react'
 import { SingleImageUpload } from '@/components/ui/single-image-upload'
 import { MagicTaskGenerator } from '@/components/ai/MagicTaskGenerator'
 import { Textarea } from '@/components/ui/textarea'
@@ -26,6 +26,7 @@ interface WizardData {
   type: BoardType
   useAI: boolean
   aiPrompt: string
+  aiImages: File[]
 }
 
 export default function BoardCreationWizard({ organizationId, onSuccess, children }: BoardCreationWizardProps) {
@@ -39,7 +40,8 @@ export default function BoardCreationWizard({ organizationId, onSuccess, childre
     name: '',
     type: 'kanban',
     useAI: false,
-    aiPrompt: ''
+    aiPrompt: '',
+    aiImages: []
   })
 
   const handleCreateBoard = async () => {
@@ -147,7 +149,8 @@ export default function BoardCreationWizard({ organizationId, onSuccess, childre
       name: '',
       type: 'kanban',
       useAI: false,
-      aiPrompt: ''
+      aiPrompt: '',
+      aiImages: []
     })
     setLogoFile(null)
     setShowMagicGenerator(false)
@@ -164,6 +167,20 @@ export default function BoardCreationWizard({ organizationId, onSuccess, childre
     // Reset wizard and close
     resetWizard()
     onSuccess?.({ id: createdBoardId })
+  }
+
+  const handleAddAIImage = (files: File[]) => {
+    setWizardData(prev => ({
+      ...prev,
+      aiImages: [...prev.aiImages, ...files]
+    }))
+  }
+
+  const handleRemoveAIImage = (index: number) => {
+    setWizardData(prev => ({
+      ...prev,
+      aiImages: prev.aiImages.filter((_, i) => i !== index)
+    }))
   }
 
   return (
@@ -198,15 +215,15 @@ export default function BoardCreationWizard({ organizationId, onSuccess, childre
         <div className="space-y-6">
           <div className="space-y-3">
             <Label htmlFor="boardName">Board Name *</Label>
-            <div className="flex items-center gap-3">
+            <div className="relative">
               <Input
                 id="boardName"
                 placeholder="Enter board name"
                 value={wizardData.name}
                 onChange={(e) => setWizardData(prev => ({ ...prev, name: e.target.value }))}
-                className="flex-1"
+                className="pr-12"
               />
-              <div className="flex-shrink-0">
+              <div className="absolute right-2 top-1/2 -translate-y-1/2">
                 <SingleImageUpload
                   onChange={setLogoFile}
                   accept="image/*"
@@ -214,7 +231,7 @@ export default function BoardCreationWizard({ organizationId, onSuccess, childre
                   disabled={isCreating}
                   placeholder="Logo"
                   variant="compact"
-                  className="w-12 h-12"
+                  className="w-8 h-8"
                 />
               </div>
             </div>
@@ -278,22 +295,87 @@ export default function BoardCreationWizard({ organizationId, onSuccess, childre
                 </p>
                 
                 {wizardData.useAI && (
-                  <Textarea
-                    placeholder="Describe what you want to build (e.g., 'A task management app with user authentication, task creation, and team collaboration features')"
-                    value={wizardData.aiPrompt}
-                    onChange={(e) => setWizardData(prev => ({ ...prev, aiPrompt: e.target.value }))}
-                    rows={3}
-                    className="text-sm"
-                    disabled={isCreating}
-                  />
+                  <div className="space-y-3">
+                    <Textarea
+                      placeholder="Describe what you want to build (e.g., 'A task management app with user authentication, task creation, and team collaboration features')"
+                      value={wizardData.aiPrompt}
+                      onChange={(e) => setWizardData(prev => ({ ...prev, aiPrompt: e.target.value }))}
+                      rows={3}
+                      className="text-sm"
+                      disabled={isCreating}
+                    />
+                    
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-sm font-medium">Reference Images</Label>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={isCreating}
+                          onClick={() => document.getElementById('ai-image-upload')?.click()}
+                          className="h-8 px-2 text-xs"
+                        >
+                          <ImageIcon className="h-3 w-3 mr-1" />
+                          Add Images
+                        </Button>
+                        <input
+                          id="ai-image-upload"
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          className="hidden"
+                          onChange={(e) => {
+                            const files = Array.from(e.target.files || [])
+                            handleAddAIImage(files)
+                            e.target.value = '' // Reset input
+                          }}
+                        />
+                      </div>
+                      
+                      {wizardData.aiImages.length > 0 && (
+                        <div className="grid grid-cols-4 gap-2">
+                          {wizardData.aiImages.map((image, index) => (
+                            <div key={index} className="relative group">
+                              <img
+                                src={URL.createObjectURL(image)}
+                                alt={`Reference ${index + 1}`}
+                                className="w-full h-16 object-cover rounded-md border"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveAIImage(index)}
+                                className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                disabled={isCreating}
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                              <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-xs p-1 rounded-b-md truncate">
+                                {image.name}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      
+                      {wizardData.aiImages.length > 0 && (
+                        <p className="text-xs text-muted-foreground">
+                          Images will help AI understand your requirements better
+                        </p>
+                      )}
+                    </div>
+                  </div>
                 )}
               </div>
             </div>
             
-            {wizardData.useAI && wizardData.aiPrompt && (
+            {wizardData.useAI && (wizardData.aiPrompt || wizardData.aiImages.length > 0) && (
               <div className="flex items-center gap-2 text-xs text-purple-700 bg-purple-100 p-2 rounded">
                 <Sparkles className="h-3 w-3" />
-                <span>AI will generate tasks after board creation</span>
+                <span>
+                  AI will generate tasks after board creation
+                  {wizardData.aiImages.length > 0 && ` using ${wizardData.aiImages.length} reference image${wizardData.aiImages.length > 1 ? 's' : ''}`}
+                </span>
               </div>
             )}
           </div>
@@ -332,16 +414,19 @@ export default function BoardCreationWizard({ organizationId, onSuccess, childre
         {/* Magic Task Generator Modal */}
         {showMagicGenerator && createdBoardId && (
           <MagicTaskGenerator
-            isOpen={showMagicGenerator}
-            onClose={() => {
-              setShowMagicGenerator(false)
-              resetWizard()
-              onSuccess?.({ id: createdBoardId })
+            open={showMagicGenerator}
+            onOpenChange={(open) => {
+              if (!open) {
+                setShowMagicGenerator(false)
+                resetWizard()
+                onSuccess?.({ id: createdBoardId })
+              }
             }}
             boardId={createdBoardId}
             boardType={wizardData.type}
             organizationId={organizationId}
             initialPrompt={wizardData.aiPrompt}
+            initialImages={wizardData.aiImages}
             onTasksCreated={handleAITasksCreated}
           />
         )}

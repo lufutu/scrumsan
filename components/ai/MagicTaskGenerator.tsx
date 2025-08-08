@@ -40,6 +40,21 @@ import { useOptimisticUpdates } from '@/lib/optimistic-updates'
 import { logger } from '@/lib/logger'
 import type { AITask, AITaskGeneration } from '@/lib/ai/schemas'
 
+// Utility function to convert file to base64
+const fileToBase64 = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.readAsDataURL(file)
+    reader.onload = () => {
+      const result = reader.result as string
+      // Remove the data:image/jpeg;base64, prefix to get just the base64 string
+      const base64 = result.split(',')[1]
+      resolve(base64)
+    }
+    reader.onerror = error => reject(error)
+  })
+}
+
 interface MagicTaskGeneratorProps {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -54,6 +69,8 @@ interface MagicTaskGeneratorProps {
   title?: string
   description?: string
   maxTasks?: number
+  initialPrompt?: string
+  initialImages?: File[]
 }
 
 interface TaskPreview extends AITask {
@@ -75,9 +92,12 @@ export function MagicTaskGenerator({
   placeholder = "Describe what you want to build, and I'll break it down into actionable tasks...",
   title = "AI Magic Task Generator",
   description = "Transform your ideas into structured tasks",
-  maxTasks = 10
+  maxTasks = 10,
+  initialPrompt = '',
+  initialImages = []
 }: MagicTaskGeneratorProps) {
-  const [input, setInput] = useState('')
+  const [input, setInput] = useState(initialPrompt)
+  const [images, setImages] = useState<File[]>(initialImages)
   const [isGenerating, setIsGenerating] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
   const [generation, setGeneration] = useState<AITaskGeneration | null>(null)
@@ -91,6 +111,14 @@ export function MagicTaskGenerator({
     suggestAssignees: true
   })
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const handleAddImages = (files: File[]) => {
+    setImages(prev => [...prev, ...files])
+  }
+
+  const handleRemoveImage = (index: number) => {
+    setImages(prev => prev.filter((_, i) => i !== index))
+  }
 
   const handleGenerate = async () => {
     if (!input.trim()) {
@@ -111,8 +139,18 @@ export function MagicTaskGenerator({
       logger.log('Magic Task Generator: Starting generation', {
         inputLength: input.length,
         boardType,
-        maxTasks: options.maxTasks
+        maxTasks: options.maxTasks,
+        imageCount: images.length
       })
+
+      // Convert images to base64
+      const imageData = await Promise.all(
+        images.map(async (file) => ({
+          data: await fileToBase64(file),
+          mimeType: file.type,
+          name: file.name
+        }))
+      )
 
       const response = await fetch('/api/ai/generate-tasks', {
         method: 'POST',
@@ -125,6 +163,7 @@ export function MagicTaskGenerator({
           boardId,
           columnId,
           sprintId,
+          images: imageData,
           options
         })
       })

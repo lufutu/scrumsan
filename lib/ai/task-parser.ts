@@ -23,8 +23,12 @@ export class AITaskParser {
 
       const prompt = this.buildPrompt(input)
       
+      // Use different model and approach if images are provided
+      const hasImages = input.images && input.images.length > 0
+      const modelToUse = hasImages ? openai('gpt-4o') : this.model // gpt-4o supports vision
+      
       const { object } = await generateObject({
-        model: this.model,
+        model: modelToUse,
         schema: AITaskGenerationSchema,
         prompt,
         temperature: 0.7, // Balance creativity with consistency
@@ -74,6 +78,10 @@ CONTEXT:
 
     if (context.constraints) {
       prompt += `\n- Constraints: ${context.constraints}`
+    }
+
+    if (input.images && input.images.length > 0) {
+      prompt += `\n- Reference Images: ${input.images.length} image(s) provided showing UI mockups, wireframes, or design requirements`
     }
 
     prompt += `
