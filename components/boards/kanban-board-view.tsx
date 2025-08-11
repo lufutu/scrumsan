@@ -34,6 +34,8 @@ import { useLabels } from '@/hooks/useLabels'
 import { useBoardColumns } from '@/hooks/useBoardColumns'
 import { useSupabase } from '@/providers/supabase-provider'
 import { useOrganization } from '@/providers/organization-provider'
+import { MultiSelectProvider, useMultiSelect } from '@/providers/multi-select-provider'
+import { BulkActionsToolbar } from '@/components/boards/bulk-actions-toolbar'
 import { Task } from '@/types/shared'
 import { toast } from 'sonner'
 // Removed @hello-pangea/dnd imports - migrated to Pragmatic D&D
@@ -78,7 +80,7 @@ interface KanbanBoardViewProps {
   onUpdate: () => void
 }
 
-export default function KanbanBoardView({ board, onUpdate }: KanbanBoardViewProps) {
+function KanbanBoardViewInner({ board, onUpdate }: KanbanBoardViewProps) {
   const { toast: uiToast } = useToast()
   const { user } = useSupabase()
   const { currentMember } = useOrganization()
@@ -289,12 +291,19 @@ export default function KanbanBoardView({ board, onUpdate }: KanbanBoardViewProp
   if (localBoard.boardType === 'scrum' && localBoard.columns) {
     return (
       <div className="h-full">
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-4">
           <div>
             <h2 className="text-2xl font-bold">{board.name}</h2>
             <p className="text-muted-foreground">Scrum board</p>
           </div>
-          {canEditBoard && (
+          <div className="flex items-center gap-2">
+            <BulkActionsToolbar 
+              boardId={board.id} 
+              onRefresh={onUpdate}
+              totalTasks={localBoard.columns?.reduce((total, col) => total + col.tasks.length, 0) || 0}
+              allTasks={localBoard.columns?.flatMap(col => col.tasks) || []}
+            />
+            {canEditBoard && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm">
@@ -338,7 +347,8 @@ export default function KanbanBoardView({ board, onUpdate }: KanbanBoardViewProp
                 </BoardDeleteDialog>
               </DropdownMenuContent>
             </DropdownMenu>
-          )}
+            )}
+          </div>
         </div>
         
         <div className="flex gap-6 h-full min-h-96 overflow-x-auto">
@@ -559,7 +569,7 @@ export default function KanbanBoardView({ board, onUpdate }: KanbanBoardViewProp
   // Kanban board implementation
   return (
     <div className="h-full">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-4">
         <div>
           <h2 className="text-2xl font-bold">{board.name}</h2>
           <p className="text-muted-foreground">
@@ -567,13 +577,21 @@ export default function KanbanBoardView({ board, onUpdate }: KanbanBoardViewProp
           </p>
         </div>
         
-        <Button 
-          onClick={() => setIsAddColumnOpen(true)}
-          className="bg-blue-600 hover:bg-blue-700"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Add Column
-        </Button>
+        <div className="flex items-center gap-2">
+          <BulkActionsToolbar 
+            boardId={board.id} 
+            onRefresh={onUpdate}
+            totalTasks={localBoard.columns?.reduce((total, col) => total + col.tasks.length, 0) || 0}
+            allTasks={localBoard.columns?.flatMap(col => col.tasks) || []}
+          />
+          <Button 
+            onClick={() => setIsAddColumnOpen(true)}
+            className="bg-blue-600 hover:bg-blue-700"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Column
+          </Button>
+        </div>
       </div>
 
       <div className="flex gap-6 h-full min-h-96 overflow-x-auto">
@@ -836,5 +854,13 @@ export default function KanbanBoardView({ board, onUpdate }: KanbanBoardViewProp
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  )
+}
+
+export default function KanbanBoardView(props: KanbanBoardViewProps) {
+  return (
+    <MultiSelectProvider>
+      <KanbanBoardViewInner {...props} />
+    </MultiSelectProvider>
   )
 } 

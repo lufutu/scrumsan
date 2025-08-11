@@ -32,6 +32,8 @@ import { TaskCardModern } from '@/components/scrum/TaskCardModern'
 import { ItemModal } from '@/components/scrum/ItemModal'
 import { ComprehensiveInlineForm } from '@/components/scrum/ComprehensiveInlineForm'
 import { MagicImportButton } from '@/components/ai/MagicImportButton'
+import { MultiSelectProvider } from '@/providers/multi-select-provider'
+import { BulkActionsToolbar } from '@/components/boards/bulk-actions-toolbar'
 import { DragDropProvider } from '@/components/drag-drop/DragDropProvider'
 import { DragDropAPI } from '@/lib/drag-drop-api'
 import { dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter'
@@ -95,7 +97,7 @@ const PragmaticDropZone = ({
   )
 }
 
-export default function EnhancedScrumBoard({ 
+function EnhancedScrumBoardInner({ 
   projectId, 
   boardId, 
   organizationId 
@@ -403,13 +405,19 @@ export default function EnhancedScrumBoard({
     >
       <div className="h-full flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-4">
           <div>
             <h1 className="text-2xl font-bold">Scrum Board</h1>
             <p className="text-muted-foreground">Product Backlog & Sprint Execution</p>
           </div>
           
           <div className="flex items-center gap-2">
+            <BulkActionsToolbar 
+              boardId={boardId}
+              onRefresh={fetchData}
+              totalTasks={filteredBacklogTasks.length + (activeSprint ? columns.reduce((total, col) => total + (col.tasks?.length || 0), 0) : 0)}
+              allTasks={[...filteredBacklogTasks, ...(activeSprint ? columns.flatMap(col => col.tasks || []) : [])]}
+            />
             {!activeSprint ? (
               <Dialog open={isCreateSprintOpen} onOpenChange={setIsCreateSprintOpen}>
                 <DialogTrigger asChild>
@@ -714,5 +722,13 @@ export default function EnhancedScrumBoard({
         />
       )}
     </DragDropProvider>
+  )
+}
+
+export default function EnhancedScrumBoard(props: EnhancedScrumBoardProps) {
+  return (
+    <MultiSelectProvider>
+      <EnhancedScrumBoardInner {...props} />
+    </MultiSelectProvider>
   )
 }

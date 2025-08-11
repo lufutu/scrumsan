@@ -23,6 +23,8 @@ import {
   CheckSquare,
   Square
 } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { useMultiSelect } from '@/providers/multi-select-provider';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -76,6 +78,11 @@ export function TaskCardModern({
   sprintColumnId,
   isDragging = false
 }: ExtendedTaskCardModernProps) {
+  const { 
+    isMultiSelectMode, 
+    isTaskSelected, 
+    toggleTaskSelection 
+  } = useMultiSelect();
 
   // Get boardId from task data or props
   const taskBoardId = (boardId || (typeof window !== 'undefined' && window.location.pathname.includes('/boards/')
@@ -699,20 +706,51 @@ export function TaskCardModern({
     }
   };
 
+  const isSelected = isMultiSelectMode && isTaskSelected(id);
+
+  const handleCardClick = (e: React.MouseEvent) => {
+    if (isMultiSelectMode) {
+      e.preventDefault();
+      e.stopPropagation();
+      toggleTaskSelection(id, e.shiftKey);
+    } else {
+      onClick?.();
+    }
+  };
+
+  const handleCheckboxChange = (checked: boolean) => {
+    toggleTaskSelection(id);
+  };
+
   return (
     <>
       <DraggableCard isDragging={isDragging || false} className="w-full">
       <div
         ref={dragRef}
         className={cn(
-          "group bg-white rounded-lg border border-gray-200 hover:shadow-md transition-all cursor-pointer",
+          "group relative bg-white rounded-lg border border-gray-200 hover:shadow-md transition-all cursor-pointer",
           "shadow-sm hover:shadow-lg hover:-translate-y-0.5 transform duration-200 ease-out",
-          status === 'done' && "opacity-75"
+          status === 'done' && "opacity-75",
+          isSelected && "ring-2 ring-primary ring-offset-2 bg-primary/5"
         )}
-        onClick={onClick}
+        onClick={handleCardClick}
       >
+      {/* Checkbox for multi-select mode */}
+      {isMultiSelectMode && (
+        <div className="absolute top-3 left-3 z-10" onClick={(e) => e.stopPropagation()}>
+          <Checkbox
+            checked={isSelected}
+            onCheckedChange={handleCheckboxChange}
+            className="h-5 w-5"
+          />
+        </div>
+      )}
+      
       {/* Task Header with Icon, Title, and Assignees */}
-      <div className="flex items-start justify-between p-3 pb-2">
+      <div className={cn(
+        "flex items-start justify-between p-3 pb-2",
+        isMultiSelectMode && "pl-11"
+      )}>
         <div className="flex items-center gap-2 flex-1 min-w-0">
           <div className={cn(
             "w-6 h-6 rounded flex items-center justify-center text-white text-sm flex-shrink-0",
